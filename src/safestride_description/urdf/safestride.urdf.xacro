@@ -1,0 +1,99 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="safestride">
+  <!-- Replace these measured values before using odometry on the real walker. -->
+  <xacro:arg name="wheel_radius" default="0.15"/>
+  <xacro:arg name="wheel_separation" default="0.55"/>
+  <xacro:arg name="wheel_width" default="0.04"/>
+
+  <xacro:property name="wheel_radius" value="$(arg wheel_radius)"/>
+  <xacro:property name="wheel_separation" value="$(arg wheel_separation)"/>
+  <xacro:property name="wheel_width" value="$(arg wheel_width)"/>
+
+  <material name="frame_gray">
+    <color rgba="0.35 0.38 0.42 1.0"/>
+  </material>
+  <material name="wheel_black">
+    <color rgba="0.03 0.03 0.03 1.0"/>
+  </material>
+
+  <link name="base_footprint"/>
+
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0.28" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.40 ${wheel_separation + 0.08} 0.56"/>
+      </geometry>
+      <material name="frame_gray"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.28" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.40 ${wheel_separation + 0.08} 0.56"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 0.28" rpy="0 0 0"/>
+      <mass value="20.0"/>
+      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+    </inertial>
+  </link>
+
+  <xacro:macro name="wheel" params="side y">
+    <link name="${side}_wheel_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="${pi / 2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <material name="wheel_black"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${pi / 2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="1.0"/>
+        <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.01"/>
+      </inertial>
+    </link>
+    <joint name="${side}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${side}_wheel_link"/>
+      <origin xyz="0 ${y} 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:wheel side="left" y="${wheel_separation / 2}"/>
+  <xacro:wheel side="right" y="${-wheel_separation / 2}"/>
+
+  <link name="imu_link"/>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0.35" rpy="0 0 0"/>
+  </joint>
+
+  <link name="front_left_range_link"/>
+  <joint name="front_left_range_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="front_left_range_link"/>
+    <origin xyz="0.21 0.18 0.08" rpy="0 0 0"/>
+  </joint>
+
+  <link name="front_right_range_link"/>
+  <joint name="front_right_range_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="front_right_range_link"/>
+    <origin xyz="0.21 -0.18 0.08" rpy="0 0 0"/>
+  </joint>
+</robot>
