@@ -1,0 +1,6 @@
+uint8 STOW=0
+uint8 DEPLOY=1
+uint8 command
+---
+bool accepted
+string message

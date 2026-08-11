@@ -1,0 +1,21 @@
+[Unit]
+Description=SafeStride ROS 2 Jazzy stack
+After=network-online.target dev-safestride\x2ddrive.device
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=CHANGE_ME_USER
+Group=CHANGE_ME_GROUP
+SupplementaryGroups=dialout video
+EnvironmentFile=/etc/safestride/safestride.env
+ExecStart=/usr/bin/bash ${SAFESTRIDE_WORKSPACE}/scripts/run.sh
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=5
+KillSignal=SIGINT
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

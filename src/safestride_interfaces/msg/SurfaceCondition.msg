@@ -1,0 +1,13 @@
+std_msgs/Header header
+uint8 UNKNOWN=0
+uint8 SMOOTH=1
+uint8 ROUGH=2
+uint8 WET=3
+uint8 GRAVEL=4
+uint8 STEP=5
+uint8 HOLE=6
+uint8 classification
+float32 confidence
+float32 recommended_speed_scale
+bool valid
+string model_version

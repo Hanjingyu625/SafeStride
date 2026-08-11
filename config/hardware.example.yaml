@@ -1,0 +1,35 @@
+schema_version: 1
+computers:
+  drive_uno:
+    serial_by_id: /dev/serial/by-id/CHANGE_ME_DRIVE_UNO
+    baudrate: 115200
+  terrain_uno:
+    serial_by_id: /dev/serial/by-id/CHANGE_ME_TERRAIN_UNO
+    baudrate: 115200
+  gps:
+    device: /dev/serial/by-id/CHANGE_ME_BE220
+    baudrate: 115200
+drive:
+  motor_output_enabled: false
+  wheel_radius_m: 0.15
+  wheel_separation_m: 0.55
+  encoder_counts_per_revolution: 1024
+  pressure:
+    left_pressed_threshold: null
+    right_pressed_threshold: null
+terrain:
+  leg_output_enabled: false
+  tof:
+    interface: CHANGE_ME_I2C_OR_UART
+    mount_height_m: null
+    mount_pitch_deg: null
+  leg:
+    motion_timeout_s: 4.0
+    max_deploy_wheel_speed_mps: 0.03
+    require_retracted_limit: true
+    require_deployed_limit: true
+perception:
+  model_path: models/road_surface.onnx
+  model_sha256: CHANGE_ME
+  confidence_threshold: 0.65
+  unknown_speed_scale: 0.0

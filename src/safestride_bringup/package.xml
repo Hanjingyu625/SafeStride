@@ -16,6 +16,7 @@
   <exec_depend>safestride_control</exec_depend>
   <exec_depend>safestride_bridge</exec_depend>
   <exec_depend>safestride_description</exec_depend>
+  <exec_depend>safestride_interfaces</exec_depend>
   <exec_depend>xacro</exec_depend>
 
   <export>

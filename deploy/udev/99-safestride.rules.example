@@ -1,0 +1,5 @@
+# Replace each CHANGE_ME value using: udevadm info -a -n /dev/ttyACM0
+# Match serial numbers as well as VID/PID so two Uno boards never swap roles.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="CHANGE_ME", ATTRS{idProduct}=="CHANGE_ME", ATTRS{serial}=="CHANGE_ME_DRIVE", SYMLINK+="safestride-drive", GROUP="dialout", MODE="0660"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="CHANGE_ME", ATTRS{idProduct}=="CHANGE_ME", ATTRS{serial}=="CHANGE_ME_TERRAIN", SYMLINK+="safestride-terrain", GROUP="dialout", MODE="0660"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="CHANGE_ME", ATTRS{idProduct}=="CHANGE_ME", ATTRS{serial}=="CHANGE_ME_GPS", SYMLINK+="safestride-gps", GROUP="dialout", MODE="0660"

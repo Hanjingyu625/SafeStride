@@ -21,3 +21,15 @@ firmware/**/build/
 *.elf
 *.hex
 
+# Runtime data and large model artifacts
+.env
+*.bag
+*.db3
+models/*.pt
+models/*.onnx
+data/external/**
+!data/external/.gitkeep
+data/generated/**
+!data/generated/.gitkeep
+logs/**
+!logs/.gitkeep
