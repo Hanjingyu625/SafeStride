@@ -102,7 +102,7 @@ test/                        PC에서 실행하는 펌웨어 테스트
 |---|---|
 | `safestride_interfaces` | `WalkerStatus`, `TerrainStatus`, `SurfaceCondition`, `HandlePressure` 메시지와 `SetLegState` 서비스를 정의한다. |
 | `safestride_bridge` | Drive Uno와 USB serial로 통신하고 MCU 텔레메트리를 표준 ROS 토픽으로 변환한다. |
-| `safestride_control` | 입력 속도 명령에 timeout, 거리, deadman, fault와 가감속 제한을 적용한다. |
+| `safestride_control` | 일반 속도 명령에 timeout, 거리, deadman, fault와 가감속 제한을 적용한다. |
 | `safestride_sensors` | BE-220 GPS의 NMEA 파싱 코드다. ROS GPS 노드는 아직 없다. |
 | `safestride_perception` | 노면 분류 결과를 보수적인 속도 배율로 바꾸는 정책이다. 카메라·YOLO 실행 노드는 아직 없다. |
 | `safestride_terrain` | 지형 센서, 양손 감지, 바퀴 속도와 limit 상태를 이용해 다리 전개 가능 여부를 판단한다. ROS/Uno 연결 노드는 아직 없다. |
@@ -121,8 +121,8 @@ Python ROS 패키지 내부의 `resource/`는 ROS 패키지 검색 등록용이�
 
 | 이름 | 형식 | 발행자 -> 구독자 | 역할 |
 |---|---|---|---|
-| `/cmd_vel_intent` | `geometry_msgs/msg/Twist` | 조이스틱·상위 제어 -> Safety Supervisor | 사용자의 원래 주행 의도다. 직접 모터로 전달되지 않는다. |
-| `/cmd_vel_safe` | `geometry_msgs/msg/Twist` | Safety Supervisor -> Serial Bridge | 모든 ROS 안전 검사를 통과한 최종 속도 명령이다. |
+| `/cmd_vel` | `geometry_msgs/msg/TwistStamped` | ROS -> Safety Supervisor | 일반 주행 속도 명령이다. |
+| `/cmd_vel_safe` | `geometry_msgs/msg/TwistStamped` | Safety Supervisor -> Serial Bridge | 안전 검사를 통과해 Drive Uno로 전달되는 속도 명령이다. |
 | `/joint_states` | `sensor_msgs/msg/JointState` | Serial Bridge -> ROS | 좌우 바퀴 엔코더의 위치와 속도다. |
 | `/odom` | `nav_msgs/msg/Odometry` | Serial Bridge -> ROS | 엔코더로 계산한 보행기 위치와 속도다. |
 | `/range/front_left` | `sensor_msgs/msg/Range` | Serial Bridge -> Safety Supervisor | 왼쪽 전방 거리다. 토픽은 구현됐지만 실제 센서 드라이버는 아직 없다. |

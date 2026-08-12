@@ -59,7 +59,6 @@ bool g_have_command_sequence = false;
 uint16_t g_active_command_ttl_ms = cfg::COMMAND_WATCHDOG_MAX_MS;
 uint32_t g_last_valid_command_ms = 0UL;
 uint32_t g_last_session_activity_ms = 0UL;
-uint8_t g_neutral_arm_count = 0U;
 bool g_stationary_tracking = false;
 uint32_t g_stationary_since_ms = 0UL;
 
@@ -160,7 +159,6 @@ uint32_t makeBootId() {
 void immediateStop(ControllerState state, bool watchdog_timeout) {
   g_left_requested_mrad_s = 0L;
   g_right_requested_mrad_s = 0L;
-  g_neutral_arm_count = 0U;
   g_watchdog_timed_out = watchdog_timeout;
   g_state = state;
   g_drive.disableImmediately();
@@ -178,7 +176,6 @@ void clearSession() {
   g_session_id = 0UL;
   g_valid_command_seen = false;
   g_have_command_sequence = false;
-  g_neutral_arm_count = 0U;
   g_last_hello_ms = millis() - cfg::HELLO_PERIOD_MS;
 }
 
@@ -189,7 +186,6 @@ void invalidateSessionForWatchdog() {
   g_session_id = 0UL;
   g_valid_command_seen = false;
   g_have_command_sequence = false;
-  g_neutral_arm_count = 0U;
   g_last_hello_ms = millis() - cfg::HELLO_PERIOD_MS;
 }
 
@@ -340,13 +336,6 @@ void sendTelemetry() {
       sizeof(payload));
 }
 
-bool neutralTargets(int32_t left, int32_t right) {
-  return left >= -cfg::ARM_NEUTRAL_THRESHOLD_MRAD_S &&
-         left <= cfg::ARM_NEUTRAL_THRESHOLD_MRAD_S &&
-         right >= -cfg::ARM_NEUTRAL_THRESHOLD_MRAD_S &&
-         right <= cfg::ARM_NEUTRAL_THRESHOLD_MRAD_S;
-}
-
 bool stationaryDwellMet() {
   return g_stationary_tracking &&
          elapsedMs(millis(), g_stationary_since_ms) >=
@@ -450,23 +439,17 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
       g_state == ControllerState::ESTOP ||
       g_state == ControllerState::SAFE_STOP ||
       g_state == ControllerState::FAULT) {
-    g_neutral_arm_count = 0U;
     return false;
   }
 
   if (g_state == ControllerState::DISARMED) {
-    if (!neutralTargets(left, right) || !stationaryDwellMet()) {
-      g_neutral_arm_count = 0U;
+    if (!stationaryDwellMet()) {
       return false;
     }
     markAcceptedCommand(frame, ttl_ms);
-    ++g_neutral_arm_count;
-    if (g_neutral_arm_count >= cfg::ARM_NEUTRAL_COMMANDS_REQUIRED) {
-      g_neutral_arm_count = cfg::ARM_NEUTRAL_COMMANDS_REQUIRED;
-      g_state = ControllerState::ARMED;
-    }
-    g_left_requested_mrad_s = 0L;
-    g_right_requested_mrad_s = 0L;
+    g_state = ControllerState::ARMED;
+    g_left_requested_mrad_s = left;
+    g_right_requested_mrad_s = right;
     return true;
   }
 

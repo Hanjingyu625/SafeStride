@@ -28,8 +28,6 @@ constexpr uint16_t COMMAND_TTL_MIN_MS = 20U;
 constexpr int32_t MAX_WHEEL_TARGET_MRAD_S = 3000L;
 constexpr int32_t MAX_ACCEL_MRAD_S2 = 1200L;
 constexpr int32_t MAX_DECEL_MRAD_S2 = 2500L;
-constexpr int32_t ARM_NEUTRAL_THRESHOLD_MRAD_S = 20L;
-constexpr uint8_t ARM_NEUTRAL_COMMANDS_REQUIRED = 3U;
 constexpr int32_t ARM_MAX_MEASURED_SPEED_MRAD_S = 100L;
 constexpr uint16_t ARM_STATIONARY_DWELL_MS = 250U;
 
@@ -138,9 +136,6 @@ static_assert(
 static_assert(
     COMMAND_WATCHDOG_MAX_MS >= COMMAND_TTL_MIN_MS,
     "command TTL range is invalid");
-static_assert(
-    ARM_NEUTRAL_COMMANDS_REQUIRED > 0U,
-    "at least one neutral command must be required to arm");
 static_assert(
     ARM_MAX_MEASURED_SPEED_MRAD_S >= 0L,
     "arming stationary-speed threshold must not be negative");

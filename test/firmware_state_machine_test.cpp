@@ -115,6 +115,28 @@ int main() {
   assert(!g_watchdog_timed_out);
   assert(g_state == ControllerState::DISARMED);
 
+  // Once the wheels have remained stationary for the configured dwell, the
+  // first enabled motion command must be accepted.
+  g_stationary_tracking = true;
+  g_stationary_since_ms =
+      g_test_millis - cfg::ARM_STATIONARY_DWELL_MS;
+  proto::writeI32(command_payload + 0U, 500L);
+  proto::writeI32(command_payload + 4U, 600L);
+  command_payload[10U] = 1U;
+  proto::FrameView motion_enable_command = {
+      proto::TYPE_COMMAND,
+      0U,
+      15U,
+      proto::COMMAND_PAYLOAD_SIZE,
+      g_session_id,
+      g_test_millis,
+      command_payload,
+  };
+  assert(handleCommand(motion_enable_command));
+  assert(g_state == ControllerState::ARMED);
+  assert(g_left_requested_mrad_s == 500L);
+  assert(g_right_requested_mrad_s == 600L);
+
   printf("firmware watchdog/session state-machine tests: OK\n");
   return 0;
 }

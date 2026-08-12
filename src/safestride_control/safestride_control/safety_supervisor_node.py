@@ -17,11 +17,7 @@ from rclpy.qos import (
 from sensor_msgs.msg import Range
 
 from safestride_interfaces.msg import WalkerStatus
-from .safety_logic import (
-    PostArmNeutralGate,
-    apply_command_deadband,
-    finite_parameter,
-)
+from .safety_logic import finite_parameter
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -46,8 +42,6 @@ class SafetySupervisor(Node):
         self.declare_parameter('range_timeout', 0.35)
         self.declare_parameter('require_range_sensors', True)
         self.declare_parameter('require_deadman', True)
-        self.declare_parameter('arm_neutral_linear_threshold', 0.01)
-        self.declare_parameter('arm_neutral_angular_threshold', 0.02)
 
         self.declare_parameter('max_forward_velocity', 0.15)
         self.declare_parameter('max_reverse_velocity', 0.08)
@@ -60,7 +54,7 @@ class SafetySupervisor(Node):
         self.declare_parameter('stop_distance', 0.35)
         self.declare_parameter('slow_distance', 0.80)
 
-        self.declare_parameter('intent_topic', '/cmd_vel_intent')
+        self.declare_parameter('command_topic', '/cmd_vel')
         self.declare_parameter('safe_command_topic', '/cmd_vel_safe')
         self.declare_parameter('left_range_topic', '/range/front_left')
         self.declare_parameter('right_range_topic', '/range/front_right')
@@ -116,23 +110,6 @@ class SafetySupervisor(Node):
         self._require_deadman = bool(
             self.get_parameter('require_deadman').value
         )
-        self._arm_neutral_linear_threshold = finite_parameter(
-            'arm_neutral_linear_threshold',
-            self.get_parameter(
-                'arm_neutral_linear_threshold'
-            ).value,
-            minimum=0.0,
-            maximum=1.0,
-        )
-        self._arm_neutral_angular_threshold = finite_parameter(
-            'arm_neutral_angular_threshold',
-            self.get_parameter(
-                'arm_neutral_angular_threshold'
-            ).value,
-            minimum=0.0,
-            maximum=5.0,
-        )
-
         self._max_forward = finite_parameter(
             'max_forward_velocity',
             self.get_parameter('max_forward_velocity').value,
@@ -203,7 +180,6 @@ class SafetySupervisor(Node):
 
         self._last_command: Optional[TwistStamped] = None
         self._last_command_time: Optional[float] = None
-        self._command_generation = 0
         self._last_status: Optional[WalkerStatus] = None
         self._last_status_time: Optional[float] = None
         self._ranges: Dict[str, Dict[str, object]] = {
@@ -225,11 +201,6 @@ class SafetySupervisor(Node):
         self._last_diagnostic_time = -math.inf
         self._last_log_summary = ''
         self._command_output_suppressed = False
-        self._armed_status_active = False
-        self._post_arm_gate = PostArmNeutralGate(
-            self._arm_neutral_linear_threshold,
-            self._arm_neutral_angular_threshold,
-        )
 
         status_qos = QoSProfile(
             history=HistoryPolicy.KEEP_LAST,
@@ -240,7 +211,7 @@ class SafetySupervisor(Node):
 
         self.create_subscription(
             TwistStamped,
-            str(self.get_parameter('intent_topic').value),
+            str(self.get_parameter('command_topic').value),
             self._command_callback,
             10,
         )
@@ -291,20 +262,10 @@ class SafetySupervisor(Node):
     def _command_callback(self, msg: TwistStamped) -> None:
         self._last_command = msg
         self._last_command_time = self._now_seconds()
-        self._command_generation += 1
 
     def _status_callback(self, msg: WalkerStatus) -> None:
         self._last_status = msg
         self._last_status_time = self._now_seconds()
-        armed_now = (
-            msg.state == WalkerStatus.STATE_ARMED
-            and bool(msg.armed)
-        )
-        if not armed_now or not self._armed_status_active:
-            self._post_arm_gate.require_new_neutral(
-                self._command_generation
-            )
-        self._armed_status_active = armed_now
 
     def _range_callback(self, side: str, msg: Range) -> None:
         distance = float(msg.range)
@@ -470,19 +431,6 @@ class SafetySupervisor(Node):
         )
         if not finite_input:
             return 0.0, 0.0, ['nonfinite_command']
-        if not self._post_arm_gate.observe(
-            self._command_generation,
-            requested_linear,
-            requested_angular,
-        ):
-            return 0.0, 0.0, ['awaiting_post_arm_neutral']
-        requested_linear, requested_angular = apply_command_deadband(
-            requested_linear,
-            requested_angular,
-            self._arm_neutral_linear_threshold,
-            self._arm_neutral_angular_threshold,
-        )
-
         linear = _clamp(
             requested_linear, -self._max_reverse, self._max_forward
         )
@@ -532,15 +480,16 @@ class SafetySupervisor(Node):
         hard_stop_reasons.extend(self._status_reasons(now))
         range_reasons, distances, range_scales = self._range_state(now)
         hard_stop_reasons.extend(range_reasons)
+        motion_stop_reasons = [
+            reason for reason in hard_stop_reasons
+            if reason != 'disarmed'
+        ]
 
         operating_notes: List[str] = []
-        if hard_stop_reasons:
+        if motion_stop_reasons:
             # Stale or unsafe state must never coast on the last valid command.
             self._output_linear = 0.0
             self._output_angular = 0.0
-            self._post_arm_gate.require_new_neutral(
-                self._command_generation
-            )
         else:
             desired_linear, desired_angular, operating_notes = (
                 self._desired_command(range_scales)
@@ -549,9 +498,6 @@ class SafetySupervisor(Node):
                 # Stop-zone entry is immediate and requires release-to-resume.
                 self._output_linear = 0.0
                 self._output_angular = 0.0
-                self._post_arm_gate.require_new_neutral(
-                    self._command_generation
-                )
             else:
                 self._output_linear = self._slew(
                     self._output_linear,
@@ -568,10 +514,10 @@ class SafetySupervisor(Node):
                     dt,
                 )
 
-        # A clean DISARMED state needs a stream of zero commands so the
-        # operator can explicitly arm. Other invalid/stale inputs publish one
-        # immediate zero and then go silent, forcing the bridge timeout to
-        # disarm the MCU. Recovery therefore cannot resume motion by itself.
+        # Keep forwarding a valid supervised command while DISARMED so an
+        # explicit enable request can activate the controller. Other invalid
+        # or stale inputs publish one immediate zero and then go silent,
+        # forcing the bridge timeout to disarm the MCU.
         may_stream_command = (
             not hard_stop_reasons
             or set(hard_stop_reasons).issubset({'disarmed'})
@@ -648,10 +594,6 @@ class SafetySupervisor(Node):
             KeyValue(
                 key='command_output_suppressed',
                 value=_bool_text(self._command_output_suppressed),
-            ),
-            KeyValue(
-                key='post_arm_neutral_seen',
-                value=_bool_text(self._post_arm_gate.neutral_seen),
             ),
             KeyValue(
                 key='command_age_s',

@@ -98,13 +98,9 @@ class SerialBridgeNode(Node):
         self._last_command_time: Optional[float] = None
         self._target_linear = 0.0
         self._target_angular = 0.0
-        self._command_generation = 0
         self._command_timed_out = True
-        self._arm_neutral_remaining = 0
         self._arm_confirmed = False
         self._arm_confirmation_deadline: Optional[float] = None
-        self._post_arm_neutral_generation = 0
-        self._post_arm_neutral_seen = False
 
         self._last_telemetry_time: Optional[float] = None
         self._last_telemetry: Optional[TelemetryPayload] = None
@@ -180,7 +176,6 @@ class SerialBridgeNode(Node):
             ('command.publish_rate_hz', 50.0),
             ('command.timeout_s', 0.20),
             ('command.ttl_ms', 200),
-            ('command.arm_neutral_cycles', 5),
             ('command.arm_max_wheel_speed_rad_s', 0.10),
             ('command.arm_confirmation_timeout_s', 1.0),
             ('telemetry.timeout_s', 0.30),
@@ -272,12 +267,6 @@ class SerialBridgeNode(Node):
             self._value('command.ttl_ms'),
             minimum=20,
             maximum=250,
-        )
-        self._arm_neutral_cycles = bounded_int(
-            'command.arm_neutral_cycles',
-            self._value('command.arm_neutral_cycles'),
-            minimum=1,
-            maximum=100,
         )
         self._arm_max_wheel_speed = finite_float(
             'command.arm_max_wheel_speed_rad_s',
@@ -479,11 +468,8 @@ class SerialBridgeNode(Node):
 
     def _clear_enable_request(self) -> None:
         self._enabled_requested = False
-        self._arm_neutral_remaining = 0
         self._arm_confirmed = False
         self._arm_confirmation_deadline = None
-        self._post_arm_neutral_generation = self._command_generation
-        self._post_arm_neutral_seen = False
 
     def _reset_link_state(self) -> None:
         self._session_id = 0
@@ -617,10 +603,6 @@ class SerialBridgeNode(Node):
             else:
                 self._arm_confirmed = True
                 self._arm_confirmation_deadline = None
-                self._post_arm_neutral_generation = (
-                    self._command_generation
-                )
-                self._post_arm_neutral_seen = False
         elif self._arm_confirmed and not controller_armed:
             self._clear_enable_request()
             self.get_logger().warning(
@@ -730,7 +712,6 @@ class SerialBridgeNode(Node):
             self._target_linear = linear
             self._target_angular = angular
             self._last_command_time = self._now_monotonic()
-            self._command_generation += 1
             self._command_timed_out = False
 
     def _on_set_enabled(self, request, response):
@@ -807,15 +788,6 @@ class SerialBridgeNode(Node):
             response.success = False
             response.message = 'cannot enable: dead-man switch is not active'
             return response
-        if (
-            abs(self._target_linear) > 1.0e-6
-            or abs(self._target_angular) > 1.0e-6
-        ):
-            response.success = False
-            response.message = (
-                'cannot enable: supervised velocity target is not neutral'
-            )
-            return response
         maximum_measured_speed_mrad_s = int(
             round(self._arm_max_wheel_speed * 1000.0)
         )
@@ -840,13 +812,10 @@ class SerialBridgeNode(Node):
 
         with self._lock:
             self._enabled_requested = True
-            self._arm_neutral_remaining = self._arm_neutral_cycles
             self._arm_confirmed = False
             self._arm_confirmation_deadline = (
                 now + self._arm_confirmation_timeout
             )
-            self._post_arm_neutral_generation = self._command_generation
-            self._post_arm_neutral_seen = False
         response.success = True
         response.message = (
             'enable gate opened; motion still requires fresh velocity commands'
@@ -897,27 +866,6 @@ class SerialBridgeNode(Node):
             )
             self._clear_enable_request()
             self._send_command(0, 0, False)
-            return
-
-        if self._enabled_requested and self._arm_neutral_remaining > 0:
-            if self._send_command(0, 0, True):
-                self._arm_neutral_remaining -= 1
-            return
-        if self._enabled_requested and not self._arm_confirmed:
-            self._send_command(0, 0, True)
-            return
-        if self._enabled_requested and not self._post_arm_neutral_seen:
-            new_command_after_arm = (
-                self._command_generation
-                > self._post_arm_neutral_generation
-            )
-            neutral_command = (
-                abs(self._target_linear) <= 1.0e-6
-                and abs(self._target_angular) <= 1.0e-6
-            )
-            if new_command_after_arm and neutral_command:
-                self._post_arm_neutral_seen = True
-            self._send_command(0, 0, True)
             return
 
         enable = self._enabled_requested and link_ok and remote_safe
@@ -1303,10 +1251,6 @@ class SerialBridgeNode(Node):
             KeyValue(
                 key='enabled_requested',
                 value=str(self._enabled_requested).lower(),
-            ),
-            KeyValue(
-                key='post_arm_neutral_seen',
-                value=str(self._post_arm_neutral_seen).lower(),
             ),
         ]
         array.status = [status]

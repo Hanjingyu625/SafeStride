@@ -11,7 +11,6 @@ serial_bridge:
       publish_rate_hz: 50.0
       timeout_s: 0.20
       ttl_ms: 200
-      arm_neutral_cycles: 5
       arm_max_wheel_speed_rad_s: 0.10
       arm_confirmation_timeout_s: 1.0
     telemetry: {timeout_s: 0.30}
@@ -49,8 +48,6 @@ safety_supervisor:
     range_timeout: 0.35
     require_range_sensors: true
     require_deadman: true
-    arm_neutral_linear_threshold: 0.01
-    arm_neutral_angular_threshold: 0.02
     max_forward_velocity: 0.15
     max_reverse_velocity: 0.08
     max_angular_velocity: 0.35
@@ -60,7 +57,7 @@ safety_supervisor:
     max_angular_deceleration: 1.00
     stop_distance: 0.35
     slow_distance: 0.80
-    intent_topic: /cmd_vel_intent
+    command_topic: /cmd_vel
     safe_command_topic: /cmd_vel_safe
     left_range_topic: /range/front_left
     right_range_topic: /range/front_right

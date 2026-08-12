@@ -106,11 +106,9 @@ payload 형식은 `<iiHBB`이다.
 - E-stop, dead-man, local fault 조건이 요청된 상태를 허용한다.
 
 수락된 최신 명령만 watchdog 제한 시간을 갱신한다. `DISARMED` 상태에서
-enable하려면, 설정된 dwell 시간 동안 바퀴 속도 feedback이 정지 상태여야
-하며 neutral 목표값을 여러 번 받아야 한다. MCU가 `ARMED` 상태를 확인한
-후에도 host bridge는 더 최신의 neutral supervised command를 받을 때까지
-출력을 0으로 유지한다. reset, E-stop, watchdog timeout, session 변경 또는
-critical fault가 발생하면 명시적인 새 arm 절차가 필요하다.
+enable하려면 설정된 dwell 시간 동안 바퀴 속도 feedback이 정지 상태여야 한다.
+reset, E-stop, watchdog timeout, session 변경 또는 critical fault가 발생하면
+명시적인 새 arm 절차가 필요하다.
 
 MCU의 command watchdog 제한 시간이 만료되면 대기 중인 직렬 입력을
 해석하기 전에 전체 session을 무효화한다. 이후 MCU는 새로운 `HELLO`를
