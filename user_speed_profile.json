@@ -1,0 +1,10 @@
+{
+  "updated_at": "2026-08-10T02:21:42",
+  "sample_count": 2,
+  "safe_speed_mps": 0.3,
+  "average_speed_mps": 0.128,
+  "recent_speed_samples_mps": [
+    0.125,
+    0.13
+  ]
+}

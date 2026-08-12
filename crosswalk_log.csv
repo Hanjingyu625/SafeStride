@@ -1,0 +1,7 @@
+timestamp,latitude,longitude,itstId,direction,crosswalk_distance_m,crosswalk_length_m,crosswalk_width_m,walking_speed_mps,signal_remaining_s,required_time_s,decision,reason
+2026-07-12T18:43:15,37.5402069,127.0701619,1678,nt,8758.18,3.49,2.52,0.6,8.9,8.82,WAIT,Crosswalk is too far
+2026-07-12T18:53:44,37.5402069,127.0701619,1678,nt,8758.18,3.49,2.52,0.6,101.9,8.82,WAIT,Crosswalk is too far
+2026-08-11T12:49:43,37.5398631,127.0705243,1678,nt,12.54,29.34,8.24,0.6,92.3,51.9,CAN CROSS,Enough signal time
+2026-08-12T23:29:34,37.5398631,127.0705243,1678,nw,12.54,29.34,8.24,0.6,,51.9,WAIT,Signal or API error: nwPdsgRmdrCs not found
+2026-08-12T23:38:31,37.5398631,127.0705243,1678,nt,12.54,29.34,8.24,0.6,115.2,51.9,CAN CROSS,Enough signal time
+2026-08-12T23:39:34,37.5398631,127.0705243,1678,nw,12.54,29.34,8.24,0.6,,50.9,WAIT,Signal or API error: nwPdsgRmdrCs not found
