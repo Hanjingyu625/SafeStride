@@ -45,7 +45,7 @@ and an MCU-local timeout. Any failed condition stops wheel and leg motion.
 
 ## Non-negotiable safety boundaries
 
-1. Motor enable pins need external bias that disables drivers during reset.
+1. Motor PWM/enable inputs need external bias that disables drivers during reset.
 2. E-stop must interrupt driver enable electrically, not only through software.
 3. The leg requires retracted and deployed limit switches.
 4. Both Unos invalidate their sessions after a watchdog timeout.

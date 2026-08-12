@@ -83,32 +83,30 @@ DriveController::DriveController()
       encoder_fault_mask_(0U) {}
 
 void DriveController::begin() {
-  // Preload the output latch before changing pin direction. This avoids an
-  // active-low enable pulse while the pin transitions from input to output.
-  digitalWrite(
-      cfg::MOTOR_DRIVER_ENABLE_PIN,
-      cfg::MOTOR_DRIVER_ENABLE_INACTIVE_LEVEL);
-  pinMode(cfg::MOTOR_DRIVER_ENABLE_PIN, OUTPUT);
-  digitalWrite(
-      cfg::MOTOR_DRIVER_ENABLE_PIN,
-      cfg::MOTOR_DRIVER_ENABLE_INACTIVE_LEVEL);
-
+  // Preload PWM and direction outputs LOW before changing their pin modes.
+  digitalWrite(cfg::LEFT_MOTOR_PWM_PIN, LOW);
+  digitalWrite(cfg::LEFT_MOTOR_IN1_PIN, LOW);
+  digitalWrite(cfg::LEFT_MOTOR_IN2_PIN, LOW);
+  digitalWrite(cfg::RIGHT_MOTOR_PWM_PIN, LOW);
+  digitalWrite(cfg::RIGHT_MOTOR_IN1_PIN, LOW);
+  digitalWrite(cfg::RIGHT_MOTOR_IN2_PIN, LOW);
   pinMode(cfg::LEFT_MOTOR_PWM_PIN, OUTPUT);
-  pinMode(cfg::LEFT_MOTOR_DIR_PIN, OUTPUT);
+  pinMode(cfg::LEFT_MOTOR_IN1_PIN, OUTPUT);
+  pinMode(cfg::LEFT_MOTOR_IN2_PIN, OUTPUT);
   pinMode(cfg::RIGHT_MOTOR_PWM_PIN, OUTPUT);
-  pinMode(cfg::RIGHT_MOTOR_DIR_PIN, OUTPUT);
+  pinMode(cfg::RIGHT_MOTOR_IN1_PIN, OUTPUT);
+  pinMode(cfg::RIGHT_MOTOR_IN2_PIN, OUTPUT);
   analogWrite(cfg::LEFT_MOTOR_PWM_PIN, 0);
   analogWrite(cfg::RIGHT_MOTOR_PWM_PIN, 0);
-  digitalWrite(cfg::LEFT_MOTOR_DIR_PIN, LOW);
-  digitalWrite(cfg::RIGHT_MOTOR_DIR_PIN, LOW);
 }
 
 void DriveController::disableImmediately() {
-  digitalWrite(
-      cfg::MOTOR_DRIVER_ENABLE_PIN,
-      cfg::MOTOR_DRIVER_ENABLE_INACTIVE_LEVEL);
   analogWrite(cfg::LEFT_MOTOR_PWM_PIN, 0);
   analogWrite(cfg::RIGHT_MOTOR_PWM_PIN, 0);
+  digitalWrite(cfg::LEFT_MOTOR_IN1_PIN, LOW);
+  digitalWrite(cfg::LEFT_MOTOR_IN2_PIN, LOW);
+  digitalWrite(cfg::RIGHT_MOTOR_IN1_PIN, LOW);
+  digitalWrite(cfg::RIGHT_MOTOR_IN2_PIN, LOW);
   applied_left_mrad_s_ = 0.0F;
   applied_right_mrad_s_ = 0.0F;
   left_pid_ = {0.0F, 0.0F};
@@ -167,7 +165,8 @@ float DriveController::calculatePid(
 
 void DriveController::writeMotor(
     uint8_t pwm_pin,
-    uint8_t direction_pin,
+    uint8_t in1_pin,
+    uint8_t in2_pin,
     int8_t motor_sign,
     float pwm) {
   float signed_pwm = pwm * static_cast<float>(motor_sign);
@@ -175,10 +174,18 @@ void DriveController::writeMotor(
       signed_pwm,
       -static_cast<float>(cfg::MAX_PWM),
       static_cast<float>(cfg::MAX_PWM));
-  const bool forward = signed_pwm >= 0.0F;
   const uint8_t magnitude = static_cast<uint8_t>(
       lroundf(fabsf(signed_pwm)));
-  digitalWrite(direction_pin, forward ? HIGH : LOW);
+  if (signed_pwm > 0.0F) {
+    digitalWrite(in1_pin, HIGH);
+    digitalWrite(in2_pin, LOW);
+  } else if (signed_pwm < 0.0F) {
+    digitalWrite(in1_pin, LOW);
+    digitalWrite(in2_pin, HIGH);
+  } else {
+    digitalWrite(in1_pin, LOW);
+    digitalWrite(in2_pin, LOW);
+  }
   analogWrite(pwm_pin, magnitude);
 }
 
@@ -276,17 +283,16 @@ void DriveController::update(
 
   writeMotor(
       cfg::LEFT_MOTOR_PWM_PIN,
-      cfg::LEFT_MOTOR_DIR_PIN,
+      cfg::LEFT_MOTOR_IN1_PIN,
+      cfg::LEFT_MOTOR_IN2_PIN,
       cfg::LEFT_MOTOR_SIGN,
       left_pwm);
   writeMotor(
       cfg::RIGHT_MOTOR_PWM_PIN,
-      cfg::RIGHT_MOTOR_DIR_PIN,
+      cfg::RIGHT_MOTOR_IN1_PIN,
+      cfg::RIGHT_MOTOR_IN2_PIN,
       cfg::RIGHT_MOTOR_SIGN,
       right_pwm);
-  digitalWrite(
-      cfg::MOTOR_DRIVER_ENABLE_PIN,
-      cfg::MOTOR_DRIVER_ENABLE_ACTIVE_LEVEL);
 }
 
 int32_t DriveController::leftVelocityMradS() const {

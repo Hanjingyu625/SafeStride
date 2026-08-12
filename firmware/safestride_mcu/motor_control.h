@@ -69,7 +69,8 @@ class DriveController {
       PidState& state);
   static void writeMotor(
       uint8_t pwm_pin,
-      uint8_t direction_pin,
+      uint8_t in1_pin,
+      uint8_t in2_pin,
       int8_t motor_sign,
       float pwm);
   static bool updateEncoderMonitor(
