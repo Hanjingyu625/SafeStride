@@ -42,9 +42,10 @@ Put the supplied shapefile in `data/external/crosswalk_shp/` and converted JSON
 in `data/generated/`. Store YOLO weights in GitHub Releases or an artifact store
 and record their SHA-256 checksum.
 
-The ZIP's latest `smart_crosswalk_controller_v6.py` is reference material, not
-a runtime dependency. Migrate its NMEA parser and crossing state machine into
-testable ROS nodes instead of running two competing safety controllers.
+The ZIP's latest `smart_crosswalk_controller_v6.py` has been migrated into
+`safestride_sensors` and `safestride_navigation`; do not run the standalone
+controller alongside ROS. See `docs/CROSSWALK.md` for data conversion,
+`itstId`, API-key and monitor-only setup.
 
 ## Camera and YOLO
 

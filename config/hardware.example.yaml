@@ -9,6 +9,11 @@ computers:
   gps:
     device: /dev/serial/by-id/CHANGE_ME_BE220
     baudrate: 115200
+crosswalk:
+  data_file: data/generated/standard_crosswalks.json
+  api_key_file: /etc/safestride/signal_api_key.txt
+  intersection_id: CHANGE_ME_ITST_ID
+  motion_output_enabled: false
 drive:
   motor_output_enabled: false
   wheel_radius_m: 0.15

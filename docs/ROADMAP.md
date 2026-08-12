@@ -6,7 +6,8 @@
 - [ ] Bring up Terrain Uno sensors without the leg motor.
 - [ ] Add leg driver, limit switches, current sensing and timeout.
 - [ ] Test TOF against ramps, feet, holes and reflective surfaces.
-- [ ] Migrate BE-220 NMEA and crosswalk v6 logic into ROS nodes.
+- [x] Migrate BE-220 NMEA and crosswalk v6 logic into ROS nodes.
+- [ ] Add and validate the crosswalk-to-V2X `itstId` mapping source.
 - [ ] Collect and label camera data; define surface classes.
 - [ ] Export a pinned YOLO model and benchmark worst-case latency.
 - [ ] Add hardware-in-loop watchdog and fault-injection tests.

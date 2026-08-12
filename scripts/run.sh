@@ -10,4 +10,6 @@ source "${workspace}/install/setup.bash"
 exec ros2 launch safestride_bringup safestride.launch.py \
   config_file:="${config}" \
   wheel_radius:="${SAFESTRIDE_WHEEL_RADIUS_M:-0.15}" \
-  wheel_separation:="${SAFESTRIDE_WHEEL_SEPARATION_M:-0.55}"
+  wheel_separation:="${SAFESTRIDE_WHEEL_SEPARATION_M:-0.55}" \
+  enable_gps:="${SAFESTRIDE_ENABLE_GPS:-false}" \
+  enable_crosswalk:="${SAFESTRIDE_ENABLE_CROSSWALK:-false}"

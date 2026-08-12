@@ -38,6 +38,7 @@ and an MCU-local timeout. Any failed condition stops wheel and leg motion.
 - `safestride_bridge`: fail-safe Drive Uno serial bridge.
 - `safestride_control`: ROS-side wheel command safety supervisor.
 - `safestride_sensors`: BE-220 NMEA and sensor adapters.
+- `safestride_navigation`: crosswalk geometry, V2X timing and automatic crossing policy.
 - `safestride_perception`: YOLO adapter and surface speed policy.
 - `safestride_terrain`: terrain and leg coordination policy.
 - `safestride_bringup`: launch and deployment configuration.

@@ -30,7 +30,7 @@ BE-220 GPS -----> Raspberry Pi 4 <----- camera / YOLO
 
 자세한 내용은 [시스템 구조](docs/ARCHITECTURE.md),
 [하드웨어](docs/HARDWARE.md), [개발 안내](docs/DEVELOPMENT.md),
-[로드맵](docs/ROADMAP.md)을 참고한다.
+[횡단보도 기능](docs/CROSSWALK.md), [로드맵](docs/ROADMAP.md)을 참고한다.
 
 ## Raspberry Pi 4 빠른 시작
 
@@ -100,10 +100,11 @@ test/                        PC에서 실행하는 펌웨어 테스트
 
 | ROS 패키지 | 역할과 현재 상태 |
 |---|---|
-| `safestride_interfaces` | `WalkerStatus`, `TerrainStatus`, `SurfaceCondition`, `HandlePressure` 메시지와 `SetLegState` 서비스를 정의한다. |
+| `safestride_interfaces` | `WalkerStatus`, `TerrainStatus`, `SurfaceCondition`, `HandlePressure`, `CrosswalkStatus` 메시지와 `SetLegState` 서비스를 정의한다. |
 | `safestride_bridge` | Drive Uno와 USB serial로 통신하고 MCU 텔레메트리를 표준 ROS 토픽으로 변환한다. |
 | `safestride_control` | 일반 속도 명령에 timeout, 거리, deadman, fault와 가감속 제한을 적용한다. |
-| `safestride_sensors` | BE-220 GPS의 NMEA 파싱 코드다. ROS GPS 노드는 아직 없다. |
+| `safestride_sensors` | BE-220 NMEA를 파싱하고 `/gps/fix`, `/gps/speed`를 발행한다. |
+| `safestride_navigation` | GPS 위치, 횡단보도 지도와 보행신호 잔여시간으로 v6 상태기계를 실행하고 안전감독기 앞단에 속도 요청을 발행한다. |
 | `safestride_perception` | 노면 분류 결과를 보수적인 속도 배율로 바꾸는 정책이다. 카메라·YOLO 실행 노드는 아직 없다. |
 | `safestride_terrain` | 지형 센서, 양손 감지, 바퀴 속도와 limit 상태를 이용해 다리 전개 가능 여부를 판단한다. ROS/Uno 연결 노드는 아직 없다. |
 | `safestride_bringup` | robot state publisher, Drive serial bridge와 safety supervisor를 한 번에 실행한다. |
@@ -129,6 +130,9 @@ Python ROS 패키지 내부의 `resource/`는 ROS 패키지 검색 등록용이�
 | `/range/front_right` | `sensor_msgs/msg/Range` | Serial Bridge -> Safety Supervisor | 오른쪽 전방 거리다. 토픽은 구현됐지만 실제 센서 드라이버는 아직 없다. |
 | `/battery_state` | `sensor_msgs/msg/BatteryState` | Serial Bridge -> ROS | Drive Uno가 보고한 배터리 상태다. |
 | `/walker/status` | `safestride_interfaces/msg/WalkerStatus` | Serial Bridge -> Safety Supervisor | MCU 상태, deadman, E-stop, watchdog과 fault를 종합한다. |
+| `/gps/fix` | `sensor_msgs/msg/NavSatFix` | BE-220 GPS -> Crosswalk Controller | 현재 GPS 위치다. |
+| `/gps/speed` | `std_msgs/msg/Float32` | BE-220 GPS -> Crosswalk Controller | RMC 문장의 지면 속도다. |
+| `/crosswalk/status` | `safestride_interfaces/msg/CrosswalkStatus` | Crosswalk Controller -> ROS | 횡단보도 상태, 거리, 신호시간, 진입 허용과 목표 속도다. |
 | `/diagnostics` | `diagnostic_msgs/msg/DiagnosticArray` | Bridge·Supervisor -> ROS | 통신, 센서 및 안전 상태 진단이다. |
 | `/tf` | `tf2_msgs/msg/TFMessage` | Serial Bridge 등 -> ROS | 기본적으로 `odom`에서 `base_footprint`로의 좌표 변환이다. |
 
@@ -154,7 +158,6 @@ service server는 아직 구현되지 않았다.
 | `/handle/pressure` | `safestride_interfaces/msg/HandlePressure` | 좌우 손잡이 압력 및 손 감지 |
 | `/terrain/status` | `safestride_interfaces/msg/TerrainStatus` | 센서 유효성, 자세, 다리 limit/state와 fault 종합 상태 |
 | `/perception/surface_condition` | `safestride_interfaces/msg/SurfaceCondition` | 카메라가 판단한 노면과 권장 속도 배율 |
-| `/gps/fix` | `sensor_msgs/msg/NavSatFix` | BE-220 GPS 위치 |
 | `/terrain/set_leg_state` | `safestride_interfaces/srv/SetLegState` | step-leg 전개 또는 복귀 요청 서비스 |
 
 위 표의 이름은 권장안이며 아직 코드와 설정에서 확정된 이름이 아니다. 구현할 때
@@ -164,10 +167,9 @@ bringup YAML에 명시해 한 곳에서 변경할 수 있도록 한다.
 
 - TOF-10120, MPU-9250 및 BNO055 하드웨어 드라이버가 아직 구현되지 않았다.
 - 계단용 다리의 pin map, 구동기 및 limit switch가 아직 선정되지 않았다.
-- BE-220 데이터 파싱은 테스트된 라이브러리 코드로 존재하지만 ROS 노드는 아직
-  구현되지 않았다.
 - YOLO 실행 기능에는 카메라 선정, 데이터셋 및 내보낸 모델이 필요하다.
-- 횡단보도 v6 ZIP 코드는 이전 작업 참고용이며 ROS에서 실행하지 않는다.
+- 횡단보도 v6 로직은 ROS로 이식됐지만 원본이 참조한 `nearest_map.py`가 제공되지
+  않아 시험 장소의 `itstId`를 설정하거나 횡단보도 JSON에 매핑해야 한다.
 - 바퀴 치수, 엔코더 해상도, PID 및 압력 임계값은 예시 값이므로 실제 장비에서
   측정하고 조정해야 한다.
 
