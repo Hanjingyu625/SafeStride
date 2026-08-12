@@ -38,6 +38,7 @@ and an MCU-local timeout. Any failed condition stops wheel and leg motion.
 - `safestride_bridge`: fail-safe Drive Uno serial bridge.
 - `safestride_control`: ROS-side wheel command safety supervisor.
 - `safestride_sensors`: BE-220 NMEA and sensor adapters.
+- `safestride_navigation`: crosswalk geometry, V2X timing and automatic crossing policy.
 - `safestride_perception`: YOLO adapter and surface speed policy.
 - `safestride_terrain`: terrain and leg coordination policy.
 - `safestride_bringup`: launch and deployment configuration.
@@ -45,7 +46,7 @@ and an MCU-local timeout. Any failed condition stops wheel and leg motion.
 
 ## Non-negotiable safety boundaries
 
-1. Motor enable pins need external bias that disables drivers during reset.
+1. Motor PWM/enable inputs need external bias that disables drivers during reset.
 2. E-stop must interrupt driver enable electrically, not only through software.
 3. The leg requires retracted and deployed limit switches.
 4. Both Unos invalidate their sessions after a watchdog timeout.

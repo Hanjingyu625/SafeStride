@@ -8,6 +8,7 @@
 #include "config.h"
 #include "controller_state.h"
 #include "motor_control.h"
+#include "pressure_sensor.h"
 #include "protocol.h"
 
 #if !defined(ARDUINO_ARCH_AVR) && !defined(SAFESTRIDE_HOST_BUILD)
@@ -44,6 +45,7 @@ volatile uint32_t g_right_encoder_count = 0UL;
 
 proto::FrameReceiver g_receiver;
 DriveController g_drive;
+PressureSensorPair g_pressure;
 
 ControllerState g_state = ControllerState::BOOT;
 uint16_t g_fault_bits = 0U;
@@ -81,7 +83,7 @@ bool deadmanActive() {
   if (!cfg::REQUIRE_DEADMAN) {
     return true;
   }
-  return digitalRead(cfg::DEADMAN_PIN) == cfg::DEADMAN_ACTIVE_LEVEL;
+  return g_pressure.bothHandsPresent();
 }
 
 bool driverFaultActive() {
@@ -564,7 +566,6 @@ void setup() {
   g_drive.begin();
 
   pinMode(cfg::ESTOP_PIN, INPUT_PULLUP);
-  pinMode(cfg::DEADMAN_PIN, INPUT_PULLUP);
   if (cfg::USE_DRIVER_FAULT_PIN) {
     pinMode(cfg::DRIVER_FAULT_PIN, INPUT_PULLUP);
   }
@@ -589,6 +590,7 @@ void setup() {
   }
 
   Serial.begin(cfg::SERIAL_BAUD);
+  g_pressure.begin(millis());
   g_boot_id = makeBootId();
   g_state = estopActive()
       ? ControllerState::ESTOP
@@ -614,6 +616,8 @@ void loop() {
   // Otherwise a late but valid frame could overwrite the receive timestamp
   // and conceal a control-loop stall.
   uint32_t now_ms = millis();
+  g_pressure.update(now_ms);
+  refreshPhysicalSafety();
   enforceWatchdogs(now_ms);
   processSerial();
   now_ms = millis();

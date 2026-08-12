@@ -64,3 +64,38 @@ safety_supervisor:
     status_topic: /walker/status
     diagnostics_topic: /diagnostics
     output_frame_id: base_link
+
+gps_node:
+  ros__parameters:
+    port: /dev/serial/by-id/CHANGE_ME_BE220
+    baudrate: 115200
+    poll_rate_hz: 50.0
+    reconnect_period_s: 1.0
+    frame_id: gps_link
+    fix_topic: /gps/fix
+    speed_topic: /gps/speed
+
+crosswalk_controller:
+  ros__parameters:
+    crosswalk_file: /home/CHANGE_ME/SafeStride/data/generated/standard_crosswalks.json
+    api_key_file: /etc/safestride/signal_api_key.txt
+    # Set this manually unless each crosswalk JSON record contains itstId.
+    intersection_id: ''
+    update_rate_hz: 5.0
+    gps_timeout_s: 2.0
+    speed_timeout_s: 1.0
+    signal_refresh_interval_s: 3.0
+    signal_cache_max_age_s: 12.0
+    signal_request_timeout_s: 3.0
+    maximum_crosswalk_distance_m: 80.0
+    default_safe_speed_mps: 0.50
+    profile_file: ''
+    # Enable only after logged Pi-only tests and lifted-wheel validation.
+    motion_output_enabled: false
+    fix_topic: /gps/fix
+    gps_speed_topic: /gps/speed
+    odom_topic: /odom
+    command_topic: /cmd_vel
+    status_topic: /crosswalk/status
+    diagnostics_topic: /diagnostics
+    output_frame_id: base_link

@@ -15,7 +15,7 @@ void pinMode(uint8_t, uint8_t) {}
 void digitalWrite(uint8_t, uint8_t) {}
 int digitalRead(uint8_t) { return LOW; }
 void analogWrite(uint8_t, int) {}
-int analogRead(uint8_t) { return 0; }
+int analogRead(uint8_t) { return 200; }
 int digitalPinToInterrupt(uint8_t) { return 0; }
 void attachInterrupt(int, void (*)(), int) {}
 void noInterrupts() {}
@@ -30,10 +30,13 @@ size_t HardwareSerial::write(uint8_t) { return 1U; }
 size_t HardwareSerial::write(const uint8_t*, size_t length) {
   return length;
 }
+size_t HardwareSerial::print(const char*) { return 1U; }
+size_t HardwareSerial::println(const char*) { return 1U; }
 
 int main() {
   namespace proto = safestride_protocol;
 
+  g_pressure.begin(0UL);
   g_boot_id = 0x12345678UL;
   g_session_id = 0xABCDEF01UL;
   g_session_active = true;

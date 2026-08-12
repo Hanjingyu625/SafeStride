@@ -22,6 +22,11 @@
 #define A5 19
 #define PI 3.1415926535897932384626433832795
 
+template <typename T>
+T constrain(T value, T lower, T upper) {
+  return value < lower ? lower : (value > upper ? upper : value);
+}
+
 class Stream {
  public:
   virtual ~Stream() {}
@@ -38,6 +43,8 @@ class HardwareSerial : public Stream {
   int read();
   size_t write(uint8_t);
   size_t write(const uint8_t*, size_t);
+  size_t print(const char* value);
+  size_t println(const char* value);
 };
 
 extern HardwareSerial Serial;

@@ -10,9 +10,12 @@ HardwareSerial Serial;
 
 namespace {
 
-uint8_t g_enable_level = cfg::MOTOR_DRIVER_ENABLE_INACTIVE_LEVEL;
-int g_left_pwm = 0;
-int g_right_pwm = 0;
+int g_left_in1_pwm = 0;
+int g_right_in1_pwm = 0;
+uint8_t g_left_in1_level = LOW;
+uint8_t g_left_in2_level = LOW;
+uint8_t g_right_in1_level = LOW;
+uint8_t g_right_in2_level = LOW;
 
 void primeFeedback(DriveController& drive) {
   drive.update(5000UL, 0UL, 0UL, 0L, 0L, false);
@@ -25,8 +28,14 @@ void primeFeedback(DriveController& drive) {
 void pinMode(uint8_t, uint8_t) {}
 
 void digitalWrite(uint8_t pin, uint8_t value) {
-  if (pin == cfg::MOTOR_DRIVER_ENABLE_PIN) {
-    g_enable_level = value;
+  if (pin == cfg::LEFT_MOTOR_IN1_PIN) {
+    g_left_in1_level = value;
+  } else if (pin == cfg::LEFT_MOTOR_IN2_PIN) {
+    g_left_in2_level = value;
+  } else if (pin == cfg::RIGHT_MOTOR_IN1_PIN) {
+    g_right_in1_level = value;
+  } else if (pin == cfg::RIGHT_MOTOR_IN2_PIN) {
+    g_right_in2_level = value;
   }
 }
 
@@ -34,9 +43,9 @@ int digitalRead(uint8_t) { return LOW; }
 
 void analogWrite(uint8_t pin, int value) {
   if (pin == cfg::LEFT_MOTOR_PWM_PIN) {
-    g_left_pwm = value;
+    g_left_in1_pwm = value;
   } else if (pin == cfg::RIGHT_MOTOR_PWM_PIN) {
-    g_right_pwm = value;
+    g_right_in1_pwm = value;
   }
 }
 
@@ -55,6 +64,8 @@ size_t HardwareSerial::write(uint8_t) { return 1U; }
 size_t HardwareSerial::write(const uint8_t*, size_t length) {
   return length;
 }
+size_t HardwareSerial::print(const char*) { return 1U; }
+size_t HardwareSerial::println(const char*) { return 1U; }
 
 int main() {
   {
@@ -67,6 +78,12 @@ int main() {
       drive.update(5000UL, count, count, 1000L, 1000L, true);
     }
     assert(drive.encoderFaultMask() == 0U);
+    assert(g_left_in1_pwm > 0);
+    assert(g_right_in1_pwm > 0);
+    assert(g_left_in1_level == HIGH);
+    assert(g_left_in2_level == LOW);
+    assert(g_right_in1_level == LOW);
+    assert(g_right_in2_level == HIGH);
   }
 
   {
@@ -80,9 +97,12 @@ int main() {
         drive.encoderFaultMask() ==
         (DriveController::ENCODER_FAULT_LEFT |
          DriveController::ENCODER_FAULT_RIGHT));
-    assert(g_enable_level == cfg::MOTOR_DRIVER_ENABLE_INACTIVE_LEVEL);
-    assert(g_left_pwm == 0);
-    assert(g_right_pwm == 0);
+    assert(g_left_in1_pwm == 0);
+    assert(g_right_in1_pwm == 0);
+    assert(g_left_in1_level == LOW);
+    assert(g_left_in2_level == LOW);
+    assert(g_right_in1_level == LOW);
+    assert(g_right_in2_level == LOW);
   }
 
   {

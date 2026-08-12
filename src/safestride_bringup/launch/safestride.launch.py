@@ -2,6 +2,7 @@
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
 from launch.substitutions import (
     Command,
     FindExecutable,
@@ -25,6 +26,8 @@ def generate_launch_description() -> LaunchDescription:
     config_file = LaunchConfiguration('config_file')
     wheel_radius = LaunchConfiguration('wheel_radius')
     wheel_separation = LaunchConfiguration('wheel_separation')
+    enable_gps = LaunchConfiguration('enable_gps')
+    enable_crosswalk = LaunchConfiguration('enable_crosswalk')
     robot_description = ParameterValue(
         Command(
             [
@@ -63,6 +66,16 @@ def generate_launch_description() -> LaunchDescription:
                 default_value='0.55',
                 description='Measured lateral separation of powered wheels.',
             ),
+            DeclareLaunchArgument(
+                'enable_gps',
+                default_value='false',
+                description='Start the BE-220 serial GPS adapter.',
+            ),
+            DeclareLaunchArgument(
+                'enable_crosswalk',
+                default_value='false',
+                description='Start GPS/V2X crosswalk assistance.',
+            ),
             Node(
                 package='robot_state_publisher',
                 executable='robot_state_publisher',
@@ -94,6 +107,22 @@ def generate_launch_description() -> LaunchDescription:
                 executable='safety_supervisor',
                 name='safety_supervisor',
                 output='screen',
+                parameters=[config_file],
+            ),
+            Node(
+                package='safestride_sensors',
+                executable='gps_node',
+                name='gps_node',
+                output='screen',
+                condition=IfCondition(enable_gps),
+                parameters=[config_file],
+            ),
+            Node(
+                package='safestride_navigation',
+                executable='crosswalk_controller',
+                name='crosswalk_controller',
+                output='screen',
+                condition=IfCondition(enable_crosswalk),
                 parameters=[config_file],
             ),
         ]

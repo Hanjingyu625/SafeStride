@@ -52,36 +52,49 @@ constexpr uint8_t LEFT_ENCODER_B_PIN = 4U;
 constexpr uint8_t RIGHT_ENCODER_A_PIN = 3U;
 constexpr uint8_t RIGHT_ENCODER_B_PIN = 7U;
 
-constexpr uint8_t LEFT_MOTOR_PWM_PIN = 9U;
-constexpr uint8_t LEFT_MOTOR_DIR_PIN = 8U;
-constexpr uint8_t RIGHT_MOTOR_PWM_PIN = 10U;
-constexpr uint8_t RIGHT_MOTOR_DIR_PIN = 12U;
-constexpr uint8_t MOTOR_DRIVER_ENABLE_PIN = 6U;
-constexpr uint8_t MOTOR_DRIVER_ENABLE_ACTIVE_LEVEL = HIGH;
-constexpr uint8_t MOTOR_DRIVER_ENABLE_INACTIVE_LEVEL = LOW;
+// SZH-GNP521 single-channel drivers use one dedicated PWM input plus IN1/IN2
+// direction inputs. One driver is required per motor.
+constexpr uint8_t LEFT_MOTOR_PWM_PIN = 5U;
+constexpr uint8_t LEFT_MOTOR_IN1_PIN = 6U;
+constexpr uint8_t LEFT_MOTOR_IN2_PIN = 8U;
+constexpr uint8_t RIGHT_MOTOR_PWM_PIN = 9U;
+constexpr uint8_t RIGHT_MOTOR_IN1_PIN = 10U;
+constexpr uint8_t RIGHT_MOTOR_IN2_PIN = 12U;
 constexpr int8_t LEFT_MOTOR_SIGN = 1;
-constexpr int8_t RIGHT_MOTOR_SIGN = 1;
+constexpr int8_t RIGHT_MOTOR_SIGN = -1;
 constexpr uint16_t MAX_PWM = 100U;  // deliberately low for first lifted test
 
 // Normally-closed E-stop example: normal contact pulls the pin to ground and
 // pressing/disconnecting it produces HIGH through INPUT_PULLUP.
-constexpr uint8_t ESTOP_PIN = A0;
+constexpr uint8_t ESTOP_PIN = A2;
 constexpr uint8_t ESTOP_ACTIVE_LEVEL = HIGH;
 
-// Dead-man example: pressed switch pulls the pin to ground.
+// The two FSR channels replace the single digital dead-man switch. Each FSR
+// must be wired as a voltage divider that reads near zero when released.
 constexpr bool REQUIRE_DEADMAN = true;
-constexpr uint8_t DEADMAN_PIN = A1;
-constexpr uint8_t DEADMAN_ACTIVE_LEVEL = LOW;
+constexpr uint8_t PRESSURE_LEFT_PIN = A0;
+constexpr uint8_t PRESSURE_RIGHT_PIN = A1;
+constexpr uint16_t PRESSURE_SAMPLE_PERIOD_MS = 100U;
+constexpr float PRESSURE_FILTER_ALPHA = 0.2F;
+constexpr float PRESSURE_HANDS_OFF_THRESHOLD = 100.0F;
+constexpr float PRESSURE_IMBALANCE_THRESHOLD = 300.0F;
+constexpr float PRESSURE_SUDDEN_CHANGE_THRESHOLD = 150.0F;
+
+// Pressure-state LEDs. Analogue inputs can also act as digital outputs. A3/A4
+// and A5 are available because optional current/battery sensing is disabled.
+constexpr uint8_t LED_GREEN_PIN = A3;
+constexpr uint8_t LED_YELLOW_PIN = A4;
+constexpr uint8_t LED_RED_PIN = A5;
 
 // Set to a real input and true only after wiring a driver's fault output.
 constexpr bool USE_DRIVER_FAULT_PIN = false;
-constexpr uint8_t DRIVER_FAULT_PIN = A5;
+constexpr uint8_t DRIVER_FAULT_PIN = 13U;
 constexpr uint8_t DRIVER_FAULT_ACTIVE_LEVEL = LOW;
 
 // Optional analogue telemetry. Disabled values are sent using protocol
 // sentinels and are never interpreted by ROS as real measurements.
 constexpr bool ENABLE_BATTERY_SENSE = false;
-constexpr uint8_t BATTERY_SENSE_PIN = A2;
+constexpr uint8_t BATTERY_SENSE_PIN = A5;
 constexpr float ADC_REFERENCE_V = 5.0F;
 constexpr float BATTERY_DIVIDER_RATIO = 3.0F;
 
@@ -105,16 +118,12 @@ constexpr float RIGHT_FEEDFORWARD = 10.0F;
 constexpr float PID_INTEGRAL_LIMIT = 30.0F;
 constexpr float VELOCITY_FILTER_ALPHA = 0.35F;
 
-// AVR's hardware watchdog protects against a frozen main loop. Motor EN still
-// needs an external bias to its inactive level while the MCU resets.
+// AVR's hardware watchdog protects against a frozen main loop. The driver's
+// PWM input still needs an external pull-down while the MCU resets.
 // A persistent boot counter prevents buffered pre-reset commands from matching
 // a newly booted controller. EEPROM.put() updates only changed bytes.
 constexpr int AVR_BOOT_COUNTER_EEPROM_ADDRESS = 0;
 
-static_assert(
-    MOTOR_DRIVER_ENABLE_ACTIVE_LEVEL !=
-        MOTOR_DRIVER_ENABLE_INACTIVE_LEVEL,
-    "motor enable active and inactive levels must differ");
 static_assert(
     LEFT_MOTOR_SIGN == 1 || LEFT_MOTOR_SIGN == -1,
     "LEFT_MOTOR_SIGN must be +1 or -1");
