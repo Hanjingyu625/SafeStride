@@ -1,0 +1,89 @@
+timestamp,latitude,longitude,itstId,direction,crosswalk_distance_m,crosswalk_length_m,walking_speed_mps,required_time_s,signal_remaining_s,decision,status
+2026-07-12T19:21:15,37.53978567,127.08391250,2620,sw,9784.24,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:21:20,37.53976967,127.08391050,2620,sw,9783.24,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:21:26,37.53975083,127.08386317,2620,wt,9778.58,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:21:32,37.53974150,127.08382267,2620,wt,9774.94,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:21:38,37.53974167,127.08377650,2620,wt,9771.35,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:21:43,37.53973950,127.08373517,2620,wt,9768.03,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:21:49,37.53975183,127.08368783,2620,et,9764.99,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:21:54,37.53977150,127.08373533,2620,et,9769.72,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:22:00,37.53977583,127.08375350,2620,et,9771.36,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:22:06,37.53977667,127.08374617,2620,et,9770.83,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:22:12,37.53978550,127.08368950,2620,wt,9766.89,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:22:22,37.53978633,127.08366583,2620,wt,9765.09,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:22:27,37.53979150,127.08367267,2620,et,9765.89,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:22:32,37.53979083,127.08367517,2620,et,9766.05,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:22:38,37.53979333,127.08367333,2620,et,9766.04,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:22:44,37.53979917,127.08360200,2620,wt,9760.8,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:22:50,37.53980833,127.08353533,2620,wt,9756.1,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:22:56,37.53980917,127.08347467,2620,wt,9751.43,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:23:02,37.53980233,127.08342950,2620,wt,9747.56,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:23:10,37.53982950,127.08337350,2620,nw,9744.64,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:23:15,37.53984133,127.08339433,2620,et,9746.88,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:23:21,37.53985267,127.08342400,2620,et,9749.78,3.49,0.6,8.8,,WAIT,Crosswalk is farther than 60 m
+2026-07-12T19:52:01,37.53833067,127.08386450,1697,wt,35.15,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:52:06,37.53834050,127.08385867,1697,wt,34.29,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:52:12,37.53837067,127.08386033,1697,wt,33.43,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:52:18,37.53838250,127.08385617,1697,wt,32.77,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:52:24,37.53840317,127.08385033,1697,wt,31.85,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:52:29,37.53842167,127.08383733,1697,wt,30.46,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:52:35,37.53842633,127.08381300,1697,wt,28.28,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:52:41,37.53843283,127.08380533,1697,wt,27.56,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:52:46,37.53846817,127.08380967,1697,wt,28.02,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:52:52,37.53848183,127.08382000,1697,wt,29.09,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:52:57,37.53849550,127.08380783,1697,wt,28.29,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:53:08,37.53850733,127.08380150,1697,wt,28.03,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:53:14,37.53851783,127.08380817,1697,wt,28.9,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:53:20,37.53853917,127.08378083,1697,wt,27.41,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:53:25,37.53855433,127.08375283,1697,wt,25.88,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:53:31,37.53858300,127.08375117,1697,wt,27.39,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:53:36,37.53860117,127.08376400,1697,wt,29.47,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:53:42,37.53861483,127.08376633,1697,wt,30.55,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:53:47,37.53863467,127.08376617,1697,wt,31.94,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:53:52,37.53868033,127.08375683,1697,wt,34.94,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:53:58,37.53867550,127.08375400,1697,wt,34.37,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:54:03,37.53864317,127.08375217,1697,wt,31.67,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:54:15,37.53865217,127.08375467,1697,wt,32.53,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:54:21,37.53861017,127.08376333,1697,wt,30.02,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:54:26,37.53858933,127.08376750,1697,wt,28.98,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:54:31,37.53857150,127.08377100,1697,wt,28.2,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:54:37,37.53855600,127.08378217,1697,wt,28.27,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:54:42,37.53854100,127.08378967,1697,wt,28.2,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:54:48,37.53854167,127.08379867,1697,wt,28.97,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:54:53,37.53854017,127.08381100,1697,wt,29.92,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:54:59,37.53853933,127.08382983,1697,wt,31.45,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:55:04,37.53853050,127.08384100,1697,wt,32.08,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T19:55:10,37.53854200,127.08384500,1697,wt,32.81,13.57,0.6,25.6,,WAIT,"wtPdsgRmdrCs=36001; etPdsgRmdrCs=36001; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T21:16:11,37.53998350,127.08337150,2620,sw,48.38,6.75,0.6,14.2,,NO SIGNAL DATA,"swPdsgRmdrCs missing; nePdsgRmdrCs missing; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T21:16:16,37.53998567,127.08336250,2620,sw,48.16,6.75,0.6,14.2,,NO SIGNAL DATA,"swPdsgRmdrCs missing; nePdsgRmdrCs missing; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T21:16:22,37.53998383,127.08335950,2620,sw,47.85,6.75,0.6,14.2,,NO SIGNAL DATA,"swPdsgRmdrCs missing; nePdsgRmdrCs missing; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T21:16:29,37.53998800,127.08334883,2620,sw,47.77,6.75,0.6,14.2,,NO SIGNAL DATA,"swPdsgRmdrCs missing; nePdsgRmdrCs missing; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T21:16:34,37.53999850,127.08333383,2620,sw,48.16,6.75,0.6,14.2,,NO SIGNAL DATA,"swPdsgRmdrCs missing; nePdsgRmdrCs missing; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T21:16:40,37.53999733,127.08333267,2620,sw,47.99,6.75,0.6,14.2,,NO SIGNAL DATA,"swPdsgRmdrCs missing; nePdsgRmdrCs missing; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T21:16:46,37.54000150,127.08332683,2620,sw,48.17,6.75,0.6,14.2,,NO SIGNAL DATA,"swPdsgRmdrCs missing; nePdsgRmdrCs missing; available=etPdsgRmdrCs,nePdsgRmdrCs,ntPdsgRmdrCs,nwPdsgRmdrCs,sePdsgRmdrCs,stPdsgRmdrCs,swPdsgRmdrCs,wtPdsgRmdrCs"
+2026-07-12T21:23:41,37.53996867,127.08343633,2620,st,48.42,10.45,0.6,20.4,49.2,CAN CROSS,AUTO FIELD: etPdsgRmdrCs; GPS direction did not match
+2026-07-12T21:23:47,37.53996683,127.08343667,2620,st,48.22,10.45,0.6,20.4,44.2,CAN CROSS,AUTO FIELD: etPdsgRmdrCs; GPS direction did not match
+2026-07-12T21:23:52,37.53996783,127.08343683,2620,st,48.33,10.45,0.6,20.4,40.2,CAN CROSS,AUTO FIELD: etPdsgRmdrCs; GPS direction did not match
+2026-07-12T21:23:58,37.53996833,127.08343733,2620,st,48.39,10.45,0.6,20.4,31.2,CAN CROSS,AUTO FIELD: etPdsgRmdrCs; GPS direction did not match
+2026-07-12T21:24:04,37.53997200,127.08343700,2620,st,48.79,10.45,0.6,20.4,27.2,CAN CROSS,AUTO FIELD: etPdsgRmdrCs; GPS direction did not match
+2026-07-12T21:24:09,37.53997750,127.08343633,2620,st,49.39,10.45,0.6,20.4,23.2,CAN CROSS,AUTO FIELD: etPdsgRmdrCs; GPS direction did not match
+2026-07-12T21:24:16,37.53998667,127.08343600,2620,st,50.4,10.45,0.6,20.4,14.2,WAIT,AUTO FIELD: etPdsgRmdrCs; GPS direction did not match
+2026-07-12T21:24:22,37.53998833,127.08343717,2620,st,50.59,10.45,0.6,20.4,10.2,WAIT,AUTO FIELD: etPdsgRmdrCs; GPS direction did not match
+2026-07-12T21:37:17,37.53986800,127.08349200,2620,st,33.05,38.56,10.45,176.4,0.6,20.4,,,DIRECTION CHECK,"No valid signal in crosswalk pair: {'stPdsgRmdrCs': None, 'ntPdsgRmdrCs': None}; other valid=[(72.2, 'etPdsgRmdrCs')]"
+2026-07-12T21:37:23,37.53987167,127.08349450,2620,st,33.51,39.02,10.45,176.4,0.6,20.4,,,DIRECTION CHECK,"No valid signal in crosswalk pair: {'stPdsgRmdrCs': None, 'ntPdsgRmdrCs': None}; other valid=[(68.2, 'etPdsgRmdrCs')]"
+2026-07-12T21:37:29,37.53987633,127.08349217,2620,st,33.94,39.45,10.45,176.4,0.6,20.4,,,DIRECTION CHECK,"No valid signal in crosswalk pair: {'stPdsgRmdrCs': None, 'ntPdsgRmdrCs': None}; other valid=[(64.2, 'etPdsgRmdrCs')]"
+2026-07-12T21:37:36,37.53988267,127.08348783,2620,st,34.5,40.01,10.45,176.4,0.6,20.4,,,DIRECTION CHECK,"No valid signal in crosswalk pair: {'stPdsgRmdrCs': None, 'ntPdsgRmdrCs': None}; other valid=[(55.2, 'etPdsgRmdrCs')]"
+2026-07-12T21:37:41,37.53988983,127.08348500,2620,st,35.2,40.71,10.45,176.4,0.6,20.4,,,DIRECTION CHECK,"No valid signal in crosswalk pair: {'stPdsgRmdrCs': None, 'ntPdsgRmdrCs': None}; other valid=[(50.2, 'etPdsgRmdrCs')]"
+2026-07-12T21:37:47,37.53988917,127.08348600,2620,st,35.15,40.66,10.45,176.4,0.6,20.4,,,DIRECTION CHECK,"No valid signal in crosswalk pair: {'stPdsgRmdrCs': None, 'ntPdsgRmdrCs': None}; other valid=[(46.2, 'etPdsgRmdrCs')]"
+2026-07-12T21:37:54,37.53988867,127.08348533,2620,st,35.08,40.59,10.45,176.4,0.6,20.4,,,DIRECTION CHECK,"No valid signal in crosswalk pair: {'stPdsgRmdrCs': None, 'ntPdsgRmdrCs': None}; other valid=[(37.2, 'etPdsgRmdrCs')]"
+2026-07-12T21:37:59,37.53988100,127.08348167,2620,st,34.17,39.68,10.45,176.4,0.6,20.4,,,DIRECTION CHECK,"No valid signal in crosswalk pair: {'stPdsgRmdrCs': None, 'ntPdsgRmdrCs': None}; other valid=[(32.2, 'etPdsgRmdrCs')]"
+2026-07-12T21:38:04,37.53988500,127.08347800,2620,st,34.52,40.03,10.45,176.4,0.6,20.4,,,DIRECTION CHECK,"No valid signal in crosswalk pair: {'stPdsgRmdrCs': None, 'ntPdsgRmdrCs': None}; other valid=[(28.4, 'etPdsgRmdrCs')]"
+2026-07-12T21:38:11,37.53988783,127.08347583,2620,st,34.78,40.28,10.45,176.4,0.6,20.4,,,DIRECTION CHECK,"No valid signal in crosswalk pair: {'stPdsgRmdrCs': None, 'ntPdsgRmdrCs': None}; other valid=[(19.2, 'etPdsgRmdrCs')]"
+2026-07-12T21:40:49,37.53976050,127.08345733,2620,st,wt,20.74,26.25,10.45,176.4,0.6,20.4,etPdsgRmdrCs,13.2,APPROACHING,OK
+2026-07-12T21:40:55,37.53976250,127.08345767,2620,st,wt,20.96,26.47,10.45,176.4,0.6,20.4,etPdsgRmdrCs,8.2,APPROACHING,OK
+2026-07-14T17:19:14,37.54023700,127.07041100,1678,st,wt,15.99,30.38,29.34,18.8,0.6,51.9,etPdsgRmdrCs,9.4,WAIT,OK
+2026-07-14T17:19:19,37.54023850,127.07040517,1678,st,wt,16.35,30.64,29.34,18.8,0.6,51.9,etPdsgRmdrCs,4.4,WAIT,OK
+2026-07-14T17:19:25,37.54023283,127.07040850,1678,st,wt,15.66,29.96,29.34,18.8,0.6,51.9,etPdsgRmdrCs,0.4,WAIT,OK
+2026-07-14T17:19:31,37.54022850,127.07041050,1678,st,wt,15.14,29.46,29.34,18.8,0.6,51.9,wtPdsgRmdrCs,39.3,WAIT,OK
+2026-07-14T17:19:37,37.54022683,127.07041400,1678,st,wt,14.85,29.22,29.34,18.8,0.6,51.9,wtPdsgRmdrCs,34.3,WAIT,OK
+2026-07-14T17:19:42,37.54020900,127.07043400,1678,st,wt,12.34,26.99,29.34,18.8,0.6,51.9,wtPdsgRmdrCs,30.4,WAIT,OK

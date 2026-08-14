@@ -1,0 +1,15 @@
+{
+  "timestamp": 1784021856.9083316,
+  "port": "/dev/ttyACM0",
+  "baud": 115200,
+  "left_pressure": 0,
+  "right_pressure": 0,
+  "left_threshold": 50,
+  "right_threshold": 50,
+  "left_contact": false,
+  "right_contact": false,
+  "both_contact": false,
+  "pi_command_allowed": false,
+  "reason": "BOTH_HANDLES_RELEASED",
+  "serial_timeout": false
+}
