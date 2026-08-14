@@ -1,15 +1,17 @@
-# Terrain Uno firmware
+# Terrain Uno 펌웨어
 
-This controller owns TOF-10120, MPU-9250, BNO055 and the leg actuator. The
-current sketch is intentionally non-driving: `LEG_OUTPUT_ENABLED` is false.
+이 제어기는 TOF-10120, MPU-9250, BNO055 및 다리 구동기의 최종 제어 권한을
+가집니다. 현재 스케치는 의도적으로 구동하지 않도록 되어 있으며,
+`LEG_OUTPUT_ENABLED` 값은 `false`입니다.
 
-The TOF-10120 is read over I2C at address `0x52` every 50 ms. Its distance is
-filtered with an EMA and compared with a slower adaptive reference. A 60 mm
-error is a step candidate; an error above 60 mm together with a filtered rise
-above 10 mm for four consecutive frames is a confirmed step. The red result is
-held for one second. D8/D9/D10 show normal/candidate/step, and an invalid I2C
-sample is shown as red.
+TOF-10120은 I2C 주소 `0x52`에서 50 ms마다 읽습니다. 측정 거리에 지수 이동
+평균(EMA) 필터를 적용한 뒤, 더 느리게 변하는 적응형 기준값과 비교합니다.
+오차가 60 mm를 넘으면 계단 후보로 판정합니다. 오차가 60 mm를 넘고 필터링된
+거리 증가량도 10 mm를 넘는 상태가 4프레임 연속으로 발생하면 계단으로
+확정합니다. 빨간색 표시 결과는 1초 동안 유지됩니다. D8/D9/D10은 각각
+정상/후보/계단 상태를 표시하며, 유효하지 않은 I2C 측정값도 빨간색으로
+표시합니다.
 
-Final states are `STOWED`, `DEPLOYING`, `DEPLOYED`, `RETRACTING`, `SAFE_STOP`
-and `FAULT`. Motion requires a fresh host command, both limits, valid attitude,
-low wheel speed and a local deadline.
+최종 상태는 `STOWED`, `DEPLOYING`, `DEPLOYED`, `RETRACTING`, `SAFE_STOP`,
+`FAULT`입니다. 구동하려면 최신 호스트 명령, 양쪽 리미트 스위치, 유효한 자세
+정보, 낮은 바퀴 속도 및 로컬 제한시간 조건을 모두 충족해야 합니다.

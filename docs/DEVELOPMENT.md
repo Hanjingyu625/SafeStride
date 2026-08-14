@@ -15,6 +15,19 @@ bash scripts/build.sh
 bash scripts/test.sh
 ```
 
+For short build and clean commands, load the project commands once in your
+shell startup file:
+
+```bash
+echo 'source ~/SafeStride/scripts/commands.sh' >> ~/.bashrc
+source ~/.bashrc
+```
+
+After that, `cbr` builds the workspace using `scripts/build.sh`, and `rb`
+removes only the generated colcon directories (`build/`, `install/`, and
+`log/`). Both commands work from any directory. Extra arguments passed to
+`cbr` are forwarded to `colcon build`.
+
 The installer intentionally does not flash firmware, install udev rules, enable
 systemd or arm a motor.
 

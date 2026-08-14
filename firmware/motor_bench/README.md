@@ -1,26 +1,27 @@
-# Motor bench sketch
+# 모터 벤치 스케치
 
-This sketch preserves the `M,<signed PWM>` command used during the two-motor
-bench test. It is intentionally separate from `safestride_mcu`, whose binary
-serial session, watchdog, E-stop, pressure dead-man and encoder checks must not
-be bypassed in normal operation.
+이 스케치는 모터 2개를 벤치에서 시험할 때 사용하는 `M,<부호 있는 PWM>`
+명령을 제공합니다. 정상 운용 시 우회해서는 안 되는 바이너리 시리얼 세션,
+워치독, E-stop, 압력식 데드맨 및 엔코더 검사를 갖춘 `safestride_mcu`와는
+의도적으로 분리되어 있습니다.
 
-## Pin map
+## 핀 배치
 
-| Driver input | Uno pin |
+| 드라이버 입력 | Uno 핀 |
 |---|---:|
-| Left PWM | D5 |
-| Left IN1 | D6 |
-| Left IN2 | D8 |
-| Right PWM | D9 |
-| Right IN1 | D10 |
-| Right IN2 | D12 |
+| 왼쪽 PWM | D5 |
+| 왼쪽 IN1 | D6 |
+| 왼쪽 IN2 | D8 |
+| 오른쪽 PWM | D9 |
+| 오른쪽 IN1 | D10 |
+| 오른쪽 IN2 | D12 |
 
-Connect Arduino GND to both driver control grounds. Do not power either motor
-or driver from the Uno 5 V pin. For each SZH-GNP521, connect Uno PWM to the
-driver `PWM`, the two direction pins to `IN1` and `IN2`, and Arduino GND to
-driver `COM`. Leave the driver's `5VO` output unconnected. Confirm the terminal
-labels against the exact driver revision before applying power.
+Arduino GND를 두 드라이버의 제어 접지에 모두 연결합니다. 모터나 드라이버에
+Uno의 5 V 핀으로 전원을 공급하지 마십시오. 각 SZH-GNP521에서 Uno의 PWM을
+드라이버 `PWM`에, 방향 핀 2개를 `IN1`과 `IN2`에, Arduino GND를 드라이버
+`COM`에 연결합니다. 드라이버의 `5VO` 출력은 연결하지 않습니다. 전원을
+인가하기 전에 사용 중인 드라이버 리비전의 단자 표기를 반드시 확인하십시오.
 
-Use a current-limited supply or a correctly sized fuse, keep both wheels off the
-ground and begin with `M,20`. `MAX_PWM` is capped at 100 for first testing.
+전류 제한 전원이나 용량이 적절한 퓨즈를 사용하고, 두 바퀴를 지면에서 띄운
+상태에서 `M,20`으로 시작하십시오. 최초 시험을 위해 `MAX_PWM`은 100으로
+제한되어 있습니다.

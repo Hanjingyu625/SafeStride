@@ -1,6 +1,6 @@
-# Model artifacts
+# 모델 산출물
 
-Do not commit large YOLO weights here. Document the model version, download URL,
-SHA-256 checksum, training dataset revision, class names and validation metrics.
-Missing, stale or low-confidence inference must produce a conservative speed
-recommendation.
+용량이 큰 YOLO 가중치를 이 폴더에 커밋하지 마십시오. 모델 버전, 다운로드 URL,
+SHA-256 체크섬, 학습 데이터셋 리비전, 클래스 이름 및 검증 지표를 문서화해야
+합니다. 추론 결과가 없거나 오래되었거나 신뢰도가 낮으면 보수적인 권장 속도를
+출력해야 합니다.
