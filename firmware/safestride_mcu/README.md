@@ -20,6 +20,17 @@ Arduino Uno가 단일 SZH-GNP521을 통해 두 모터에 공통 속도 명령을
 D4, D7, D9, D10, D12는 현재 사용하지 않는다. 상태 LED 출력도 사용하지
 않는다.
 
+## 현재 자석 펄스 벤치 모드
+
+바퀴가 없는 회로 시험을 위해 `config.h`의 `MAGNET_BENCH_MODE=true`가 설정되어
+있다. ROS에서 최신 직진 속도 명령을 발행하고 명시적으로 enable한 뒤 D2 또는
+D3 홀센서에 자석을 통과시키면 PWM 60으로 두 모터가 750 ms 동안 함께 구동된다.
+펄스를 반복하면 마지막 펄스 기준으로 구동 시간이 연장된다. 이 모드는 홀 보정,
+압력 dead-man, 정지 대기, Hall stall/overspeed fault를 우회하지만 serial session과
+command watchdog은 유지한다. 정상 운용 전에는 펌웨어의
+`MAGNET_BENCH_MODE=false`와 두 ROS YAML의 `allow_magnet_bench_mode: false`를
+함께 적용해야 한다.
+
 ## 필수 보정
 
 1. `HALL_CALIBRATED=false`인 운영 펌웨어를 업로드하고 ROS bridge를 실행한다.
@@ -28,8 +39,8 @@ D4, D7, D9, D10, D12는 현재 사용하지 않는다. 상태 LED 출력도 사�
 4. `config.h`와 두 ROS YAML의 회전당 펄스 수를 같은 값으로 수정한다. 두 센서가 다른
    값을 내면 기구 또는 센서 설치를 먼저 수정한다.
 5. 속도와 fault 임계값을 들어 올린 휠에서 검증한 뒤
-   `HALL_CALIBRATED=true`로 변경한다. `false`이면 MCU와 ROS 브리지가 모두
-   모터 활성화를 거부한다.
+   `HALL_CALIBRATED=true`로 변경한다. 정상 모드에서는 `false`이면 MCU와 ROS
+   브리지가 모두 모터 활성화를 거부한다.
 6. 운영 펌웨어를 다시 업로드하고 `/handle/pressure` 로그로 좌우 압력 임계값도 보정한다.
 
 단일출력 홀센서는 회전 방향을 직접 측정하지 못하므로 부호는 드라이버 명령

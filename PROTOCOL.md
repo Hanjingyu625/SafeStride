@@ -44,6 +44,7 @@ Payload `<II>`: `boot_id`, `capabilities`.
 | 4 | dead-man 입력 |
 | 5 | E-stop 입력(현재 미구현이므로 Drive Uno가 광고하지 않음) |
 | 6 | 좌우 압력센서 텔레메트리 |
+| 7 | 자석 펄스 모터 벤치 모드(임시 시험 빌드) |
 | 8 | Terrain TOF 텔레메트리 |
 
 ### `SESSION_START` (`0x02`, Pi → MCU)
@@ -67,6 +68,12 @@ Drive Uno는 홀센서 보정, dead-man, fault, session, 정지 대기 조건을
 정상 상태로 보고한다. 단일 드라이버 구조이므로 회전
 목표는 존재하지 않는다. ROS 브리지는 허용치를 넘는 `angular.z` 명령을
 거부하고 명시적으로 다시 활성화하기 전까지 정지 상태를 유지한다.
+
+Capability/status bit 7이 모두 설정된 임시 자석 벤치 빌드에서는 ROS 측의
+`allow_magnet_bench_mode`도 명시적으로 true일 때만 홀 보정, dead-man, 정지
+대기를 우회한다. enable 상태와 최신 속도 명령이 있어도 모터 출력은 D2 또는
+D3의 최근 펄스가 있을 때만 고정 저출력으로 켜진다. 세션 및 command watchdog은
+이 모드에서도 유지된다.
 
 ### `TELEMETRY` (`0x20`, Drive Uno → Pi)
 
@@ -103,6 +110,7 @@ Status bitmap:
 | 4 | command watchdog timeout |
 | 5 | 현재 session에서 유효 명령 수신 |
 | 6 | 휠 1회전당 홀 펄스 수 보정 완료 |
+| 7 | 자석 펄스 모터 벤치 모드 활성 |
 | 8..10 | firmware state (`BOOT=0`, `DISARMED=1`, `ARMED=2`, `SAFE_STOP=3`, `ESTOP=4`, `FAULT=5`) |
 
 Fault bitmap의 공통 값은 `WalkerStatus.msg`와 같다. `0x0002`는 단일

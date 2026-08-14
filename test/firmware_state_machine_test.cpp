@@ -118,11 +118,10 @@ int main() {
   assert(!g_watchdog_timed_out);
   assert(g_state == ControllerState::DISARMED);
 
-  // Even after the wheels remain stationary, uncalibrated Hall feedback must
-  // prevent an enabled motion command from being accepted.
-  g_stationary_tracking = true;
-  g_stationary_since_ms =
-      g_test_millis - cfg::ARM_STATIONARY_DWELL_MS;
+  // Explicit magnet bench mode permits arming without Hall calibration,
+  // pressure dead-man, or stationary dwell. Motor PWM still requires a pulse
+  // in runControlLoop and a stream of fresh commands.
+  g_stationary_tracking = false;
   proto::writeI32(command_payload + 0U, 500L);
   command_payload[6U] = 1U;
   proto::FrameView motion_enable_command = {
@@ -134,9 +133,9 @@ int main() {
       g_test_millis,
       command_payload,
   };
-  assert(!handleCommand(motion_enable_command));
-  assert(g_state == ControllerState::DISARMED);
-  assert(g_requested_mrad_s == 0L);
+  assert(handleCommand(motion_enable_command));
+  assert(g_state == ControllerState::ARMED);
+  assert(g_requested_mrad_s == 500L);
 
   printf("firmware watchdog/session state-machine tests: OK\n");
   return 0;

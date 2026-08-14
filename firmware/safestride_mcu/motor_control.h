@@ -22,6 +22,12 @@ class DriveController {
       const HallSample& right_hall,
       int32_t requested_mrad_s,
       bool output_allowed);
+  void updateMagnetBench(
+      uint32_t elapsed_us,
+      const HallSample& left_hall,
+      const HallSample& right_hall,
+      int32_t requested_mrad_s,
+      bool output_allowed);
   void disableImmediately();
 
   int32_t leftVelocityMradS() const;

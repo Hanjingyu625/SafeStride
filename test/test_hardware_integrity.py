@@ -9,6 +9,14 @@ ROOT = Path(__file__).resolve().parents[1]
 DRIVE_CONFIG = ROOT / "firmware/safestride_mcu/config.h"
 DRIVE_FIRMWARE = ROOT / "firmware/safestride_mcu/safestride_mcu.ino"
 TERRAIN_FIRMWARE = ROOT / "firmware/terrain_mcu/terrain_mcu.ino"
+BRIDGE = (
+    ROOT
+    / "src/safestride_bridge/safestride_bridge/serial_bridge_node.py"
+)
+ROS_CONFIGS = (
+    ROOT / "config/raspberry_pi.yaml",
+    ROOT / "src/safestride_bringup/config/safestride.yaml",
+)
 
 
 def constant_expression(text: str, name: str) -> str:
@@ -28,6 +36,7 @@ class TestHardwareIntegrity(unittest.TestCase):
         cls.config = DRIVE_CONFIG.read_text(encoding="utf-8")
         cls.drive = DRIVE_FIRMWARE.read_text(encoding="utf-8")
         cls.terrain = TERRAIN_FIRMWARE.read_text(encoding="utf-8")
+        cls.bridge = BRIDGE.read_text(encoding="utf-8")
 
     def test_drive_active_pins_are_unique(self):
         names = (
@@ -76,6 +85,37 @@ class TestHardwareIntegrity(unittest.TestCase):
             r"if\s*\(cfg::ENABLE_ESTOP\)\s*\{\s*"
             r"capabilities\s*\|=\s*CAP_ESTOP;",
         )
+
+    def test_magnet_bench_mode_is_explicit_and_bounded(self):
+        self.assertEqual(
+            constant_expression(self.config, "MAGNET_BENCH_MODE"),
+            "true",
+        )
+        pwm = int(
+            constant_expression(self.config, "MAGNET_BENCH_PWM")
+            .removesuffix("U")
+        )
+        hold_ms = int(
+            constant_expression(
+                self.config, "MAGNET_BENCH_PULSE_HOLD_MS"
+            ).removesuffix("U")
+        )
+        self.assertGreater(pwm, 0)
+        self.assertLessEqual(pwm, 100)
+        self.assertGreater(hold_ms, 0)
+        self.assertLessEqual(hold_ms, 1000)
+        self.assertIn("output_allowed && magnet_pulse_recent", self.drive)
+        self.assertIn("COMMAND_WATCHDOG_MAX_MS", self.config)
+
+    def test_ros_must_explicitly_allow_magnet_bench_mode(self):
+        self.assertIn(
+            "('command.allow_magnet_bench_mode', False)", self.bridge
+        )
+        self.assertIn("CAP_MAGNET_BENCH_MODE", self.bridge)
+        self.assertIn("STATUS_MAGNET_BENCH_MODE", self.bridge)
+        for path in ROS_CONFIGS:
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("allow_magnet_bench_mode: true", text)
 
     def test_terrain_uses_i2c_without_gpio_actuator_outputs(self):
         self.assertIn("Wire.begin()", self.terrain)

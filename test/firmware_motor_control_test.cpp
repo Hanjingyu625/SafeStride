@@ -126,6 +126,32 @@ int main() {
          DriveController::HALL_FAULT_RIGHT));
   }
 
+  {
+    DriveController drive;
+    drive.begin();
+    const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
+    const HallSample magnet_pulse = sample(1UL);
+    drive.updateMagnetBench(
+        5000UL, magnet_pulse, stopped, 500L, true);
+    assert(drive.hallFaultMask() == 0U);
+    assert(g_motor_pwm == cfg::MAGNET_BENCH_PWM);
+    assert(g_motor_in1_level == HIGH);
+    assert(g_motor_in2_level == LOW);
+    assert(drive.leftHallPulsePosition() == 0L);
+
+    drive.updateMagnetBench(
+        5000UL, magnet_pulse, stopped, 500L, false);
+    assert(g_motor_pwm == 0);
+    assert(g_motor_in1_level == LOW);
+    assert(g_motor_in2_level == LOW);
+
+    drive.updateMagnetBench(
+        5000UL, magnet_pulse, stopped, -500L, true);
+    assert(g_motor_pwm == cfg::MAGNET_BENCH_PWM);
+    assert(g_motor_in1_level == LOW);
+    assert(g_motor_in2_level == HIGH);
+  }
+
   printf("firmware Hall feedback and single-driver tests: OK\n");
   return 0;
 }
