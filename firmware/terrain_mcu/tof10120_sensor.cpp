@@ -2,24 +2,11 @@
 
 #include <Wire.h>
 
+#include "config.h"
+
 namespace {
 
-constexpr uint8_t TOF10120_I2C_ADDRESS = 0x52U;
-constexpr uint8_t DISTANCE_REGISTER = 0x00U;
-constexpr uint16_t SENSOR_PERIOD_MS = 50U;
-constexpr uint16_t MIN_VALID_DISTANCE_MM = 1U;
-constexpr uint16_t MAX_VALID_DISTANCE_MM = 1999U;
-
-constexpr float FILTER_ALPHA = 0.3F;
-constexpr float REFERENCE_ALPHA = 0.02F;
-constexpr float ERROR_THRESHOLD_MM = 60.0F;
-constexpr float CHANGE_THRESHOLD_MM = 10.0F;
-constexpr uint8_t REQUIRED_FRAMES = 4U;
-constexpr uint16_t RED_HOLD_MS = 1000U;
-
-constexpr uint8_t LED_GREEN_PIN = 8U;
-constexpr uint8_t LED_YELLOW_PIN = 9U;
-constexpr uint8_t LED_RED_PIN = 10U;
+namespace cfg = safestride_terrain_config;
 
 }  // namespace
 
@@ -38,41 +25,37 @@ Tof10120Sensor::Tof10120Sensor()
       alert_(TofAlert::INVALID) {}
 
 void Tof10120Sensor::begin(uint32_t now_ms) {
-  pinMode(LED_GREEN_PIN, OUTPUT);
-  pinMode(LED_YELLOW_PIN, OUTPUT);
-  pinMode(LED_RED_PIN, OUTPUT);
-  last_sample_ms_ = now_ms - SENSOR_PERIOD_MS;
-  writeLeds();
+  last_sample_ms_ = now_ms - cfg::TOF_SAMPLE_PERIOD_MS;
 }
 
 void Tof10120Sensor::update(uint32_t now_ms) {
-  if (now_ms - last_sample_ms_ < SENSOR_PERIOD_MS) {
+  if (now_ms - last_sample_ms_ < cfg::TOF_SAMPLE_PERIOD_MS) {
     return;
   }
   last_sample_ms_ = now_ms;
 
   const uint16_t distance = readDistanceI2c();
-  if (distance < MIN_VALID_DISTANCE_MM ||
-      distance > MAX_VALID_DISTANCE_MM) {
+  if (distance < cfg::TOF_MIN_VALID_DISTANCE_MM ||
+      distance > cfg::TOF_MAX_VALID_DISTANCE_MM) {
     valid_ = false;
     consecutive_count_ = 0U;
     alert_ = TofAlert::INVALID;
-    writeLeds();
     return;
   }
 
   classify(now_ms, distance);
-  writeLeds();
 }
 
 uint16_t Tof10120Sensor::readDistanceI2c() {
-  Wire.beginTransmission(TOF10120_I2C_ADDRESS);
-  Wire.write(DISTANCE_REGISTER);
+  Wire.beginTransmission(cfg::TOF_I2C_ADDRESS);
+  Wire.write(cfg::TOF_DISTANCE_REGISTER);
   if (Wire.endTransmission() != 0U) {
     return 0xFFFFU;
   }
 
-  if (Wire.requestFrom(TOF10120_I2C_ADDRESS, static_cast<uint8_t>(2U)) !=
+  delayMicroseconds(50U);
+
+  if (Wire.requestFrom(cfg::TOF_I2C_ADDRESS, static_cast<uint8_t>(2U)) !=
       2U) {
     return 0xFFFFU;
   }
@@ -103,49 +86,38 @@ void Tof10120Sensor::classify(
   }
 
   const float previous_filtered = filtered_mm_;
-  filtered_mm_ = FILTER_ALPHA * static_cast<float>(distance_mm) +
-                 (1.0F - FILTER_ALPHA) * filtered_mm_;
-  reference_mm_ = REFERENCE_ALPHA * filtered_mm_ +
-                  (1.0F - REFERENCE_ALPHA) * reference_mm_;
+  filtered_mm_ = cfg::TOF_FILTER_ALPHA * static_cast<float>(distance_mm) +
+                 (1.0F - cfg::TOF_FILTER_ALPHA) * filtered_mm_;
+  reference_mm_ = cfg::TOF_REFERENCE_ALPHA * filtered_mm_ +
+                  (1.0F - cfg::TOF_REFERENCE_ALPHA) * reference_mm_;
   error_mm_ = filtered_mm_ - reference_mm_;
   change_mm_ = filtered_mm_ - previous_filtered;
 
-  if (error_mm_ > ERROR_THRESHOLD_MM &&
-      change_mm_ > CHANGE_THRESHOLD_MM) {
-    if (consecutive_count_ < REQUIRED_FRAMES) {
+  if (error_mm_ > cfg::TOF_ERROR_THRESHOLD_MM &&
+      change_mm_ > cfg::TOF_CHANGE_THRESHOLD_MM) {
+    if (consecutive_count_ < cfg::TOF_REQUIRED_FRAMES) {
       ++consecutive_count_;
     }
   } else {
     consecutive_count_ = 0U;
   }
 
-  if (consecutive_count_ >= REQUIRED_FRAMES) {
+  if (consecutive_count_ >= cfg::TOF_REQUIRED_FRAMES) {
     red_hold_active_ = true;
     last_red_ms_ = now_ms;
   }
-  if (red_hold_active_ && now_ms - last_red_ms_ >= RED_HOLD_MS) {
+  if (red_hold_active_ &&
+      now_ms - last_red_ms_ >= cfg::TOF_RED_HOLD_MS) {
     red_hold_active_ = false;
   }
 
   if (red_hold_active_) {
     alert_ = TofAlert::STEP;
-  } else if (error_mm_ > ERROR_THRESHOLD_MM) {
+  } else if (error_mm_ > cfg::TOF_ERROR_THRESHOLD_MM) {
     alert_ = TofAlert::CANDIDATE;
   } else {
     alert_ = TofAlert::NORMAL;
   }
-}
-
-void Tof10120Sensor::writeLeds() {
-  const bool red = alert_ == TofAlert::STEP ||
-                   alert_ == TofAlert::INVALID;
-  digitalWrite(LED_RED_PIN, red ? HIGH : LOW);
-  digitalWrite(
-      LED_YELLOW_PIN,
-      alert_ == TofAlert::CANDIDATE ? HIGH : LOW);
-  digitalWrite(
-      LED_GREEN_PIN,
-      alert_ == TofAlert::NORMAL ? HIGH : LOW);
 }
 
 bool Tof10120Sensor::valid() const {

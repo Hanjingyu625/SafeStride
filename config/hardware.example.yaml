@@ -15,17 +15,21 @@ crosswalk:
   intersection_id: CHANGE_ME_ITST_ID
   motion_output_enabled: false
 drive:
-  motor_output_enabled: false
+  requires_explicit_ros_enable: true
   wheel_radius_m: 0.15
   wheel_separation_m: 0.55
-  encoder_counts_per_revolution: 1024
+  hall_pulses_per_revolution: null
+  hall_calibrated: false
   pressure:
     left_pressed_threshold: null
     right_pressed_threshold: null
+    left_active_high: null
+    right_active_high: null
 terrain:
   leg_output_enabled: false
   tof:
-    interface: CHANGE_ME_I2C_OR_UART
+    interface: I2C
+    address_7bit: 0x52
     mount_height_m: null
     mount_pitch_deg: null
   leg:

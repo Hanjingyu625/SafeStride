@@ -12,11 +12,12 @@ serial_bridge:
       timeout_s: 0.20
       ttl_ms: 200
       arm_max_wheel_speed_rad_s: 0.10
+      max_abs_angular_z_rad_s: 0.0
       arm_confirmation_timeout_s: 1.0
     telemetry: {timeout_s: 0.30}
     diagnostics: {publish_rate_hz: 1.0}
     base:
-      ticks_per_revolution: 1024
+      hall_pulses_per_revolution: 1
       max_wheel_speed_rad_s: 3.0
     range: {min_m: 0.02, max_m: 4.0, field_of_view_rad: 0.35}
     battery: {empty_voltage: 0.0, full_voltage: 0.0}
@@ -33,10 +34,30 @@ serial_bridge:
       range_left: /range/front_left
       range_right: /range/front_right
       battery: /battery_state
+      pressure: /handle/pressure
+      hall: /wheel/hall
       status: /walker/status
       diagnostics: /diagnostics
     services: {set_enabled: /walker/set_enabled}
     publish_tf: true
+
+terrain_bridge:
+  ros__parameters:
+    serial:
+      port: /dev/safestride-terrain
+      baudrate: 115200
+      read_chunk_size: 256
+      max_frame_size: 160
+      reconnect_period_s: 1.0
+    transport: {poll_rate_hz: 100.0}
+    telemetry: {timeout_s: 0.30}
+    diagnostics: {publish_rate_hz: 1.0}
+    range: {min_m: 0.10, max_m: 2.0, field_of_view_rad: 0.052}
+    frames: {tof: terrain_tof_link}
+    topics:
+      tof: /terrain/tof
+      status: /terrain/status
+      diagnostics: /diagnostics
 
 safety_supervisor:
   ros__parameters:
@@ -46,11 +67,12 @@ safety_supervisor:
     status_timeout: 0.50
     max_telemetry_age: 0.50
     range_timeout: 0.35
-    require_range_sensors: true
+    # The terrain TOF faces downward and cannot replace front obstacle ranges.
+    require_range_sensors: false
     require_deadman: true
     max_forward_velocity: 0.15
     max_reverse_velocity: 0.08
-    max_angular_velocity: 0.35
+    max_angular_velocity: 0.0
     max_linear_acceleration: 0.20
     max_linear_deceleration: 0.50
     max_angular_acceleration: 0.50

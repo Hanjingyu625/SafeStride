@@ -28,6 +28,7 @@ def generate_launch_description() -> LaunchDescription:
     wheel_separation = LaunchConfiguration('wheel_separation')
     enable_gps = LaunchConfiguration('enable_gps')
     enable_crosswalk = LaunchConfiguration('enable_crosswalk')
+    enable_terrain = LaunchConfiguration('enable_terrain')
     robot_description = ParameterValue(
         Command(
             [
@@ -65,6 +66,11 @@ def generate_launch_description() -> LaunchDescription:
                 'wheel_separation',
                 default_value='0.55',
                 description='Measured lateral separation of powered wheels.',
+            ),
+            DeclareLaunchArgument(
+                'enable_terrain',
+                default_value='true',
+                description='Start the Terrain Uno serial sensor bridge.',
             ),
             DeclareLaunchArgument(
                 'enable_gps',
@@ -107,6 +113,14 @@ def generate_launch_description() -> LaunchDescription:
                 executable='safety_supervisor',
                 name='safety_supervisor',
                 output='screen',
+                parameters=[config_file],
+            ),
+            Node(
+                package='safestride_bridge',
+                executable='terrain_bridge_node',
+                name='terrain_bridge',
+                output='screen',
+                condition=IfCondition(enable_terrain),
                 parameters=[config_file],
             ),
             Node(

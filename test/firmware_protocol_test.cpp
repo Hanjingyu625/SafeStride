@@ -47,10 +47,9 @@ int main() {
 
   uint8_t command[proto::COMMAND_PAYLOAD_SIZE];
   proto::writeI32(command + 0U, -12345L);
-  proto::writeI32(command + 4U, 67890L);
-  proto::writeU16(command + 8U, 150U);
-  command[10] = 1U;
-  command[11] = 0U;
+  proto::writeU16(command + 4U, 150U);
+  command[6] = 1U;
+  command[7] = 0U;
 
   BufferStream stream;
   assert(proto::sendFrame(
@@ -62,12 +61,13 @@ int main() {
       command,
       sizeof(command)));
 
-  // Golden vector produced by safestride_bridge.protocol.Frame.encode().
+  // Protocol-v2 golden vector produced by
+  // safestride_bridge.protocol.Frame.encode().
   static const uint8_t expected[] = {
-      0x03, 0x01, 0x10, 0x01, 0x04, 0x34, 0x12, 0x0c,
-      0x10, 0xef, 0xcd, 0xab, 0x89, 0x40, 0x30, 0x20,
-      0x10, 0xc7, 0xcf, 0xff, 0xff, 0x32, 0x09, 0x01,
-      0x02, 0x96, 0x02, 0x01, 0x03, 0x36, 0x4d, 0x00};
+      0x03, 0x02, 0x10, 0x01, 0x04, 0x34, 0x12, 0x08,
+      0x0e, 0xef, 0xcd, 0xab, 0x89, 0x40, 0x30, 0x20,
+      0x10, 0xc7, 0xcf, 0xff, 0xff, 0x96, 0x02, 0x01,
+      0x03, 0x2f, 0x93, 0x00};
   assert(stream.length() == sizeof(expected));
   assert(memcmp(stream.data(), expected, sizeof(expected)) == 0);
 
@@ -85,10 +85,9 @@ int main() {
   assert(frame.timestamp_ms == 0x10203040UL);
   assert(frame.payload_length == proto::COMMAND_PAYLOAD_SIZE);
   assert(proto::readI32(frame.payload + 0U) == -12345L);
-  assert(proto::readI32(frame.payload + 4U) == 67890L);
-  assert(proto::readU16(frame.payload + 8U) == 150U);
-  assert(frame.payload[10] == 1U);
-  assert(frame.payload[11] == 0U);
+  assert(proto::readU16(frame.payload + 4U) == 150U);
+  assert(frame.payload[6] == 1U);
+  assert(frame.payload[7] == 0U);
 
   assert(proto::sequenceIsNewer(0U, 0xFFFFU));
   assert(!proto::sequenceIsNewer(10U, 10U));

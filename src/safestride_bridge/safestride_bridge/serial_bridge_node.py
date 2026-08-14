@@ -14,7 +14,7 @@ from nav_msgs.msg import Odometry
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from safestride_interfaces.msg import WalkerStatus
+from safestride_interfaces.msg import HandlePressure, WalkerStatus, WheelHall
 from sensor_msgs.msg import BatteryState, JointState, Range
 from std_srvs.srv import SetBool
 from tf2_ros import TransformBroadcaster
@@ -45,8 +45,15 @@ STATUS_DEADMAN = 1 << 2
 STATUS_ESTOP = 1 << 3
 STATUS_WATCHDOG_TIMEOUT = 1 << 4
 STATUS_COMMAND_SEEN = 1 << 5
+STATUS_HALL_CALIBRATED = 1 << 6
 STATUS_STATE_SHIFT = 8
 STATUS_STATE_MASK = 0x7
+
+PRESSURE_LEFT_PRESENT = 1 << 0
+PRESSURE_RIGHT_PRESENT = 1 << 1
+PRESSURE_CALIBRATED = 1 << 2
+CAP_PRESSURE_TELEMETRY = 1 << 6
+CAP_TWO_HALL_SENSORS = 1 << 0
 
 # Firmware state values encoded in status_bits[10:8].
 FW_BOOT = 0
@@ -97,7 +104,6 @@ class SerialBridgeNode(Node):
         self._enabled_requested = False
         self._last_command_time: Optional[float] = None
         self._target_linear = 0.0
-        self._target_angular = 0.0
         self._command_timed_out = True
         self._arm_confirmed = False
         self._arm_confirmation_deadline: Optional[float] = None
@@ -105,8 +111,8 @@ class SerialBridgeNode(Node):
         self._last_telemetry_time: Optional[float] = None
         self._last_telemetry: Optional[TelemetryPayload] = None
         self._last_telemetry_sequence: Optional[int] = None
-        self._last_encoder_left: Optional[int] = None
-        self._last_encoder_right: Optional[int] = None
+        self._last_hall_left: Optional[int] = None
+        self._last_hall_right: Optional[int] = None
         self._joint_left = 0.0
         self._joint_right = 0.0
         self._odom_x = 0.0
@@ -127,6 +133,12 @@ class SerialBridgeNode(Node):
         )
         self._battery_pub = self.create_publisher(
             BatteryState, self._topic_battery, qos_profile_sensor_data
+        )
+        self._pressure_pub = self.create_publisher(
+            HandlePressure, self._topic_pressure, qos_profile_sensor_data
+        )
+        self._hall_pub = self.create_publisher(
+            WheelHall, self._topic_hall, qos_profile_sensor_data
         )
         self._status_pub = self.create_publisher(
             WalkerStatus, self._topic_status, 10
@@ -177,12 +189,13 @@ class SerialBridgeNode(Node):
             ('command.timeout_s', 0.20),
             ('command.ttl_ms', 200),
             ('command.arm_max_wheel_speed_rad_s', 0.10),
+            ('command.max_abs_angular_z_rad_s', 0.0),
             ('command.arm_confirmation_timeout_s', 1.0),
             ('telemetry.timeout_s', 0.30),
             ('diagnostics.publish_rate_hz', 1.0),
             ('base.wheel_radius_m', 0.15),
             ('base.wheel_separation_m', 0.55),
-            ('base.ticks_per_revolution', 1024),
+            ('base.hall_pulses_per_revolution', 1),
             ('base.max_wheel_speed_rad_s', 3.0),
             ('range.min_m', 0.02),
             ('range.max_m', 4.0),
@@ -201,6 +214,8 @@ class SerialBridgeNode(Node):
             ('topics.range_left', '/range/front_left'),
             ('topics.range_right', '/range/front_right'),
             ('topics.battery', '/battery_state'),
+            ('topics.pressure', '/handle/pressure'),
+            ('topics.hall', '/wheel/hall'),
             ('topics.status', '/walker/status'),
             ('topics.diagnostics', '/diagnostics'),
             ('services.set_enabled', '/walker/set_enabled'),
@@ -274,6 +289,12 @@ class SerialBridgeNode(Node):
             minimum=0.0,
             maximum=100.0,
         )
+        self._max_abs_angular_z = finite_float(
+            'command.max_abs_angular_z_rad_s',
+            self._value('command.max_abs_angular_z_rad_s'),
+            minimum=0.0,
+            maximum=10.0,
+        )
         self._arm_confirmation_timeout = finite_float(
             'command.arm_confirmation_timeout_s',
             self._value('command.arm_confirmation_timeout_s'),
@@ -310,9 +331,9 @@ class SerialBridgeNode(Node):
             maximum=10.0,
             minimum_inclusive=False,
         )
-        self._ticks_per_revolution = finite_float(
-            'base.ticks_per_revolution',
-            self._value('base.ticks_per_revolution'),
+        self._hall_pulses_per_revolution = finite_float(
+            'base.hall_pulses_per_revolution',
+            self._value('base.hall_pulses_per_revolution'),
             minimum=0.0,
             maximum=1.0e9,
             minimum_inclusive=False,
@@ -396,6 +417,8 @@ class SerialBridgeNode(Node):
         self._topic_range_left = str(self._value('topics.range_left'))
         self._topic_range_right = str(self._value('topics.range_right'))
         self._topic_battery = str(self._value('topics.battery'))
+        self._topic_pressure = str(self._value('topics.pressure'))
+        self._topic_hall = str(self._value('topics.hall'))
         self._topic_status = str(self._value('topics.status'))
         self._topic_diagnostics = str(self._value('topics.diagnostics'))
         self._service_set_enabled = str(
@@ -458,6 +481,8 @@ class SerialBridgeNode(Node):
             self._firmware_status_consistent(telemetry)
             and bool(telemetry.status_bits & STATUS_SESSION)
             and bool(telemetry.status_bits & STATUS_DEADMAN)
+            and bool(telemetry.status_bits & STATUS_HALL_CALIBRATED)
+            and bool(self._capabilities & CAP_TWO_HALL_SENSORS)
             and not bool(telemetry.status_bits & STATUS_ESTOP)
             and not bool(
                 telemetry.status_bits & STATUS_WATCHDOG_TIMEOUT
@@ -482,8 +507,8 @@ class SerialBridgeNode(Node):
         self._last_telemetry_time = None
         self._last_telemetry = None
         self._last_telemetry_sequence = None
-        self._last_encoder_left = None
-        self._last_encoder_right = None
+        self._last_hall_left = None
+        self._last_hall_right = None
         self._parser.reset()
 
     def _close_serial(self, reason: str) -> None:
@@ -595,7 +620,7 @@ class SerialBridgeNode(Node):
                 and now >= self._arm_confirmation_deadline
             ):
                 self._clear_enable_request()
-                self._send_command(0, 0, False)
+                self._send_command(0, False)
                 self.get_logger().warning(
                     'ignored late ARMED confirmation; '
                     'explicit re-enable required'
@@ -645,8 +670,8 @@ class SerialBridgeNode(Node):
             self._last_telemetry_time = None
             self._last_telemetry = None
             self._last_telemetry_sequence = None
-            self._last_encoder_left = None
-            self._last_encoder_right = None
+            self._last_hall_left = None
+            self._last_hall_right = None
 
         payload = SessionStartPayload(hello.boot_id).pack()
         frame = self._make_frame(
@@ -708,9 +733,22 @@ class SerialBridgeNode(Node):
         if not math.isfinite(linear) or not math.isfinite(angular):
             self.get_logger().error('discarded non-finite /cmd_vel_safe')
             return
+        if abs(angular) > self._max_abs_angular_z:
+            with self._lock:
+                self._target_linear = 0.0
+                self._last_command_time = None
+                self._command_timed_out = True
+                self._clear_enable_request()
+            self.get_logger().error(
+                'discarded angular command: one shared motor driver '
+                'supports straight motion only',
+                throttle_duration_sec=2.0,
+            )
+            if self._session_started and self._serial_connected():
+                self._send_command(0, False)
+            return
         with self._lock:
             self._target_linear = linear
-            self._target_angular = angular
             self._last_command_time = self._now_monotonic()
             self._command_timed_out = False
 
@@ -719,7 +757,7 @@ class SerialBridgeNode(Node):
         if not request.data:
             with self._lock:
                 self._clear_enable_request()
-            delivered = self._send_command(0, 0, False)
+            delivered = self._send_command(0, False)
             response.success = delivered
             if delivered:
                 response.message = (
@@ -784,6 +822,16 @@ class SerialBridgeNode(Node):
             response.success = False
             response.message = 'cannot enable: controller session is inactive'
             return response
+        if not (self._capabilities & CAP_TWO_HALL_SENSORS):
+            response.success = False
+            response.message = 'cannot enable: Hall feedback is unavailable'
+            return response
+        if not (telemetry.status_bits & STATUS_HALL_CALIBRATED):
+            response.success = False
+            response.message = (
+                'cannot enable: Hall pulses per revolution are not calibrated'
+            )
+            return response
         if not (telemetry.status_bits & STATUS_DEADMAN):
             response.success = False
             response.message = 'cannot enable: dead-man switch is not active'
@@ -834,7 +882,7 @@ class SerialBridgeNode(Node):
         )
         if not link_ok or not remote_safe:
             self._clear_enable_request()
-            self._send_command(0, 0, False)
+            self._send_command(0, False)
             return
 
         fresh = (
@@ -849,7 +897,7 @@ class SerialBridgeNode(Node):
                 )
             self._command_timed_out = True
             self._clear_enable_request()
-            self._send_command(0, 0, False)
+            self._send_command(0, False)
             return
 
         if (
@@ -865,38 +913,26 @@ class SerialBridgeNode(Node):
                 'explicit re-enable required'
             )
             self._clear_enable_request()
-            self._send_command(0, 0, False)
+            self._send_command(0, False)
             return
 
         enable = self._enabled_requested and link_ok and remote_safe
         if not enable:
-            self._send_command(0, 0, False)
+            self._send_command(0, False)
             return
 
-        left = (
-            self._target_linear
-            - 0.5 * self._wheel_separation * self._target_angular
-        ) / self._wheel_radius
-        right = (
-            self._target_linear
-            + 0.5 * self._wheel_separation * self._target_angular
-        ) / self._wheel_radius
-        left = max(-self._max_wheel_speed, min(self._max_wheel_speed, left))
-        right = max(
-            -self._max_wheel_speed, min(self._max_wheel_speed, right)
+        target = self._target_linear / self._wheel_radius
+        target = max(
+            -self._max_wheel_speed,
+            min(self._max_wheel_speed, target),
         )
-        self._send_command(
-            int(round(left * 1000.0)),
-            int(round(right * 1000.0)),
-            True,
-        )
+        self._send_command(int(round(target * 1000.0)), True)
 
     def _send_command(
-        self, left_mrad_s: int, right_mrad_s: int, enable: bool
+        self, target_mrad_s: int, enable: bool
     ) -> bool:
         payload = CommandPayload(
-            left_mrad_s=left_mrad_s,
-            right_mrad_s=right_mrad_s,
+            target_mrad_s=target_mrad_s,
             ttl_ms=self._command_ttl_ms,
             enable=1 if enable else 0,
         ).pack()
@@ -909,16 +945,18 @@ class SerialBridgeNode(Node):
         left_velocity = telemetry.velocity_left_mrad_s / 1000.0
         right_velocity = telemetry.velocity_right_mrad_s / 1000.0
 
-        if self._last_encoder_left is not None:
+        if self._last_hall_left is not None:
             left_delta = _int32_delta(
-                telemetry.encoder_left, self._last_encoder_left
+                telemetry.hall_left_pulses, self._last_hall_left
             )
             right_delta = _int32_delta(
-                telemetry.encoder_right, self._last_encoder_right
+                telemetry.hall_right_pulses, self._last_hall_right
             )
-            radians_per_tick = 2.0 * math.pi / self._ticks_per_revolution
-            left_angle_delta = left_delta * radians_per_tick
-            right_angle_delta = right_delta * radians_per_tick
+            radians_per_pulse = (
+                2.0 * math.pi / self._hall_pulses_per_revolution
+            )
+            left_angle_delta = left_delta * radians_per_pulse
+            right_angle_delta = right_delta * radians_per_pulse
             self._joint_left += left_angle_delta
             self._joint_right += right_angle_delta
 
@@ -936,8 +974,20 @@ class SerialBridgeNode(Node):
                 math.cos(self._odom_yaw + yaw_delta),
             )
 
-        self._last_encoder_left = telemetry.encoder_left
-        self._last_encoder_right = telemetry.encoder_right
+        self._last_hall_left = telemetry.hall_left_pulses
+        self._last_hall_right = telemetry.hall_right_pulses
+
+        hall = WheelHall()
+        hall.header.stamp = stamp
+        hall.header.frame_id = self._frame_base
+        hall.left_pulses = telemetry.hall_left_pulses
+        hall.right_pulses = telemetry.hall_right_pulses
+        hall.left_velocity_rad_s = left_velocity
+        hall.right_velocity_rad_s = right_velocity
+        hall.calibrated = bool(
+            telemetry.status_bits & STATUS_HALL_CALIBRATED
+        )
+        self._hall_pub.publish(hall)
 
         joints = JointState()
         joints.header.stamp = stamp
@@ -1004,6 +1054,7 @@ class SerialBridgeNode(Node):
             stamp,
         )
         self._publish_battery(telemetry, stamp)
+        self._publish_pressure(telemetry, stamp)
         self._publish_status()
 
     def _publish_range(
@@ -1057,6 +1108,31 @@ class SerialBridgeNode(Node):
         else:
             message.percentage = float('nan')
         self._battery_pub.publish(message)
+
+    def _publish_pressure(self, telemetry: TelemetryPayload, stamp) -> None:
+        message = HandlePressure()
+        message.header.stamp = stamp
+        message.header.frame_id = self._frame_base
+        message.left_raw = (
+            float('nan')
+            if telemetry.pressure_left_raw == 0xFFFF
+            else float(telemetry.pressure_left_raw)
+        )
+        message.right_raw = (
+            float('nan')
+            if telemetry.pressure_right_raw == 0xFFFF
+            else float(telemetry.pressure_right_raw)
+        )
+        message.left_present = bool(
+            telemetry.pressure_flags & PRESSURE_LEFT_PRESENT
+        )
+        message.right_present = bool(
+            telemetry.pressure_flags & PRESSURE_RIGHT_PRESENT
+        )
+        message.calibrated = bool(
+            telemetry.pressure_flags & PRESSURE_CALIBRATED
+        )
+        self._pressure_pub.publish(message)
 
     @staticmethod
     def _walker_constant(name: str, fallback: int) -> int:
@@ -1202,6 +1278,22 @@ class SerialBridgeNode(Node):
         ):
             status.level = DiagnosticStatus.ERROR
             status.message = 'emergency stop is active'
+        elif not (self._capabilities & CAP_TWO_HALL_SENSORS):
+            status.level = DiagnosticStatus.ERROR
+            status.message = 'drive firmware lacks Hall feedback'
+        elif self._last_telemetry and not (
+            self._last_telemetry.status_bits & STATUS_HALL_CALIBRATED
+        ):
+            status.level = DiagnosticStatus.WARN
+            status.message = 'Hall pulses per revolution are not calibrated'
+        elif not (self._capabilities & CAP_PRESSURE_TELEMETRY):
+            status.level = DiagnosticStatus.WARN
+            status.message = 'drive firmware lacks pressure telemetry'
+        elif self._last_telemetry and not (
+            self._last_telemetry.pressure_flags & PRESSURE_CALIBRATED
+        ):
+            status.level = DiagnosticStatus.WARN
+            status.message = 'pressure thresholds are not marked calibrated'
         elif (
             self._parser.crc_error_count
             or self._parser.frame_error_count
@@ -1252,6 +1344,57 @@ class SerialBridgeNode(Node):
                 key='enabled_requested',
                 value=str(self._enabled_requested).lower(),
             ),
+            KeyValue(
+                key='hall_left_pulses',
+                value=(
+                    str(telemetry.hall_left_pulses)
+                    if telemetry is not None
+                    else 'unknown'
+                ),
+            ),
+            KeyValue(
+                key='hall_right_pulses',
+                value=(
+                    str(telemetry.hall_right_pulses)
+                    if telemetry is not None
+                    else 'unknown'
+                ),
+            ),
+            KeyValue(
+                key='hall_calibrated',
+                value=str(
+                    bool(
+                        telemetry
+                        and telemetry.status_bits & STATUS_HALL_CALIBRATED
+                    )
+                ).lower(),
+            ),
+            KeyValue(
+                key='pressure_left_raw',
+                value=(
+                    str(telemetry.pressure_left_raw)
+                    if telemetry is not None
+                    else 'unknown'
+                ),
+            ),
+            KeyValue(
+                key='pressure_right_raw',
+                value=(
+                    str(telemetry.pressure_right_raw)
+                    if telemetry is not None
+                    else 'unknown'
+                ),
+            ),
+            KeyValue(
+                key='pressure_calibrated',
+                value=str(
+                    bool(
+                        telemetry
+                        and telemetry.pressure_flags
+                        & PRESSURE_CALIBRATED
+                    )
+                ).lower(),
+            ),
         ]
         array.status = [status]
         self._diagnostics_pub.publish(array)
@@ -1260,7 +1403,7 @@ class SerialBridgeNode(Node):
         """Best-effort disabled command before releasing the serial port."""
 
         if self._session_started and self._serial_connected():
-            self._send_command(0, 0, False)
+            self._send_command(0, False)
         if self._serial is not None:
             try:
                 self._serial.close()

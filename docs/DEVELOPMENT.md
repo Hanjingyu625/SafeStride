@@ -1,5 +1,9 @@
 # Development workflow
 
+For wired Raspberry Pi access, direct-cable addressing, SSH helpers, and ROS 2
+subnet discovery, follow [ETHERNET.md](ETHERNET.md) before the installation
+steps below.
+
 The production target is Raspberry Pi 4 running 64-bit Ubuntu Server 24.04
 (Noble), ROS 2 Jazzy and Python 3.12. Windows is an editing and host-unit-test
 environment; release acceptance happens on arm64 Linux.
@@ -31,8 +35,12 @@ under `/dev/serial/by-id/`; never assume `ttyACM0` ordering.
 
 Copy and edit `deploy/udev/99-safestride.rules.example`, then install it only
 after checking the unique serial attribute of each device. The runtime config
-expects `/dev/safestride-drive`; terrain and GPS nodes will use their respective
-aliases when implemented.
+expects `/dev/safestride-drive` and `/dev/safestride-terrain`; GPS uses its own
+alias when enabled.
+
+Both Arduino sketches must be flashed after a wire-protocol change. Protocol
+v2 is intentionally incompatible with the old dual-wheel command payload, so
+the Drive MCU, Terrain MCU and ROS bridge must be updated together.
 
 For unattended startup, first review `config/raspberry_pi.yaml`, install the
 udev rules, build successfully, and then run `bash scripts/install_service.sh`.

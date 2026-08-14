@@ -60,8 +60,8 @@ class CrossingStateMachine:
         self.progress_history: Deque[Tuple[float, float]] = deque(maxlen=12)
         self.exit_seen_since: Optional[float] = None
         self.crossing_started_at: Optional[float] = None
-        self.arm_encoder_origin: Optional[float] = None
-        self.crossing_encoder_origin: Optional[float] = None
+        self.arm_wheel_origin: Optional[float] = None
+        self.crossing_wheel_origin: Optional[float] = None
         self.reason = 'waiting for a crosswalk'
 
     def set_state(self, new_state: str, reason: str) -> None:
@@ -71,7 +71,7 @@ class CrossingStateMachine:
             self.state = new_state
             self.state_since = self._clock()
             if new_state in ('WAIT_AT_CURB', 'ENTRY_ALLOWED'):
-                self.arm_encoder_origin = None
+                self.arm_wheel_origin = None
             if new_state in ('CROSSING', 'CROSSING_URGENT'):
                 if self.crossing_started_at is None:
                     self.crossing_started_at = self.state_since
@@ -93,8 +93,8 @@ class CrossingStateMachine:
         self.progress_history.clear()
         self.exit_seen_since = None
         self.crossing_started_at = None
-        self.arm_encoder_origin = None
-        self.crossing_encoder_origin = None
+        self.arm_wheel_origin = None
+        self.crossing_wheel_origin = None
         self.reason = reason
 
     def current_crosswalk(
@@ -125,7 +125,7 @@ class CrossingStateMachine:
         self,
         progress_m: float,
         speed_mps: Optional[float],
-        encoder_distance_m: Optional[float],
+        wheel_distance_m: Optional[float],
     ) -> bool:
         self._record_progress(progress_m)
         if (
@@ -134,8 +134,8 @@ class CrossingStateMachine:
             or speed_mps < self.parameters.entry_min_speed_mps
         ):
             return False
-        if self.arm_encoder_origin is None and encoder_distance_m is not None:
-            self.arm_encoder_origin = encoder_distance_m
+        if self.arm_wheel_origin is None and wheel_distance_m is not None:
+            self.arm_wheel_origin = wheel_distance_m
 
         gps_started = False
         if (
@@ -145,13 +145,13 @@ class CrossingStateMachine:
             gain = progress_m - min(value for _, value in self.progress_history)
             gps_started = gain >= self.parameters.entry_start_min_gain_m
 
-        encoder_started = False
-        if encoder_distance_m is not None and self.arm_encoder_origin is not None:
-            encoder_started = (
-                encoder_distance_m - self.arm_encoder_origin
+        wheel_motion_started = False
+        if wheel_distance_m is not None and self.arm_wheel_origin is not None:
+            wheel_motion_started = (
+                wheel_distance_m - self.arm_wheel_origin
                 >= self.parameters.entry_start_min_gain_m
             )
-        return gps_started or encoder_started
+        return gps_started or wheel_motion_started
 
     def update(
         self,
@@ -164,7 +164,7 @@ class CrossingStateMachine:
         signal_valid: bool,
         safe_speed_mps: float,
         measured_speed_mps: Optional[float],
-        encoder_distance_m: Optional[float] = None,
+        wheel_distance_m: Optional[float] = None,
     ) -> Tuple[Optional[Dict[str, Any]], Optional[float], Optional[float]]:
         """Advance the policy and return active crossing, entry time and ETA."""
 
@@ -232,10 +232,10 @@ class CrossingStateMachine:
                 and self._automatic_start_detected(
                     float(progress),
                     measured_speed_mps,
-                    encoder_distance_m,
+                    wheel_distance_m,
                 )
             ):
-                self.crossing_encoder_origin = self.arm_encoder_origin
+                self.crossing_wheel_origin = self.arm_wheel_origin
                 self.set_state(
                     'CROSSING_URGENT',
                     'entry detected while waiting; continue across',
@@ -267,9 +267,9 @@ class CrossingStateMachine:
             elif progress is not None and self._automatic_start_detected(
                 float(progress),
                 measured_speed_mps,
-                encoder_distance_m,
+                wheel_distance_m,
             ):
-                self.crossing_encoder_origin = self.arm_encoder_origin
+                self.crossing_wheel_origin = self.arm_wheel_origin
                 self.set_state(
                     'CROSSING',
                     'automatic entry detected from position and motion',
@@ -278,17 +278,17 @@ class CrossingStateMachine:
         elif self.state in ('CROSSING', 'CROSSING_URGENT'):
             progress = active.get('progress_m')
             if (
-                encoder_distance_m is not None
-                and self.crossing_encoder_origin is not None
+                wheel_distance_m is not None
+                and self.crossing_wheel_origin is not None
             ):
-                encoder_progress = max(
-                    encoder_distance_m - self.crossing_encoder_origin,
+                wheel_progress = max(
+                    wheel_distance_m - self.crossing_wheel_origin,
                     0.0,
                 )
                 progress = (
-                    encoder_progress
+                    wheel_progress
                     if progress is None
-                    else max(float(progress), encoder_progress)
+                    else max(float(progress), wheel_progress)
                 )
                 active['progress_m'] = progress
                 active['remaining_m'] = max(

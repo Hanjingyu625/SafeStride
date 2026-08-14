@@ -6,7 +6,7 @@
   <version>0.1.0</version>
   <description>
     Fail-safe serial bridge between the SafeStride ROS 2 control graph and the
-    motor-controller firmware.
+    drive and terrain controller firmware.
   </description>
   <maintainer email="maintainer@example.com">SafeStride maintainers</maintainer>
   <license>Apache-2.0</license>

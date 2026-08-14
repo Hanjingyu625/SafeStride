@@ -1,40 +1,72 @@
-# Hardware integration register
+# SafeStride 하드웨어 연결표
 
-All pins, voltage levels and addresses are placeholders until checked against
-the exact modules. Do not connect 5 V Uno signals to non-tolerant 3.3 V modules.
+## 보드 역할
 
-| Device | Owner | Proposed bus | Notes |
-|---|---|---|---|
-| Wheel motors x2 | Drive Uno | PWM/IN1/IN2 | One SZH-GNP521 per motor |
-| Wheel encoders x2 | Drive Uno | interrupt GPIO | Existing code assumes quadrature |
-| Round pressure sensors x2 | Drive Uno | analog | Fixed resistors and per-handle calibration required |
-| E-stop | Drive Uno + hardware chain | normally closed | A broken wire must stop motion |
-| TOF-10120 | Terrain Uno | verify I2C/UART variant | Measure mounting geometry |
-| MPU-9250 | Terrain Uno | I2C, usually 0x68/0x69 | Verify level shifting |
-| BNO055 | Terrain Uno | I2C, usually 0x28/0x29 | Publish calibration status |
-| Leg motor | Terrain Uno | PWM/direction/enable | Needs a third driver, current protection and two limits |
-| BE-220 GPS | Raspberry Pi | dedicated UART/USB | Keep separate from Arduino device paths |
-| Camera | Raspberry Pi | CSI or USB | Calibrate after rigid mounting |
+| 장치 | 담당 보드 | 연결 |
+|---|---|---|
+| 동일 정격 모터 2개 | Drive Uno의 단일 SZH-GNP521 | 하나의 공통 출력 부하 |
+| 좌우 홀센서 | Drive Uno | D2, D3 interrupt |
+| 좌우 압력센서 | Drive Uno | A0, A1 전압분배기 |
+| E-stop | 미구현 | A2 예약, 현재 입력으로 설정하지 않음 |
+| TOF-10120 | Terrain Uno | I2C A4/A5, `0x52` |
+| MPU-9250/AK8963, BNO055 | Terrain Uno 예정 | 현재 운영 펌웨어 미구현 |
+| BE-220 GPS, 카메라 | Raspberry Pi | USB/UART, CSI/USB |
 
-## Required before assigning pins
+## Drive Uno 핀맵
 
-- Exact model and datasheet for all three motor drivers.
-- Motor voltage, stall current and encoder specification.
-- Leg travel, required torque, direction and holding behavior.
-- TOF-10120 electrical-interface variant and field of view.
-- Pressure sensor resistance range and mechanical preload.
-- Raspberry Pi, OS and camera model.
+| Uno | 기능 |
+|---:|---|
+| D2 | 왼쪽 홀센서 출력 |
+| D3 | 오른쪽 홀센서 출력 |
+| D5 | 단일 SZH-GNP521 PWM |
+| D6 | 단일 SZH-GNP521 INA(코드의 IN1) |
+| D8 | 단일 SZH-GNP521 INB(코드의 IN2) |
+| A0/A1 | 좌우 압력센서 |
+| A2 | 예약(E-stop 미구현, 현재 미사용) |
+| D13 | 선택적 드라이버 fault |
 
-## Integrated Arduino pin map
+D4, D7, D9, D10, D12는 비어 있으며 상태 LED 출력은 사용하지 않는다.
+드라이버 COM과 Uno GND를 공통 연결한다. 판매처 사양상 제어부는 5 V이지만
+이 제품은 하드웨어 리비전이 바뀔 수 있으므로 실제 보드 실크를 먼저 확인한다.
+`5VO`처럼 **출력**으로 표시된 단자는 Uno 5 V와 연결하지 말고, `VCC`/`5V IN`처럼
+**입력**으로 표시된 리비전만 규정된 5 V를 공급한다. MCU reset 중에도 정지하도록
+PWM 입력에는 드라이버 COM 기준 외부 풀다운을 둔다.
 
-The Drive Uno uses D5/D6/D8 for the left driver's PWM/IN1/IN2 and
-D9/D10/D12 for the right driver's PWM/IN1/IN2. A0/A1 read the two FSR voltage
-dividers, A2 reads the normally-closed E-stop, and A3/A4/A5 drive the pressure
-state LEDs. D2/D3 remain the encoder interrupt pins, with D4/D7 as encoder B.
-Connect both driver `COM` terminals to Arduino GND so the 5 V control signals
-share a reference. The driver `5VO` terminals are outputs and remain
-unconnected; they are not Arduino 5 V inputs. Add a 10 kOhm pull-down from each
-driver PWM input to COM so the drivers remain stopped while the Uno resets.
+두 모터 연결은 동일 전압 정격의 병렬 구성을 전제로 한다. 두 모터가 기구상
+반대 방향으로 장착되었다면 한 모터의 OUT1/OUT2 연결을 바꿔 공통 극성에서
+두 바퀴가 모두 전진하게 만든다. 다음 값을 확인하기 전에는 배터리를 연결하지
+않는다.
 
-The Terrain Uno uses I2C A4/A5 for the TOF-10120 and D8/D9/D10 for its
-green/yellow/red LEDs. The two Unos have separate pin maps.
+[판매처 표기](https://www.devicemart.co.kr/goods/view?no=1385282)는 모터 전압
+6.5~40 V, 최대 전류 15 A이며 제조 시기별 하드웨어 리비전 변경 가능성을 함께
+고지한다. `최대 15 A`를 연속 허용전류로 간주하지 말고 실물 리비전의 방열 및
+연속전류 조건을 별도로 확인한다.
+
+- 두 모터 합산 정지전류와 기동전류
+- SZH-GNP521의 연속/피크 전류 및 방열 조건
+- 배터리, 퓨즈, 커넥터와 배선 허용전류
+- 병렬 연결 시 각 모터의 동일 정격 여부
+- E-stop 구현 전 시험용 물리 전원 차단 수단이 준비되어 있는지 여부
+
+## Terrain Uno 핀맵
+
+| Uno | 기능 |
+|---:|---|
+| A4 | I2C SDA |
+| A5 | I2C SCL |
+| GND | 모든 센서 공통 기준 |
+
+TOF, MPU-9250과 BNO055는 같은 I2C 버스에 병렬 연결한다. Uno는 5 V 계열이므로
+각 브레이크아웃의 5 V 입력과 SDA/SCL 레벨시프터 지원 여부를 확인한다. 원시
+3.3 V 센서 보드에는 5 V I2C를 직접 연결하지 않는다.
+
+## 보정 필수값
+
+- 좌우 홀센서의 휠 1회전당 펄스 수
+- Hall active level과 노이즈 최소 간격
+- 압력센서의 놓음/잡음 값과 좌우 임계값
+- 휠 반지름
+- TOF 설치 높이와 측정 방향
+
+홀 펄스 수와 압력 임계값이 보정되기 전에는 사람을 태우거나 바닥에서 모터를
+구동하지 않는다.

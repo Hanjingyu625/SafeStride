@@ -47,6 +47,10 @@ int main() {
   pressure.begin(g_now_ms);
   assert(pressure.initialized());
   assert(pressure.bothHandsPresent());
+  assert(pressure.leftPresent());
+  assert(pressure.rightPresent());
+  assert(
+      pressure.calibrated() == cfg::PRESSURE_THRESHOLDS_CALIBRATED);
   assert(pressure.alert() == PressureAlert::NORMAL);
 
   g_left_raw = 1000;

@@ -6,6 +6,14 @@
 
 namespace cfg = safestride_config;
 
+namespace {
+
+bool channelPresent(float value, bool active_high, float threshold) {
+  return active_high ? value >= threshold : value <= threshold;
+}
+
+}  // namespace
+
 PressureSensorPair::PressureSensorPair()
     : initialized_(false),
       last_sample_ms_(0UL),
@@ -18,10 +26,6 @@ PressureSensorPair::PressureSensorPair()
       alert_(PressureAlert::HANDS_OFF) {}
 
 void PressureSensorPair::begin(uint32_t now_ms) {
-  pinMode(cfg::LED_GREEN_PIN, OUTPUT);
-  pinMode(cfg::LED_YELLOW_PIN, OUTPUT);
-  pinMode(cfg::LED_RED_PIN, OUTPUT);
-
   left_ = static_cast<float>(analogRead(cfg::PRESSURE_LEFT_PIN));
   right_ = static_cast<float>(analogRead(cfg::PRESSURE_RIGHT_PIN));
   previous_left_ = left_;
@@ -29,12 +33,10 @@ void PressureSensorPair::begin(uint32_t now_ms) {
   difference_ = fabsf(left_ - right_);
   maximum_delta_ = 0.0F;
   initialized_ = true;
-  alert_ = left_ >= cfg::PRESSURE_HANDS_OFF_THRESHOLD &&
-                   right_ >= cfg::PRESSURE_HANDS_OFF_THRESHOLD
+  alert_ = bothHandsPresent()
       ? PressureAlert::NORMAL
       : PressureAlert::HANDS_OFF;
   last_sample_ms_ = now_ms;
-  writeLeds();
 }
 
 void PressureSensorPair::update(uint32_t now_ms) {
@@ -76,29 +78,32 @@ void PressureSensorPair::sample() {
 
   previous_left_ = left_;
   previous_right_ = right_;
-  writeLeds();
-}
-
-void PressureSensorPair::writeLeds() {
-  digitalWrite(
-      cfg::LED_RED_PIN,
-      alert_ == PressureAlert::HANDS_OFF ? HIGH : LOW);
-  digitalWrite(
-      cfg::LED_YELLOW_PIN,
-      alert_ == PressureAlert::WARNING ? HIGH : LOW);
-  digitalWrite(
-      cfg::LED_GREEN_PIN,
-      alert_ == PressureAlert::NORMAL ? HIGH : LOW);
 }
 
 bool PressureSensorPair::bothHandsPresent() const {
-  return initialized_ &&
-         left_ >= cfg::PRESSURE_HANDS_OFF_THRESHOLD &&
-         right_ >= cfg::PRESSURE_HANDS_OFF_THRESHOLD;
+  return leftPresent() && rightPresent();
+}
+
+bool PressureSensorPair::leftPresent() const {
+  return initialized_ && channelPresent(
+      left_,
+      cfg::PRESSURE_LEFT_ACTIVE_HIGH,
+      cfg::PRESSURE_LEFT_PRESENT_THRESHOLD);
+}
+
+bool PressureSensorPair::rightPresent() const {
+  return initialized_ && channelPresent(
+      right_,
+      cfg::PRESSURE_RIGHT_ACTIVE_HIGH,
+      cfg::PRESSURE_RIGHT_PRESENT_THRESHOLD);
 }
 
 bool PressureSensorPair::initialized() const {
   return initialized_;
+}
+
+bool PressureSensorPair::calibrated() const {
+  return initialized_ && cfg::PRESSURE_THRESHOLDS_CALIBRATED;
 }
 
 PressureAlert PressureSensorPair::alert() const {

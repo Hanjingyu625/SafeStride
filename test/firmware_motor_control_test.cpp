@@ -10,16 +10,19 @@ HardwareSerial Serial;
 
 namespace {
 
-int g_left_in1_pwm = 0;
-int g_right_in1_pwm = 0;
-uint8_t g_left_in1_level = LOW;
-uint8_t g_left_in2_level = LOW;
-uint8_t g_right_in1_level = LOW;
-uint8_t g_right_in2_level = LOW;
+int g_motor_pwm = 0;
+uint8_t g_motor_in1_level = LOW;
+uint8_t g_motor_in2_level = LOW;
+
+HallSample sample(uint32_t pulses, uint32_t period_us = 6283185UL) {
+  HallSample value = {pulses, period_us, 0UL};
+  return value;
+}
 
 void primeFeedback(DriveController& drive) {
-  drive.update(5000UL, 0UL, 0UL, 0L, 0L, false);
-  drive.update(5000UL, 0UL, 0UL, 0L, 0L, false);
+  const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
+  drive.update(5000UL, stopped, stopped, 0L, false);
+  drive.update(5000UL, stopped, stopped, 0L, false);
   assert(drive.feedbackReady());
 }
 
@@ -28,24 +31,18 @@ void primeFeedback(DriveController& drive) {
 void pinMode(uint8_t, uint8_t) {}
 
 void digitalWrite(uint8_t pin, uint8_t value) {
-  if (pin == cfg::LEFT_MOTOR_IN1_PIN) {
-    g_left_in1_level = value;
-  } else if (pin == cfg::LEFT_MOTOR_IN2_PIN) {
-    g_left_in2_level = value;
-  } else if (pin == cfg::RIGHT_MOTOR_IN1_PIN) {
-    g_right_in1_level = value;
-  } else if (pin == cfg::RIGHT_MOTOR_IN2_PIN) {
-    g_right_in2_level = value;
+  if (pin == cfg::MOTOR_IN1_PIN) {
+    g_motor_in1_level = value;
+  } else if (pin == cfg::MOTOR_IN2_PIN) {
+    g_motor_in2_level = value;
   }
 }
 
 int digitalRead(uint8_t) { return LOW; }
 
 void analogWrite(uint8_t pin, int value) {
-  if (pin == cfg::LEFT_MOTOR_PWM_PIN) {
-    g_left_in1_pwm = value;
-  } else if (pin == cfg::RIGHT_MOTOR_PWM_PIN) {
-    g_right_in1_pwm = value;
+  if (pin == cfg::MOTOR_PWM_PIN) {
+    g_motor_pwm = value;
   }
 }
 
@@ -72,74 +69,63 @@ int main() {
     DriveController drive;
     drive.begin();
     primeFeedback(drive);
-    uint32_t count = 0UL;
-    for (int i = 0; i < 220; ++i) {
-      ++count;
-      drive.update(5000UL, count, count, 1000L, 1000L, true);
+    for (uint32_t count = 1UL; count <= 220UL; ++count) {
+      const HallSample moving = sample(count);
+      drive.update(5000UL, moving, moving, 1000L, true);
     }
-    assert(drive.encoderFaultMask() == 0U);
-    assert(g_left_in1_pwm > 0);
-    assert(g_right_in1_pwm > 0);
-    assert(g_left_in1_level == HIGH);
-    assert(g_left_in2_level == LOW);
-    assert(g_right_in1_level == LOW);
-    assert(g_right_in2_level == HIGH);
+    assert(drive.hallFaultMask() == 0U);
+    assert(g_motor_pwm > 0);
+    assert(g_motor_in1_level == HIGH);
+    assert(g_motor_in2_level == LOW);
+    assert(drive.leftHallPulsePosition() == 220L);
+    assert(drive.rightHallPulsePosition() == 220L);
   }
 
   {
     DriveController drive;
     drive.begin();
     primeFeedback(drive);
-    for (int i = 0; i < 220; ++i) {
-      drive.update(5000UL, 0UL, 0UL, 3000L, 3000L, true);
+    const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
+    for (int i = 0; i < 420; ++i) {
+      drive.update(5000UL, stopped, stopped, 3000L, true);
     }
     assert(
-        drive.encoderFaultMask() ==
-        (DriveController::ENCODER_FAULT_LEFT |
-         DriveController::ENCODER_FAULT_RIGHT));
-    assert(g_left_in1_pwm == 0);
-    assert(g_right_in1_pwm == 0);
-    assert(g_left_in1_level == LOW);
-    assert(g_left_in2_level == LOW);
-    assert(g_right_in1_level == LOW);
-    assert(g_right_in2_level == LOW);
+        drive.hallFaultMask() ==
+        (DriveController::HALL_FAULT_LEFT |
+         DriveController::HALL_FAULT_RIGHT));
+    assert(g_motor_pwm == 0);
+    assert(g_motor_in1_level == LOW);
+    assert(g_motor_in2_level == LOW);
   }
 
   {
     DriveController drive;
     drive.begin();
     primeFeedback(drive);
-    uint32_t reverse_count = 0UL;
-    for (int i = 0; i < 120; ++i) {
-      --reverse_count;
-      drive.update(
-          5000UL,
-          reverse_count,
-          0UL,
-          1000L,
-          0L,
-          true);
+    uint32_t right_count = 0UL;
+    const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
+    for (int i = 0; i < 420; ++i) {
+      const HallSample right = sample(++right_count);
+      drive.update(5000UL, stopped, right, 3000L, true);
     }
     assert(
-        drive.encoderFaultMask() ==
-        DriveController::ENCODER_FAULT_LEFT);
+        drive.hallFaultMask() == DriveController::HALL_FAULT_LEFT);
   }
 
   {
     DriveController drive;
     drive.begin();
     primeFeedback(drive);
-    uint32_t count = 0UL;
-    for (int i = 0; i < 40; ++i) {
-      count += 10UL;
-      drive.update(5000UL, count, count, 0L, 0L, true);
+    for (uint32_t count = 1UL; count <= 40UL; ++count) {
+      const HallSample too_fast = sample(count, 1000UL);
+      drive.update(5000UL, too_fast, too_fast, 0L, true);
     }
     assert(
-        drive.encoderFaultMask() ==
-        (DriveController::ENCODER_FAULT_LEFT |
-         DriveController::ENCODER_FAULT_RIGHT));
+        drive.hallFaultMask() ==
+        (DriveController::HALL_FAULT_LEFT |
+         DriveController::HALL_FAULT_RIGHT));
   }
 
-  printf("firmware motor-control plausibility tests: OK\n");
+  printf("firmware Hall feedback and single-driver tests: OK\n");
   return 0;
 }

@@ -359,6 +359,8 @@ class SafetySupervisor(Node):
         angular = float(self._last_command.twist.angular.z)
         if not math.isfinite(linear) or not math.isfinite(angular):
             return ['command_nonfinite']
+        if abs(angular) > self._max_angular:
+            return ['angular_command_unsupported']
         return []
 
     def _range_scale(self, distance: float) -> float:

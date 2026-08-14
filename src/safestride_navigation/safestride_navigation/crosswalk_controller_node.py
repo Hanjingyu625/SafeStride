@@ -121,7 +121,7 @@ class CrosswalkController(Node):
         self._odom_speed: Optional[float] = None
         self._odom_time: Optional[float] = None
         self._odom_position: Optional[Tuple[float, float]] = None
-        self._encoder_distance_m = 0.0
+        self._wheel_distance_m = 0.0
 
         self._executor = ThreadPoolExecutor(
             max_workers=1,
@@ -248,7 +248,7 @@ class CrosswalkController(Node):
                 current[1] - self._odom_position[1],
             )
             if 0.0 <= step <= 2.0:
-                self._encoder_distance_m += step
+                self._wheel_distance_m += step
         self._odom_position = current
 
     def _measured_speed(self, now: float) -> Optional[float]:
@@ -472,7 +472,7 @@ class CrosswalkController(Node):
                 signal_valid=signal_valid,
                 safe_speed_mps=safe_speed,
                 measured_speed_mps=measured_speed,
-                encoder_distance_m=self._encoder_distance_m,
+                wheel_distance_m=self._wheel_distance_m,
             )
             self._profile.add(
                 measured_speed,

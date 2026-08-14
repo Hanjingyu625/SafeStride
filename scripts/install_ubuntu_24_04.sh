@@ -27,6 +27,10 @@ sudo dpkg -i "${deb}"
 
 sudo apt-get update
 sudo apt-get install -y \
+  avahi-daemon \
+  build-essential \
+  netplan.io \
+  openssh-server \
   ros-jazzy-ros-base \
   ros-dev-tools \
   python3-colcon-common-extensions \
@@ -40,6 +44,7 @@ if [[ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]]; then
 fi
 rosdep update
 sudo usermod -aG dialout,video "${USER}"
+sudo systemctl enable --now ssh.service avahi-daemon.service
 
 echo "Installation complete. Log out and back in for dialout/video groups."
 echo "Then run: ./scripts/build.sh"
