@@ -47,6 +47,15 @@ constexpr uint32_t HALL_ZERO_TIMEOUT_US = 1500000UL;
 constexpr uint32_t HALL_PULSES_PER_WHEEL_REV = 1UL;
 constexpr bool HALL_CALIBRATED = false;
 
+// Temporary no-wheel hardware test. When enabled, either Hall input pulse
+// opens a short, low-PWM motor window after an explicit ROS arm request.
+// This deliberately bypasses Hall calibration, pressure dead-man, stationary
+// dwell, and Hall plausibility checks. Session and command watchdogs remain
+// active. Set this false before fitting wheels or beginning normal operation.
+constexpr bool MAGNET_BENCH_MODE = true;
+constexpr uint8_t MAGNET_BENCH_PWM = 60U;
+constexpr uint16_t MAGNET_BENCH_PULSE_HOLD_MS = 750U;
+
 // Runtime Hall plausibility monitor. Tune from lifted-wheel logs. A fault
 // latches until MCU reset so an intermittent sensor cannot silently re-arm.
 constexpr int32_t HALL_STALL_TARGET_MIN_MRAD_S = 300L;
@@ -132,6 +141,13 @@ static_assert(
 static_assert(
     MAX_PWM > 0U && MAX_PWM <= 255U,
     "MAX_PWM must fit the Arduino analogue output range");
+static_assert(
+    MAGNET_BENCH_PWM > 0U && MAGNET_BENCH_PWM <= MAX_PWM,
+    "magnet bench PWM must be positive and no higher than MAX_PWM");
+static_assert(
+    MAGNET_BENCH_PULSE_HOLD_MS > 0U &&
+        MAGNET_BENCH_PULSE_HOLD_MS <= 1000U,
+    "magnet bench pulse hold must be between 1 and 1000 ms");
 static_assert(
     HALL_PULSES_PER_WHEEL_REV > 0UL,
     "Hall pulses per wheel revolution must be positive");

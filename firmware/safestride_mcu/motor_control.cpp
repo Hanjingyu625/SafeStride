@@ -271,6 +271,40 @@ void DriveController::update(
       applied_target_mrad_s_, measured_average, dt_seconds, motor_pid_));
 }
 
+void DriveController::updateMagnetBench(
+    uint32_t elapsed_us,
+    const HallSample& left_hall,
+    const HallSample& right_hall,
+    int32_t requested_mrad_s,
+    bool output_allowed) {
+  if (elapsed_us == 0UL) {
+    return;
+  }
+
+  const float limited_target = clampFloat(
+      static_cast<float>(requested_mrad_s),
+      -static_cast<float>(cfg::MAX_WHEEL_TARGET_MRAD_S),
+      static_cast<float>(cfg::MAX_WHEEL_TARGET_MRAD_S));
+  applied_target_mrad_s_ = limited_target;
+  updateHallFeedback(elapsed_us, left_hall, right_hall);
+
+  // Calibration-dependent stall and overspeed checks are meaningless while
+  // a hand-held magnet, rather than a rotating wheel, produces the pulses.
+  hall_fault_mask_ = 0U;
+  left_hall_monitor_ = {false, 0UL, 0UL, 0UL};
+  right_hall_monitor_ = {false, 0UL, 0UL, 0UL};
+  motor_pid_ = {0.0F, 0.0F};
+
+  if (!output_allowed || limited_target == 0.0F) {
+    disableImmediately();
+    return;
+  }
+  writeMotor(
+      limited_target > 0.0F
+          ? static_cast<float>(cfg::MAGNET_BENCH_PWM)
+          : -static_cast<float>(cfg::MAGNET_BENCH_PWM));
+}
+
 int32_t DriveController::leftVelocityMradS() const {
   return roundedInt32(filtered_left_mrad_s_);
 }

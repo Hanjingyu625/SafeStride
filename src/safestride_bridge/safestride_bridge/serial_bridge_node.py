@@ -46,6 +46,7 @@ STATUS_ESTOP = 1 << 3
 STATUS_WATCHDOG_TIMEOUT = 1 << 4
 STATUS_COMMAND_SEEN = 1 << 5
 STATUS_HALL_CALIBRATED = 1 << 6
+STATUS_MAGNET_BENCH_MODE = 1 << 7
 STATUS_STATE_SHIFT = 8
 STATUS_STATE_MASK = 0x7
 
@@ -54,6 +55,7 @@ PRESSURE_RIGHT_PRESENT = 1 << 1
 PRESSURE_CALIBRATED = 1 << 2
 CAP_PRESSURE_TELEMETRY = 1 << 6
 CAP_TWO_HALL_SENSORS = 1 << 0
+CAP_MAGNET_BENCH_MODE = 1 << 7
 
 # Firmware state values encoded in status_bits[10:8].
 FW_BOOT = 0
@@ -190,6 +192,7 @@ class SerialBridgeNode(Node):
             ('command.ttl_ms', 200),
             ('command.arm_max_wheel_speed_rad_s', 0.10),
             ('command.max_abs_angular_z_rad_s', 0.0),
+            ('command.allow_magnet_bench_mode', False),
             ('command.arm_confirmation_timeout_s', 1.0),
             ('telemetry.timeout_s', 0.30),
             ('diagnostics.publish_rate_hz', 1.0),
@@ -294,6 +297,9 @@ class SerialBridgeNode(Node):
             self._value('command.max_abs_angular_z_rad_s'),
             minimum=0.0,
             maximum=10.0,
+        )
+        self._allow_magnet_bench_mode = bool(
+            self._value('command.allow_magnet_bench_mode')
         )
         self._arm_confirmation_timeout = finite_float(
             'command.arm_confirmation_timeout_s',
@@ -463,6 +469,12 @@ class SerialBridgeNode(Node):
         motor_enabled = bool(
             telemetry.status_bits & STATUS_MOTOR_ENABLED
         )
+        bench_status = bool(
+            telemetry.status_bits & STATUS_MAGNET_BENCH_MODE
+        )
+        bench_capability = bool(
+            self._capabilities & CAP_MAGNET_BENCH_MODE
+        )
         return (
             firmware_state in (
                 FW_BOOT,
@@ -473,15 +485,34 @@ class SerialBridgeNode(Node):
                 FW_FAULT,
             )
             and motor_enabled == (firmware_state == FW_ARMED)
+            and bench_status == bench_capability
+        )
+
+    def _magnet_bench_mode_active(
+        self, telemetry: TelemetryPayload
+    ) -> bool:
+        return (
+            self._allow_magnet_bench_mode
+            and bool(
+                telemetry.status_bits & STATUS_MAGNET_BENCH_MODE
+            )
+            and bool(self._capabilities & CAP_MAGNET_BENCH_MODE)
         )
 
     def _remote_allows_enable(self, telemetry: TelemetryPayload) -> bool:
         firmware_state = self._firmware_state(telemetry)
+        magnet_bench_mode = self._magnet_bench_mode_active(telemetry)
         return (
             self._firmware_status_consistent(telemetry)
             and bool(telemetry.status_bits & STATUS_SESSION)
-            and bool(telemetry.status_bits & STATUS_DEADMAN)
-            and bool(telemetry.status_bits & STATUS_HALL_CALIBRATED)
+            and (
+                bool(telemetry.status_bits & STATUS_DEADMAN)
+                or magnet_bench_mode
+            )
+            and (
+                bool(telemetry.status_bits & STATUS_HALL_CALIBRATED)
+                or magnet_bench_mode
+            )
             and bool(self._capabilities & CAP_TWO_HALL_SENSORS)
             and not bool(telemetry.status_bits & STATUS_ESTOP)
             and not bool(
@@ -826,13 +857,31 @@ class SerialBridgeNode(Node):
             response.success = False
             response.message = 'cannot enable: Hall feedback is unavailable'
             return response
-        if not (telemetry.status_bits & STATUS_HALL_CALIBRATED):
+        firmware_magnet_bench_mode = bool(
+            telemetry.status_bits & STATUS_MAGNET_BENCH_MODE
+            and self._capabilities & CAP_MAGNET_BENCH_MODE
+        )
+        if firmware_magnet_bench_mode and not self._allow_magnet_bench_mode:
+            response.success = False
+            response.message = (
+                'cannot enable: firmware magnet bench mode is not allowed '
+                'by ROS configuration'
+            )
+            return response
+        magnet_bench_mode = self._magnet_bench_mode_active(telemetry)
+        if (
+            not magnet_bench_mode
+            and not (telemetry.status_bits & STATUS_HALL_CALIBRATED)
+        ):
             response.success = False
             response.message = (
                 'cannot enable: Hall pulses per revolution are not calibrated'
             )
             return response
-        if not (telemetry.status_bits & STATUS_DEADMAN):
+        if (
+            not magnet_bench_mode
+            and not (telemetry.status_bits & STATUS_DEADMAN)
+        ):
             response.success = False
             response.message = 'cannot enable: dead-man switch is not active'
             return response
@@ -840,10 +889,13 @@ class SerialBridgeNode(Node):
             round(self._arm_max_wheel_speed * 1000.0)
         )
         if (
-            abs(telemetry.velocity_left_mrad_s)
-            > maximum_measured_speed_mrad_s
-            or abs(telemetry.velocity_right_mrad_s)
-            > maximum_measured_speed_mrad_s
+            not magnet_bench_mode
+            and (
+                abs(telemetry.velocity_left_mrad_s)
+                > maximum_measured_speed_mrad_s
+                or abs(telemetry.velocity_right_mrad_s)
+                > maximum_measured_speed_mrad_s
+            )
         ):
             response.success = False
             response.message = (
@@ -866,7 +918,10 @@ class SerialBridgeNode(Node):
             )
         response.success = True
         response.message = (
-            'enable gate opened; motion still requires fresh velocity commands'
+            'magnet bench armed; each Hall pulse opens a short motor window'
+            if magnet_bench_mode
+            else 'enable gate opened; motion still requires fresh velocity '
+            'commands'
         )
         return response
 
@@ -1281,6 +1336,24 @@ class SerialBridgeNode(Node):
         elif not (self._capabilities & CAP_TWO_HALL_SENSORS):
             status.level = DiagnosticStatus.ERROR
             status.message = 'drive firmware lacks Hall feedback'
+        elif (
+            self._last_telemetry
+            and self._last_telemetry.status_bits
+            & STATUS_MAGNET_BENCH_MODE
+            and not self._allow_magnet_bench_mode
+        ):
+            status.level = DiagnosticStatus.ERROR
+            status.message = (
+                'firmware magnet bench mode is blocked by ROS configuration'
+            )
+        elif (
+            self._last_telemetry
+            and self._magnet_bench_mode_active(self._last_telemetry)
+        ):
+            status.level = DiagnosticStatus.WARN
+            status.message = (
+                'magnet-trigger motor bench mode is active'
+            )
         elif self._last_telemetry and not (
             self._last_telemetry.status_bits & STATUS_HALL_CALIBRATED
         ):
@@ -1366,6 +1439,19 @@ class SerialBridgeNode(Node):
                     bool(
                         telemetry
                         and telemetry.status_bits & STATUS_HALL_CALIBRATED
+                    )
+                ).lower(),
+            ),
+            KeyValue(
+                key='magnet_bench_mode_allowed',
+                value=str(self._allow_magnet_bench_mode).lower(),
+            ),
+            KeyValue(
+                key='magnet_bench_mode_active',
+                value=str(
+                    bool(
+                        telemetry
+                        and self._magnet_bench_mode_active(telemetry)
                     )
                 ).lower(),
             ),
