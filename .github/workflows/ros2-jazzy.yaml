@@ -14,7 +14,7 @@ jobs:
         shell: bash
         run: |
           apt-get update
-          apt-get install -y python3-colcon-common-extensions python3-pytest python3-serial
+          apt-get install -y build-essential python3-colcon-common-extensions python3-pytest python3-serial
           rosdep update
           rosdep install --from-paths src --ignore-src -r -y --rosdistro jazzy
       - name: Build
@@ -25,6 +25,9 @@ jobs:
       - name: Test
         shell: bash
         run: |
+          bash -n scripts/*.sh
+          python3 -m unittest test/test_hardware_integrity.py
+          bash scripts/test_firmware.sh
           source /opt/ros/jazzy/setup.bash
           source install/setup.bash
           colcon test --event-handlers console_direct+

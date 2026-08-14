@@ -8,7 +8,7 @@ motion, but it must never be the only layer capable of stopping an actuator.
 | Controller | Connected hardware | Responsibility |
 |---|---|---|
 | Raspberry Pi | Camera, BE-220 GPS, two USB serial links | ROS 2, YOLO, crosswalk logic, logging and high-level requests |
-| Drive Uno | Two wheel encoders, two handle pressure sensors, E-stop, two wheel drivers | Final wheel enable, velocity control and wheel watchdog |
+| Drive Uno | Two Hall speed sensors, two handle pressure sensors, one shared motor driver | Final common wheel enable, velocity control and Hall watchdog; E-stop input is reserved but not implemented |
 | Terrain Uno | TOF-10120, MPU-9250, BNO055, leg limits, leg motor driver | Step detection, redundant attitude checks and leg state machine |
 
 The pressure sensors form a two-channel handle-presence/dead-man input, not a
@@ -47,7 +47,7 @@ and an MCU-local timeout. Any failed condition stops wheel and leg motion.
 ## Non-negotiable safety boundaries
 
 1. Motor PWM/enable inputs need external bias that disables drivers during reset.
-2. E-stop must interrupt driver enable electrically, not only through software.
+2. Before an E-stop is implemented, testing requires a separate physical motor-power disconnect; a future E-stop must interrupt driver enable electrically, not only through software.
 3. The leg requires retracted and deployed limit switches.
 4. Both Unos invalidate their sessions after a watchdog timeout.
 5. Deployment is forbidden above the configured wheel-speed threshold.

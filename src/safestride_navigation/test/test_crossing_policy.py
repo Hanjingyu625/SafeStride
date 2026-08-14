@@ -38,7 +38,7 @@ def update(machine, latitude, signal_s, signal_valid=True, speed=0.5):
         signal_valid=signal_valid,
         safe_speed_mps=0.5,
         measured_speed_mps=speed,
-        encoder_distance_m=None,
+        wheel_distance_m=None,
     )
 
 

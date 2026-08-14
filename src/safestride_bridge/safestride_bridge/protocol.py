@@ -14,7 +14,7 @@ import struct
 from typing import ClassVar, Iterable, List
 
 
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 FRAME_DELIMITER = 0x00
 MAX_RAW_FRAME_SIZE = 128
 
@@ -23,8 +23,9 @@ CRC_STRUCT = struct.Struct('<H')
 
 HELLO_STRUCT = struct.Struct('<II')
 SESSION_START_STRUCT = struct.Struct('<I')
-COMMAND_STRUCT = struct.Struct('<iiHBB')
-TELEMETRY_STRUCT = struct.Struct('<iiiiHHHhhHHH')
+COMMAND_STRUCT = struct.Struct('<iHBB')
+TELEMETRY_STRUCT = struct.Struct('<iiiiHHHhhHHHHHBB')
+TERRAIN_TELEMETRY_STRUCT = struct.Struct('<HBBHHhhH')
 
 
 class ProtocolError(ValueError):
@@ -54,6 +55,7 @@ class PacketType(IntEnum):
     SESSION_START = 0x02
     COMMAND = 0x10
     TELEMETRY = 0x20
+    TERRAIN_TELEMETRY = 0x21
 
 
 def crc16_ccitt_false(data: bytes) -> int:
@@ -384,10 +386,9 @@ class SessionStartPayload:
 
 @dataclass(frozen=True)
 class CommandPayload:
-    """COMMAND payload containing signed wheel targets in mrad/s."""
+    """COMMAND payload containing one shared signed target in mrad/s."""
 
-    left_mrad_s: int
-    right_mrad_s: int
+    target_mrad_s: int
     ttl_ms: int
     enable: int
     reserved: int = 0
@@ -399,8 +400,7 @@ class CommandPayload:
         if self.reserved != 0:
             raise ValueError('COMMAND reserved field must be zero')
         return COMMAND_STRUCT.pack(
-            int(self.left_mrad_s),
-            int(self.right_mrad_s),
+            int(self.target_mrad_s),
             _u16('ttl_ms', self.ttl_ms),
             _u8('enable', self.enable),
             _u8('reserved', self.reserved),
@@ -421,8 +421,8 @@ class CommandPayload:
 class TelemetryPayload:
     """TELEMETRY payload returned by the motor controller."""
 
-    encoder_left: int
-    encoder_right: int
+    hall_left_pulses: int
+    hall_right_pulses: int
     velocity_left_mrad_s: int
     velocity_right_mrad_s: int
     range_left_mm: int
@@ -433,12 +433,16 @@ class TelemetryPayload:
     status_bits: int
     fault_bits: int
     last_command_sequence: int
+    pressure_left_raw: int = 0xFFFF
+    pressure_right_raw: int = 0xFFFF
+    pressure_flags: int = 0
+    pressure_alert: int = 0
     TYPE: ClassVar[PacketType] = PacketType.TELEMETRY
 
     def pack(self) -> bytes:
         return TELEMETRY_STRUCT.pack(
-            int(self.encoder_left),
-            int(self.encoder_right),
+            int(self.hall_left_pulses),
+            int(self.hall_right_pulses),
             int(self.velocity_left_mrad_s),
             int(self.velocity_right_mrad_s),
             _u16('range_left_mm', self.range_left_mm),
@@ -449,9 +453,52 @@ class TelemetryPayload:
             _u16('status_bits', self.status_bits),
             _u16('fault_bits', self.fault_bits),
             _u16('last_command_sequence', self.last_command_sequence),
+            _u16('pressure_left_raw', self.pressure_left_raw),
+            _u16('pressure_right_raw', self.pressure_right_raw),
+            _u8('pressure_flags', self.pressure_flags),
+            _u8('pressure_alert', self.pressure_alert),
         )
 
     @classmethod
     def unpack(cls, data: bytes) -> 'TelemetryPayload':
         _require_size('TELEMETRY', data, TELEMETRY_STRUCT.size)
         return cls(*TELEMETRY_STRUCT.unpack(data))
+
+
+@dataclass(frozen=True)
+class TerrainTelemetryPayload:
+    """Sensor telemetry returned by the terrain controller."""
+
+    tof_distance_mm: int
+    tof_valid: int
+    tof_alert: int
+    tof_filtered_mm: int
+    tof_reference_mm: int
+    tof_error_mm: int
+    tof_change_mm: int
+    fault_bits: int
+    TYPE: ClassVar[PacketType] = PacketType.TERRAIN_TELEMETRY
+
+    def pack(self) -> bytes:
+        if self.tof_valid not in (0, 1):
+            raise ValueError('tof_valid must be 0 or 1')
+        return TERRAIN_TELEMETRY_STRUCT.pack(
+            _u16('tof_distance_mm', self.tof_distance_mm),
+            _u8('tof_valid', self.tof_valid),
+            _u8('tof_alert', self.tof_alert),
+            _u16('tof_filtered_mm', self.tof_filtered_mm),
+            _u16('tof_reference_mm', self.tof_reference_mm),
+            int(self.tof_error_mm),
+            int(self.tof_change_mm),
+            _u16('fault_bits', self.fault_bits),
+        )
+
+    @classmethod
+    def unpack(cls, data: bytes) -> 'TerrainTelemetryPayload':
+        _require_size(
+            'TERRAIN_TELEMETRY', data, TERRAIN_TELEMETRY_STRUCT.size
+        )
+        payload = cls(*TERRAIN_TELEMETRY_STRUCT.unpack(data))
+        if payload.tof_valid not in (0, 1):
+            raise PayloadDecodeError('tof_valid must be 0 or 1')
+        return payload

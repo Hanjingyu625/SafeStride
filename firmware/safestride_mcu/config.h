@@ -5,8 +5,8 @@
 // ---------------------------------------------------------------------------
 // SafeStride example hardware configuration
 // ---------------------------------------------------------------------------
-// Every value in this file is a placeholder.  Verify pin voltage, polarity,
-// PWM capability, interrupt capability, gearbox ratio, and encoder convention
+// Every value in this file is a placeholder. Verify pin voltage, polarity,
+// PWM capability, interrupt capability, Hall pulse count, and gearbox ratio
 // against the actual hardware before connecting motor power.
 
 namespace safestride_config {
@@ -31,41 +31,42 @@ constexpr int32_t MAX_DECEL_MRAD_S2 = 2500L;
 constexpr int32_t ARM_MAX_MEASURED_SPEED_MRAD_S = 100L;
 constexpr uint16_t ARM_STATIONARY_DWELL_MS = 250U;
 
-// Runtime encoder plausibility monitor. Tune from lifted-wheel logs. A fault
-// latches until MCU reset so an intermittent encoder cannot silently re-arm.
-constexpr int32_t ENCODER_STALL_TARGET_MIN_MRAD_S = 150L;
-constexpr uint16_t ENCODER_STALL_TIMEOUT_MS = 400U;
-constexpr int32_t ENCODER_REVERSE_MIN_MRAD_S = 100L;
-constexpr uint16_t ENCODER_REVERSE_TIMEOUT_MS = 150U;
-constexpr int32_t ENCODER_MAX_PLAUSIBLE_MRAD_S = 5000L;
-constexpr uint16_t ENCODER_OVERSPEED_TIMEOUT_MS = 50U;
+// One single-output Hall sensor is installed per wheel. The interrupt counts
+// falling edges and the controller estimates speed from the pulse period.
+// A single channel cannot measure direction independently; velocity sign is
+// derived from the commanded direction of the shared motor driver.
+constexpr uint8_t LEFT_HALL_PIN = 2U;
+constexpr uint8_t RIGHT_HALL_PIN = 3U;
+constexpr uint8_t HALL_ACTIVE_LEVEL = LOW;
+// Reject sub-millisecond electrical chatter without discarding valid pulses
+// if the measured pulse-per-revolution value is increased later.
+constexpr uint32_t HALL_MIN_PULSE_INTERVAL_US = 500UL;
+constexpr uint32_t HALL_ZERO_TIMEOUT_US = 1500000UL;
+// Measure this with the standalone sensor bench. Keep HALL_CALIBRATED false
+// until both channels produce the verified number of pulses per wheel turn.
+constexpr uint32_t HALL_PULSES_PER_WHEEL_REV = 1UL;
+constexpr bool HALL_CALIBRATED = false;
 
-// Encoder A is sampled on CHANGE and encoder B determines direction, so this
-// value must match that 2x-A-edge convention. Include the gearbox ratio.
-constexpr uint32_t ENCODER_COUNTS_PER_WHEEL_REV = 1024UL;
-constexpr int8_t LEFT_ENCODER_SIGN = 1;
-constexpr int8_t RIGHT_ENCODER_SIGN = 1;
+// Runtime Hall plausibility monitor. Tune from lifted-wheel logs. A fault
+// latches until MCU reset so an intermittent sensor cannot silently re-arm.
+constexpr int32_t HALL_STALL_TARGET_MIN_MRAD_S = 300L;
+constexpr uint16_t HALL_STALL_TIMEOUT_MS = 1500U;
+constexpr int32_t HALL_MAX_PLAUSIBLE_MRAD_S = 5000L;
+constexpr uint16_t HALL_OVERSPEED_TIMEOUT_MS = 100U;
 
-// Example Arduino Uno-compatible pins.
-constexpr uint8_t LEFT_ENCODER_A_PIN = 2U;
-constexpr uint8_t LEFT_ENCODER_B_PIN = 4U;
-constexpr uint8_t RIGHT_ENCODER_A_PIN = 3U;
-constexpr uint8_t RIGHT_ENCODER_B_PIN = 7U;
-
-// SZH-GNP521 single-channel drivers use one dedicated PWM input plus IN1/IN2
-// direction inputs. One driver is required per motor.
-constexpr uint8_t LEFT_MOTOR_PWM_PIN = 5U;
-constexpr uint8_t LEFT_MOTOR_IN1_PIN = 6U;
-constexpr uint8_t LEFT_MOTOR_IN2_PIN = 8U;
-constexpr uint8_t RIGHT_MOTOR_PWM_PIN = 9U;
-constexpr uint8_t RIGHT_MOTOR_IN1_PIN = 10U;
-constexpr uint8_t RIGHT_MOTOR_IN2_PIN = 12U;
-constexpr int8_t LEFT_MOTOR_SIGN = 1;
-constexpr int8_t RIGHT_MOTOR_SIGN = -1;
+// One SZH-GNP521 drives the two motors as one electrical load. The wiring must
+// be checked independently for voltage, polarity and combined stall current.
+constexpr uint8_t MOTOR_PWM_PIN = 5U;
+constexpr uint8_t MOTOR_IN1_PIN = 6U;
+constexpr uint8_t MOTOR_IN2_PIN = 8U;
+constexpr int8_t MOTOR_SIGN = 1;
 constexpr uint16_t MAX_PWM = 100U;  // deliberately low for first lifted test
 
-// Normally-closed E-stop example: normal contact pulls the pin to ground and
-// pressing/disconnecting it produces HIGH through INPUT_PULLUP.
+// E-stop hardware is not implemented in the current build. Keep this false so
+// the input is not configured, the reported state stays normal, and the
+// capability is not advertised. The pin/polarity are reserved for a future
+// normally-closed, independently validated hardware interlock.
+constexpr bool ENABLE_ESTOP = false;
 constexpr uint8_t ESTOP_PIN = A2;
 constexpr uint8_t ESTOP_ACTIVE_LEVEL = HIGH;
 
@@ -76,15 +77,15 @@ constexpr uint8_t PRESSURE_LEFT_PIN = A0;
 constexpr uint8_t PRESSURE_RIGHT_PIN = A1;
 constexpr uint16_t PRESSURE_SAMPLE_PERIOD_MS = 100U;
 constexpr float PRESSURE_FILTER_ALPHA = 0.2F;
-constexpr float PRESSURE_HANDS_OFF_THRESHOLD = 100.0F;
+// Watch /handle/pressure with the motors isolated, then set each channel's
+// polarity and threshold halfway between its released and held readings.
+constexpr bool PRESSURE_LEFT_ACTIVE_HIGH = true;
+constexpr bool PRESSURE_RIGHT_ACTIVE_HIGH = true;
+constexpr float PRESSURE_LEFT_PRESENT_THRESHOLD = 100.0F;
+constexpr float PRESSURE_RIGHT_PRESENT_THRESHOLD = 100.0F;
+constexpr bool PRESSURE_THRESHOLDS_CALIBRATED = false;
 constexpr float PRESSURE_IMBALANCE_THRESHOLD = 300.0F;
 constexpr float PRESSURE_SUDDEN_CHANGE_THRESHOLD = 150.0F;
-
-// Pressure-state LEDs. Analogue inputs can also act as digital outputs. A3/A4
-// and A5 are available because optional current/battery sensing is disabled.
-constexpr uint8_t LED_GREEN_PIN = A3;
-constexpr uint8_t LED_YELLOW_PIN = A4;
-constexpr uint8_t LED_RED_PIN = A5;
 
 // Set to a real input and true only after wiring a driver's fault output.
 constexpr bool USE_DRIVER_FAULT_PIN = false;
@@ -104,17 +105,18 @@ constexpr uint8_t RIGHT_CURRENT_SENSE_PIN = A4;
 constexpr float CURRENT_ZERO_V = 2.5F;
 constexpr float CURRENT_MA_PER_V = 1000.0F;
 
-// PID output is PWM counts. Start with one wheel lifted, tune one wheel at a
-// time, and keep integrator gain at zero until direction and feedback are
+// The v2 telemetry layout reserves two front-range fields, but no such sensors
+// are installed in the current pin map. Do not advertise the capability or
+// require the ROS topics until real non-blocking drivers replace the sentinels.
+constexpr bool ENABLE_FRONT_RANGE_SENSORS = false;
+
+// PID output is PWM counts. Keep both wheels lifted, tune the shared output,
+// and keep integrator gain at zero until direction and both Hall channels are
 // proven. These example gains are intentionally mild.
-constexpr float LEFT_PID_KP = 12.0F;
-constexpr float LEFT_PID_KI = 0.0F;
-constexpr float LEFT_PID_KD = 0.0F;
-constexpr float LEFT_FEEDFORWARD = 10.0F;
-constexpr float RIGHT_PID_KP = 12.0F;
-constexpr float RIGHT_PID_KI = 0.0F;
-constexpr float RIGHT_PID_KD = 0.0F;
-constexpr float RIGHT_FEEDFORWARD = 10.0F;
+constexpr float MOTOR_PID_KP = 12.0F;
+constexpr float MOTOR_PID_KI = 0.0F;
+constexpr float MOTOR_PID_KD = 0.0F;
+constexpr float MOTOR_FEEDFORWARD = 10.0F;
 constexpr float PID_INTEGRAL_LIMIT = 30.0F;
 constexpr float VELOCITY_FILTER_ALPHA = 0.35F;
 
@@ -125,23 +127,18 @@ constexpr float VELOCITY_FILTER_ALPHA = 0.35F;
 constexpr int AVR_BOOT_COUNTER_EEPROM_ADDRESS = 0;
 
 static_assert(
-    LEFT_MOTOR_SIGN == 1 || LEFT_MOTOR_SIGN == -1,
-    "LEFT_MOTOR_SIGN must be +1 or -1");
-static_assert(
-    RIGHT_MOTOR_SIGN == 1 || RIGHT_MOTOR_SIGN == -1,
-    "RIGHT_MOTOR_SIGN must be +1 or -1");
-static_assert(
-    LEFT_ENCODER_SIGN == 1 || LEFT_ENCODER_SIGN == -1,
-    "LEFT_ENCODER_SIGN must be +1 or -1");
-static_assert(
-    RIGHT_ENCODER_SIGN == 1 || RIGHT_ENCODER_SIGN == -1,
-    "RIGHT_ENCODER_SIGN must be +1 or -1");
+    MOTOR_SIGN == 1 || MOTOR_SIGN == -1,
+    "MOTOR_SIGN must be +1 or -1");
 static_assert(
     MAX_PWM > 0U && MAX_PWM <= 255U,
     "MAX_PWM must fit the Arduino analogue output range");
 static_assert(
-    ENCODER_COUNTS_PER_WHEEL_REV > 0UL,
-    "encoder counts per wheel revolution must be positive");
+    HALL_PULSES_PER_WHEEL_REV > 0UL,
+    "Hall pulses per wheel revolution must be positive");
+static_assert(
+    HALL_MIN_PULSE_INTERVAL_US > 0UL &&
+        HALL_ZERO_TIMEOUT_US > HALL_MIN_PULSE_INTERVAL_US,
+    "Hall timing limits are invalid");
 static_assert(
     COMMAND_WATCHDOG_MAX_MS >= COMMAND_TTL_MIN_MS,
     "command TTL range is invalid");
@@ -152,24 +149,26 @@ static_assert(
     ARM_STATIONARY_DWELL_MS > 0U,
     "arming stationary dwell must be positive");
 static_assert(
-    ENCODER_STALL_TARGET_MIN_MRAD_S > 0L &&
-        ENCODER_STALL_TARGET_MIN_MRAD_S <=
+    HALL_STALL_TARGET_MIN_MRAD_S > 0L &&
+        HALL_STALL_TARGET_MIN_MRAD_S <=
             MAX_WHEEL_TARGET_MRAD_S,
-    "encoder stall target threshold is invalid");
+    "Hall stall target threshold is invalid");
 static_assert(
-    ENCODER_STALL_TIMEOUT_MS > 0U &&
-        ENCODER_REVERSE_TIMEOUT_MS > 0U &&
-        ENCODER_OVERSPEED_TIMEOUT_MS > 0U,
-    "encoder plausibility timeouts must be positive");
+    HALL_STALL_TIMEOUT_MS > 0U &&
+        HALL_OVERSPEED_TIMEOUT_MS > 0U,
+    "Hall plausibility timeouts must be positive");
 static_assert(
-    ENCODER_REVERSE_MIN_MRAD_S > 0L,
-    "encoder reverse threshold must be positive");
-static_assert(
-    ENCODER_MAX_PLAUSIBLE_MRAD_S >
+    HALL_MAX_PLAUSIBLE_MRAD_S >
         MAX_WHEEL_TARGET_MRAD_S,
-    "encoder plausible speed must exceed maximum target");
+    "Hall plausible speed must exceed maximum target");
 static_assert(
     AVR_BOOT_COUNTER_EEPROM_ADDRESS >= 0,
     "boot-counter EEPROM address must not be negative");
+static_assert(
+    PRESSURE_LEFT_PRESENT_THRESHOLD >= 0.0F &&
+        PRESSURE_LEFT_PRESENT_THRESHOLD <= 1023.0F &&
+        PRESSURE_RIGHT_PRESENT_THRESHOLD >= 0.0F &&
+        PRESSURE_RIGHT_PRESENT_THRESHOLD <= 1023.0F,
+    "pressure thresholds must fit the ADC range");
 
 }  // namespace safestride_config

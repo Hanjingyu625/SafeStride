@@ -40,5 +40,4 @@ class Tof10120Sensor {
 
   uint16_t readDistanceI2c();
   void classify(uint32_t now_ms, uint16_t distance_mm);
-  void writeLeds();
 };

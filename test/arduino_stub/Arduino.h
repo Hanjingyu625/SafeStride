@@ -13,6 +13,8 @@
 #define INPUT_PULLUP 0x2
 #define OUTPUT 0x1
 #define CHANGE 0x3
+#define FALLING 0x2
+#define RISING 0x3
 #define NOT_AN_INTERRUPT (-1)
 #define A0 14
 #define A1 15
@@ -60,3 +62,4 @@ void noInterrupts();
 void interrupts();
 uint32_t millis();
 uint32_t micros();
+void delayMicroseconds(unsigned int microseconds);

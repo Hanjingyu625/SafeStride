@@ -26,6 +26,7 @@ void noInterrupts() {}
 void interrupts() {}
 uint32_t millis() { return g_now_ms; }
 uint32_t micros() { return g_now_ms * 1000UL; }
+void delayMicroseconds(unsigned int) {}
 
 void HardwareSerial::begin(uint32_t) {}
 int HardwareSerial::available() { return 0; }

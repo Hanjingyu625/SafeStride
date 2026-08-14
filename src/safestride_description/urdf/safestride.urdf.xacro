@@ -83,6 +83,14 @@
     <origin xyz="0 0 0.35" rpy="0 0 0"/>
   </joint>
 
+  <link name="terrain_tof_link"/>
+  <joint name="terrain_tof_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="terrain_tof_link"/>
+    <!-- Range messages point along +X; +90 deg pitch aims +X downward. -->
+    <origin xyz="0.18 0 0.08" rpy="0 ${pi / 2} 0"/>
+  </joint>
+
   <link name="front_left_range_link"/>
   <joint name="front_left_range_joint" type="fixed">
     <parent link="base_link"/>

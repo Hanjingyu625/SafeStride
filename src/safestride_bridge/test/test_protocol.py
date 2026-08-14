@@ -7,6 +7,7 @@ from safestride_bridge.protocol import (
     COMMAND_STRUCT,
     HEADER_STRUCT,
     TELEMETRY_STRUCT,
+    TERRAIN_TELEMETRY_STRUCT,
     CobsDecodeError,
     CommandPayload,
     CrcMismatchError,
@@ -16,8 +17,10 @@ from safestride_bridge.protocol import (
     HelloPayload,
     PacketType,
     PayloadDecodeError,
+    PROTOCOL_VERSION,
     SessionStartPayload,
     TelemetryPayload,
+    TerrainTelemetryPayload,
     cobs_decode,
     cobs_encode,
     crc16_ccitt_false,
@@ -90,7 +93,7 @@ class TestFrame(unittest.TestCase):
             raw[:HEADER_STRUCT.size],
             struct.pack(
                 '<BBBBHHII',
-                1,
+                PROTOCOL_VERSION,
                 0x10,
                 0,
                 0,
@@ -149,7 +152,7 @@ class TestFrame(unittest.TestCase):
 
     def test_unsupported_version_is_rejected(self):
         frame = Frame(
-            version=2,
+            version=1,
             packet_type=PacketType.HELLO,
             sequence=0,
             session_id=0,
@@ -195,18 +198,18 @@ class TestPayloads(unittest.TestCase):
         self.assertEqual(len(payload.pack()), 4)
 
     def test_command_exact_layout(self):
-        payload = CommandPayload(-12345, 67890, 150, 1)
+        payload = CommandPayload(-12345, 150, 1)
         self.assertEqual(
             payload.pack(),
-            struct.pack('<iiHBB', -12345, 67890, 150, 1, 0),
+            struct.pack('<iHBB', -12345, 150, 1, 0),
         )
         self.assertEqual(CommandPayload.unpack(payload.pack()), payload)
         self.assertEqual(len(payload.pack()), COMMAND_STRUCT.size)
 
     def test_telemetry_exact_layout(self):
         payload = TelemetryPayload(
-            encoder_left=-123456,
-            encoder_right=789012,
+            hall_left_pulses=-123456,
+            hall_right_pulses=789012,
             velocity_left_mrad_s=-2000,
             velocity_right_mrad_s=3000,
             range_left_mm=450,
@@ -217,13 +220,17 @@ class TestPayloads(unittest.TestCase):
             status_bits=0x0207,
             fault_bits=0,
             last_command_sequence=65535,
+            pressure_left_raw=321,
+            pressure_right_raw=654,
+            pressure_flags=0x07,
+            pressure_alert=1,
         )
         packed = payload.pack()
         self.assertEqual(len(packed), TELEMETRY_STRUCT.size)
         self.assertEqual(
             packed,
             struct.pack(
-                '<iiiiHHHhhHHH',
+                '<iiiiHHHhhHHHHHBB',
                 -123456,
                 789012,
                 -2000,
@@ -236,9 +243,35 @@ class TestPayloads(unittest.TestCase):
                 0x0207,
                 0,
                 65535,
+                321,
+                654,
+                0x07,
+                1,
             ),
         )
         self.assertEqual(TelemetryPayload.unpack(packed), payload)
+
+    def test_terrain_telemetry_exact_layout(self):
+        payload = TerrainTelemetryPayload(
+            tof_distance_mm=725,
+            tof_valid=1,
+            tof_alert=2,
+            tof_filtered_mm=710,
+            tof_reference_mm=500,
+            tof_error_mm=210,
+            tof_change_mm=-15,
+            fault_bits=0,
+        )
+        self.assertEqual(
+            payload.pack(),
+            struct.pack('<HBBHHhhH', 725, 1, 2, 710, 500, 210, -15, 0),
+        )
+        self.assertEqual(
+            len(payload.pack()), TERRAIN_TELEMETRY_STRUCT.size
+        )
+        self.assertEqual(
+            TerrainTelemetryPayload.unpack(payload.pack()), payload
+        )
 
     def test_wrong_payload_size_is_rejected(self):
         with self.assertRaises(PayloadDecodeError):
@@ -250,14 +283,14 @@ class TestPayloads(unittest.TestCase):
 
     def test_command_rejects_invalid_enable_and_reserved(self):
         with self.assertRaises(ValueError):
-            CommandPayload(0, 0, 100, 2).pack()
+            CommandPayload(0, 100, 2).pack()
         with self.assertRaises(PayloadDecodeError):
             CommandPayload.unpack(
-                struct.pack('<iiHBB', 0, 0, 100, 2, 0)
+                struct.pack('<iHBB', 0, 100, 2, 0)
             )
         with self.assertRaises(PayloadDecodeError):
             CommandPayload.unpack(
-                struct.pack('<iiHBB', 0, 0, 100, 1, 1)
+                struct.pack('<iHBB', 0, 100, 1, 1)
             )
 
 

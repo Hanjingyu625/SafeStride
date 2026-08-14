@@ -16,7 +16,10 @@ class PressureSensorPair {
   void update(uint32_t now_ms);
 
   bool bothHandsPresent() const;
+  bool leftPresent() const;
+  bool rightPresent() const;
   bool initialized() const;
+  bool calibrated() const;
   PressureAlert alert() const;
   float leftFiltered() const;
   float rightFiltered() const;
@@ -35,5 +38,4 @@ class PressureSensorPair {
   PressureAlert alert_;
 
   void sample();
-  void writeLeds();
 };
