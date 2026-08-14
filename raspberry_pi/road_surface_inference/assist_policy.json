@@ -1,0 +1,53 @@
+{
+  "smooth_paved": {
+    "assist": 0.25,
+    "torque_limit": 0.85,
+    "risk": "normal"
+  },
+  "rough_paved": {
+    "assist": 0.48,
+    "torque_limit": 0.85,
+    "risk": "rough"
+  },
+  "block_paved": {
+    "assist": 0.55,
+    "torque_limit": 0.82,
+    "risk": "vibration"
+  },
+  "gravel": {
+    "assist": 0.75,
+    "torque_limit": 0.78,
+    "risk": "loose_surface"
+  },
+  "mud_dirt": {
+    "assist": 0.82,
+    "torque_limit": 0.75,
+    "risk": "high_resistance"
+  },
+  "unpaved_mixed": {
+    "assist": 0.78,
+    "torque_limit": 0.78,
+    "risk": "high_resistance"
+  },
+  "wet_paved": {
+    "assist": 0.38,
+    "torque_limit": 0.62,
+    "risk": "slip"
+  },
+  "wet_unpaved": {
+    "assist": 0.62,
+    "torque_limit": 0.62,
+    "risk": "slip_and_resistance"
+  },
+  "snow_ice": {
+    "assist": 0.22,
+    "torque_limit": 0.45,
+    "risk": "slip"
+  },
+  "__smoothing__": {
+    "probability_ema_alpha": 0.75,
+    "min_confidence": 0.52,
+    "uncertain_assist_bonus": 0.08,
+    "max_assist": 0.85
+  }
+}
