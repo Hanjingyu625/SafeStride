@@ -7,7 +7,7 @@ motion, but it must never be the only layer capable of stopping an actuator.
 
 | Controller | Connected hardware | Responsibility |
 |---|---|---|
-| Raspberry Pi | Camera, BE-220 GPS, two USB serial links | ROS 2, YOLO, crosswalk logic, logging and high-level requests |
+| Raspberry Pi | Camera, BE-220 GPS, two USB serial links | ROS 2, road-surface classification, crosswalk logic, logging and high-level requests |
 | Drive Uno | Two Hall speed sensors, two handle pressure sensors, one shared motor driver | Final common wheel enable, velocity control and Hall watchdog; E-stop input is reserved but not implemented |
 | Terrain Uno | TOF-10120, MPU-9250, BNO055, leg limits, leg motor driver | Step detection, redundant attitude checks and leg state machine |
 
@@ -18,15 +18,15 @@ later validated operating mode explicitly permits one-hand use.
 ## Data flow
 
 ```text
-BE-220 GPS -> navigation/crosswalk --+
-camera -> YOLO surface estimate -----+-> safety supervisor -> Drive Uno
-Terrain Uno -> step/attitude/state --+          |
-                                                +-> terrain coordinator -> Terrain Uno
+BE-220 GPS -> navigation/crosswalk --------+
+Pi camera -> TorchScript surface estimate -+-> safety supervisor -> Drive Uno
+Terrain Uno -> step/attitude/state --------+          |
+                                                      +-> terrain coordinator -> Terrain Uno
 ```
 
-YOLO output is advisory. It may reduce permitted speed but may not write PWM,
-enable motors or bypass stale sensor checks. Unknown, stale or low-confidence
-classification uses the conservative speed limit.
+Surface-classifier output is advisory. It may reduce permitted speed but may
+not write PWM, enable motors or bypass stale sensor checks. Unknown, stale or
+low-confidence classification stops motion when perception is enabled.
 
 TOF may propose a step. Leg deployment additionally requires low wheel speed,
 valid attitude, both hands present, fresh Pi permission, valid limit switches
@@ -39,7 +39,7 @@ and an MCU-local timeout. Any failed condition stops wheel and leg motion.
 - `safestride_control`: ROS-side wheel command safety supervisor.
 - `safestride_sensors`: BE-220 NMEA and sensor adapters.
 - `safestride_navigation`: crosswalk geometry, V2X timing and automatic crossing policy.
-- `safestride_perception`: YOLO adapter and surface speed policy.
+- `safestride_perception`: Pi camera classifier and surface speed policy.
 - `safestride_terrain`: terrain and leg coordination policy.
 - `safestride_bringup`: launch and deployment configuration.
 - `safestride_description`: geometry and sensor frames.

@@ -29,6 +29,13 @@ def generate_launch_description() -> LaunchDescription:
     enable_gps = LaunchConfiguration('enable_gps')
     enable_crosswalk = LaunchConfiguration('enable_crosswalk')
     enable_terrain = LaunchConfiguration('enable_terrain')
+    enable_perception = LaunchConfiguration('enable_perception')
+    perception_model_path = LaunchConfiguration('perception_model_path')
+    perception_classes_path = LaunchConfiguration('perception_classes_path')
+    perception_camera_index = LaunchConfiguration('perception_camera_index')
+    perception_camera_backend = LaunchConfiguration(
+        'perception_camera_backend'
+    )
     robot_description = ParameterValue(
         Command(
             [
@@ -73,6 +80,31 @@ def generate_launch_description() -> LaunchDescription:
                 description='Start the Terrain Uno serial sensor bridge.',
             ),
             DeclareLaunchArgument(
+                'enable_perception',
+                default_value='false',
+                description='Start fail-safe road-surface perception.',
+            ),
+            DeclareLaunchArgument(
+                'perception_model_path',
+                default_value='',
+                description='Absolute path to the TorchScript surface model.',
+            ),
+            DeclareLaunchArgument(
+                'perception_classes_path',
+                default_value='',
+                description='Absolute path to the model class JSON file.',
+            ),
+            DeclareLaunchArgument(
+                'perception_camera_index',
+                default_value='0',
+                description='Linux video-device index used by OpenCV.',
+            ),
+            DeclareLaunchArgument(
+                'perception_camera_backend',
+                default_value='v4l2',
+                description='OpenCV camera backend: v4l2 or auto.',
+            ),
+            DeclareLaunchArgument(
                 'enable_gps',
                 default_value='false',
                 description='Start the BE-220 serial GPS adapter.',
@@ -113,7 +145,34 @@ def generate_launch_description() -> LaunchDescription:
                 executable='safety_supervisor',
                 name='safety_supervisor',
                 output='screen',
-                parameters=[config_file],
+                parameters=[
+                    config_file,
+                    {
+                        'require_surface_condition': ParameterValue(
+                            enable_perception,
+                            value_type=bool,
+                        ),
+                    },
+                ],
+            ),
+            Node(
+                package='safestride_perception',
+                executable='surface_perception',
+                name='surface_perception',
+                output='screen',
+                condition=IfCondition(enable_perception),
+                parameters=[
+                    config_file,
+                    {
+                        'model.path': perception_model_path,
+                        'model.classes_path': perception_classes_path,
+                        'camera.index': ParameterValue(
+                            perception_camera_index,
+                            value_type=int,
+                        ),
+                        'camera.backend': perception_camera_backend,
+                    },
+                ],
             ),
             Node(
                 package='safestride_bridge',

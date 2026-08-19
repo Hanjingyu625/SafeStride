@@ -6,6 +6,7 @@ log/
 # Python
 __pycache__/
 *.py[cod]
+.venv-perception/
 .pytest_cache/
 .coverage
 htmlcov/

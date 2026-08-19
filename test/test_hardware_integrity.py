@@ -9,6 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DRIVE_CONFIG = ROOT / "firmware/safestride_mcu/config.h"
 DRIVE_FIRMWARE = ROOT / "firmware/safestride_mcu/safestride_mcu.ino"
 TERRAIN_FIRMWARE = ROOT / "firmware/terrain_mcu/terrain_mcu.ino"
+DRIVE_SKETCH_DIR = ROOT / "firmware/safestride_mcu"
+TERRAIN_SKETCH_DIR = ROOT / "firmware/terrain_mcu"
 BRIDGE = (
     ROOT
     / "src/safestride_bridge/safestride_bridge/serial_bridge_node.py"
@@ -58,6 +60,18 @@ class TestHardwareIntegrity(unittest.TestCase):
         )
         self.assertNotIn("0U", owners.values(), "D0 is reserved for USB serial")
         self.assertNotIn("1U", owners.values(), "D1 is reserved for USB serial")
+
+    def test_production_sketches_have_one_ino_entry_point(self):
+        expected = {
+            DRIVE_SKETCH_DIR: "safestride_mcu.ino",
+            TERRAIN_SKETCH_DIR: "terrain_mcu.ino",
+        }
+        for directory, primary_name in expected.items():
+            with self.subTest(directory=directory):
+                ino_files = sorted(
+                    path.name for path in directory.glob("*.ino")
+                )
+                self.assertEqual(ino_files, [primary_name])
 
     def test_optional_inputs_do_not_overlap_each_other(self):
         names = (

@@ -6,8 +6,8 @@
 |---|---|---|
 | 동일 정격 모터 2개 | Drive Uno의 단일 SZH-GNP521 | 하나의 공통 출력 부하 |
 | 좌우 홀센서 | Drive Uno | D2, D3 interrupt |
-| 좌우 압력센서 | Drive Uno | A0, A1 전압분배기 |
-| E-stop | 미구현 | A2 예약, 현재 입력으로 설정하지 않음 |
+| 좌우 압력센서 | Drive Uno | A1, A2 전압분배기 |
+| E-stop | 미구현 | 현재 입력으로 설정하지 않음 |
 | TOF-10120 | Terrain Uno | I2C A4/A5, `0x52` |
 | MPU-9250/AK8963, BNO055 | Terrain Uno 예정 | 현재 운영 펌웨어 미구현 |
 | BE-220 GPS, 카메라 | Raspberry Pi | USB/UART, CSI/USB |
@@ -21,11 +21,13 @@
 | D5 | 단일 SZH-GNP521 PWM |
 | D6 | 단일 SZH-GNP521 INA(코드의 IN1) |
 | D8 | 단일 SZH-GNP521 INB(코드의 IN2) |
-| A0/A1 | 좌우 압력센서 |
-| A2 | 예약(E-stop 미구현, 현재 미사용) |
+| A0 | 고장 핀, 현재 미사용 |
+| A1/A2 | 좌우 압력센서 |
+| D12 | E-stop placeholder, 현재 미구현·미사용 |
 | D13 | 선택적 드라이버 fault |
 
-D4, D7, D9, D10, D12는 비어 있으며 상태 LED 출력은 사용하지 않는다.
+D4, D7, D9, D10은 비어 있으며 상태 LED 출력은 사용하지 않는다. D12는
+E-stop placeholder지만 현재 입력으로 설정되지 않는다.
 드라이버 COM과 Uno GND를 공통 연결한다. 판매처 사양상 제어부는 5 V이지만
 이 제품은 하드웨어 리비전이 바뀔 수 있으므로 실제 보드 실크를 먼저 확인한다.
 `5VO`처럼 **출력**으로 표시된 단자는 Uno 5 V와 연결하지 말고, `VCC`/`5V IN`처럼

@@ -73,17 +73,17 @@ constexpr uint16_t MAX_PWM = 100U;  // deliberately low for first lifted test
 
 // E-stop hardware is not implemented in the current build. Keep this false so
 // the input is not configured, the reported state stays normal, and the
-// capability is not advertised. The pin/polarity are reserved for a future
-// normally-closed, independently validated hardware interlock.
+// capability is not advertised. A0 is known bad on the current Drive Uno, so
+// keep the placeholder away from the pressure inputs.
 constexpr bool ENABLE_ESTOP = false;
-constexpr uint8_t ESTOP_PIN = A2;
+constexpr uint8_t ESTOP_PIN = 12U;
 constexpr uint8_t ESTOP_ACTIVE_LEVEL = HIGH;
 
 // The two FSR channels replace the single digital dead-man switch. Each FSR
 // must be wired as a voltage divider that reads near zero when released.
 constexpr bool REQUIRE_DEADMAN = true;
-constexpr uint8_t PRESSURE_LEFT_PIN = A0;
-constexpr uint8_t PRESSURE_RIGHT_PIN = A1;
+constexpr uint8_t PRESSURE_LEFT_PIN = A1;
+constexpr uint8_t PRESSURE_RIGHT_PIN = A2;
 constexpr uint16_t PRESSURE_SAMPLE_PERIOD_MS = 100U;
 constexpr float PRESSURE_FILTER_ALPHA = 0.2F;
 // Watch /handle/pressure with the motors isolated, then set each channel's

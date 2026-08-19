@@ -69,8 +69,11 @@ safety_supervisor:
     status_timeout: 0.50
     max_telemetry_age: 0.50
     range_timeout: 0.35
+    surface_timeout: 1.0
     # The terrain TOF faces downward and cannot replace front obstacle ranges.
     require_range_sensors: false
+    # launch overrides this to true whenever surface perception is enabled.
+    require_surface_condition: false
     require_deadman: true
     max_forward_velocity: 0.15
     max_reverse_velocity: 0.08
@@ -85,9 +88,30 @@ safety_supervisor:
     safe_command_topic: /cmd_vel_safe
     left_range_topic: /range/front_left
     right_range_topic: /range/front_right
+    surface_topic: /perception/surface_condition
     status_topic: /walker/status
     diagnostics_topic: /diagnostics
     output_frame_id: base_link
+
+surface_perception:
+  ros__parameters:
+    camera:
+      index: 0
+      backend: v4l2
+      width: 640
+      height: 480
+      reconnect_period_s: 2.0
+    model:
+      path: ''
+      classes_path: ''
+      confidence_threshold: 0.65
+      ema_alpha: 0.75
+      version: ''
+    inference_rate_hz: 5.0
+    diagnostic_rate_hz: 1.0
+    surface_topic: /perception/surface_condition
+    diagnostics_topic: /diagnostics
+    frame_id: camera_link
 
 gps_node:
   ros__parameters:

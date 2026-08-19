@@ -55,13 +55,24 @@ The ZIP's latest `smart_crosswalk_controller_v6.py` has been migrated into
 controller alongside ROS. See `docs/CROSSWALK.md` for data conversion,
 `itstId`, API-key and monitor-only setup.
 
-## Camera and YOLO
+## Road-surface perception
 
 Ubuntu Server has no desktop requirement. Runtime perception must not call GUI
-functions such as `cv2.imshow`. The model backend is not installed yet because
-the camera and model export format have not been selected. Prefer a small ONNX
-model, pin its checksum, measure worst-case latency on the Pi, and publish an
-invalid/zero speed scale whenever inference becomes stale.
+functions such as `cv2.imshow`. The current prototype uses a CPU TorchScript
+model and a USB camera through Linux V4L2. Install its isolated Python
+environment and start it explicitly:
+
+```bash
+bash scripts/install_perception.sh
+SAFESTRIDE_ENABLE_PERCEPTION=true bash scripts/run.sh
+```
+
+Set `SAFESTRIDE_PERCEPTION_CAMERA_INDEX` if the camera is not `/dev/video0`.
+The perception node publishes `/perception/surface_condition`; when enabled,
+the safety supervisor requires a fresh valid message and applies its speed
+scale before `/cmd_vel_safe` reaches the Drive serial bridge. Camera failures,
+low confidence and stale inference therefore inhibit motion. Benchmark
+worst-case latency and classification errors on the Pi before loaded tests.
 
 The GitHub workflow builds Jazzy on Ubuntu 24.04 amd64. It catches ROS API and
 packaging errors; final arm64 performance and device tests still run on the Pi.

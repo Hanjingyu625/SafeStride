@@ -62,6 +62,15 @@ bash scripts/test.sh
 bash scripts/run.sh
 ```
 
+노면 인식을 함께 실행하려면 한 번만 PyTorch 환경을 만들고 USB 카메라를 확인한
+뒤 기능을 명시적으로 켠다. 노면 결과가 없거나 오래되면 safety supervisor가
+진행 명령을 차단한다.
+
+```bash
+bash scripts/install_perception.sh
+SAFESTRIDE_ENABLE_PERCEPTION=true bash scripts/run.sh
+```
+
 기본 운영 설정은 `/dev/safestride-drive`와 `/dev/safestride-terrain`을 사용한다.
 실물 센서와 모터를 단계별로 확인할 때는
 [ROS 하드웨어 통합 테스트 가이드](docs/ROS_HARDWARE_TEST_KO.md)를 따른다.
@@ -127,7 +136,7 @@ test/                        PC에서 실행하는 펌웨어 테스트
 | `firmware/safestride_mcu/` | Drive Uno의 단일 모터 드라이버, 좌우 홀센서, deadman, watchdog 및 시리얼 프로토콜을 구현한다. E-stop은 예약 상태다. |
 | `firmware/terrain_mcu/` | TOF-10120을 읽고 CRC serial telemetry로 전송한다. IMU와 step-leg 출력은 아직 비활성이다. |
 | `logs/` | 주행, 센서, fault 및 ROS bag 로그를 저장할 자리다. |
-| `models/` | 노면 분류용 ONNX/YOLO 모델과 관련 메타데이터를 둘 자리다. 실제 모델은 아직 없다. |
+| `models/` | 향후 배포 모델과 관련 메타데이터를 둘 자리다. 현재 시험용 TorchScript 모델은 `raspberry_pi/road_surface_inference/`에 있다. |
 | `scripts/` | Ubuntu 설치, ROS 빌드, 테스트, 실행 및 systemd 설치를 자동화한다. |
 | `src/` | ROS 2 패키지 전체가 들어 있다. |
 | `test/` | Arduino 코어 로직을 PC에서 검사하는 C++ 테스트와 Arduino stub을 포함한다. |
@@ -141,7 +150,7 @@ test/                        PC에서 실행하는 펌웨어 테스트
 | `safestride_control` | 일반 속도 명령에 timeout, 거리, deadman, fault와 가감속 제한을 적용한다. |
 | `safestride_sensors` | BE-220 NMEA를 파싱하고 `/gps/fix`, `/gps/speed`를 발행한다. |
 | `safestride_navigation` | GPS 위치, 횡단보도 지도와 보행신호 잔여시간으로 v6 상태기계를 실행하고 안전감독기 앞단에 속도 요청을 발행한다. |
-| `safestride_perception` | 노면 분류 결과를 보수적인 속도 배율로 바꾸는 정책이다. 카메라·YOLO 실행 노드는 아직 없다. |
+| `safestride_perception` | Pi 카메라와 TorchScript 모델로 노면을 분류하고 안전한 속도 배율을 발행한다. |
 | `safestride_terrain` | 지형 센서, 양손 감지, 바퀴 속도와 limit 상태를 이용해 향후 다리 전개 가능 여부를 판단하는 정책이다. |
 | `safestride_bringup` | robot state publisher, Drive/Terrain serial bridge와 safety supervisor를 한 번에 실행한다. |
 | `safestride_description` | 차체, 바퀴, 센서 위치와 TF 좌표계를 URDF/Xacro로 정의한다. |
@@ -194,14 +203,16 @@ bringup은 `/dev/safestride-drive`와 `/dev/safestride-terrain`을 열고 두 br
 | `/handle/pressure` | `safestride_interfaces/msg/HandlePressure` | 구현됨: 좌우 손잡이 ADC 값 및 손 감지 |
 | `/terrain/imu/mpu9250` | `sensor_msgs/msg/Imu` | 미구현: MPU-9250 자세·관성 데이터 |
 | `/terrain/imu/bno055` | `sensor_msgs/msg/Imu` | 미구현: BNO055 자세·관성 데이터 |
-| `/perception/surface_condition` | `safestride_interfaces/msg/SurfaceCondition` | 카메라가 판단한 노면과 권장 속도 배율 |
+| `/perception/surface_condition` | `safestride_interfaces/msg/SurfaceCondition` | 카메라가 판단한 노면과 권장 속도 배율. 활성화 시 safety supervisor가 최신 유효값을 필수로 요구한다. |
 | `/terrain/set_leg_state` | `safestride_interfaces/srv/SetLegState` | 미구현: step-leg 전개 또는 복귀 요청 서비스 |
 
 ## 현재 제한사항
 
 - MPU-9250 및 BNO055 하드웨어 드라이버가 아직 구현되지 않았다.
 - 계단용 다리의 pin map, 구동기 및 limit switch가 아직 선정되지 않았다.
-- YOLO 실행 기능에는 카메라 선정, 데이터셋 및 내보낸 모델이 필요하다.
+- 현재 노면 분류는 USB V4L2 카메라와 시험용 TorchScript 모델을 사용한다. 실제
+  장착 위치에서 오분류율과 Pi 최악 지연시간을 검증하기 전에는 주행 시험에
+  사용하지 않는다.
 - 횡단보도 v6 로직은 ROS로 이식됐지만 원본이 참조한 `nearest_map.py`가 제공되지
   않아 시험 장소의 `itstId`를 설정하거나 횡단보도 JSON에 매핑해야 한다.
 - 바퀴 치수, 홀센서의 바퀴 1회전당 펄스 수, PID 및 압력 임계값은 예시 값이므로 실제 장비에서

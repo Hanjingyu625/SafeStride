@@ -34,6 +34,8 @@ sudo apt-get install -y \
   ros-jazzy-ros-base \
   ros-dev-tools \
   python3-colcon-common-extensions \
+  python3-numpy \
+  python3-opencv \
   python3-rosdep \
   python3-serial \
   python3-venv \
@@ -48,3 +50,4 @@ sudo systemctl enable --now ssh.service avahi-daemon.service
 
 echo "Installation complete. Log out and back in for dialout/video groups."
 echo "Then run: ./scripts/build.sh"
+echo "For road-surface inference, also run: ./scripts/install_perception.sh"

@@ -16,7 +16,7 @@ from rclpy.qos import (
 )
 from sensor_msgs.msg import Range
 
-from safestride_interfaces.msg import WalkerStatus
+from safestride_interfaces.msg import SurfaceCondition, WalkerStatus
 from .safety_logic import finite_parameter
 
 
@@ -40,7 +40,9 @@ class SafetySupervisor(Node):
         self.declare_parameter('status_timeout', 0.50)
         self.declare_parameter('max_telemetry_age', 0.50)
         self.declare_parameter('range_timeout', 0.35)
+        self.declare_parameter('surface_timeout', 1.0)
         self.declare_parameter('require_range_sensors', True)
+        self.declare_parameter('require_surface_condition', False)
         self.declare_parameter('require_deadman', True)
 
         self.declare_parameter('max_forward_velocity', 0.15)
@@ -58,6 +60,9 @@ class SafetySupervisor(Node):
         self.declare_parameter('safe_command_topic', '/cmd_vel_safe')
         self.declare_parameter('left_range_topic', '/range/front_left')
         self.declare_parameter('right_range_topic', '/range/front_right')
+        self.declare_parameter(
+            'surface_topic', '/perception/surface_condition'
+        )
         self.declare_parameter('status_topic', '/walker/status')
         self.declare_parameter('diagnostics_topic', '/diagnostics')
         self.declare_parameter('output_frame_id', 'base_link')
@@ -104,8 +109,18 @@ class SafetySupervisor(Node):
             maximum=10.0,
             minimum_inclusive=False,
         )
+        self._surface_timeout = finite_parameter(
+            'surface_timeout',
+            self.get_parameter('surface_timeout').value,
+            minimum=0.0,
+            maximum=10.0,
+            minimum_inclusive=False,
+        )
         self._require_ranges = bool(
             self.get_parameter('require_range_sensors').value
+        )
+        self._require_surface = bool(
+            self.get_parameter('require_surface_condition').value
         )
         self._require_deadman = bool(
             self.get_parameter('require_deadman').value
@@ -182,6 +197,8 @@ class SafetySupervisor(Node):
         self._last_command_time: Optional[float] = None
         self._last_status: Optional[WalkerStatus] = None
         self._last_status_time: Optional[float] = None
+        self._last_surface: Optional[SurfaceCondition] = None
+        self._last_surface_time: Optional[float] = None
         self._ranges: Dict[str, Dict[str, object]] = {
             'left': {
                 'distance': math.nan,
@@ -233,6 +250,12 @@ class SafetySupervisor(Node):
             self._status_callback,
             status_qos,
         )
+        self.create_subscription(
+            SurfaceCondition,
+            str(self.get_parameter('surface_topic').value),
+            self._surface_callback,
+            qos_profile_sensor_data,
+        )
 
         self._command_publisher = self.create_publisher(
             TwistStamped,
@@ -249,10 +272,12 @@ class SafetySupervisor(Node):
         )
 
         self.get_logger().info(
-            'Safety supervisor ready at %.1f Hz; range sensors are %s'
+            'Safety supervisor ready at %.1f Hz; ranges are %s and '
+            'surface perception is %s'
             % (
                 self._publish_rate,
                 'required' if self._require_ranges else 'optional',
+                'required' if self._require_surface else 'optional',
             )
         )
 
@@ -266,6 +291,10 @@ class SafetySupervisor(Node):
     def _status_callback(self, msg: WalkerStatus) -> None:
         self._last_status = msg
         self._last_status_time = self._now_seconds()
+
+    def _surface_callback(self, msg: SurfaceCondition) -> None:
+        self._last_surface = msg
+        self._last_surface_time = self._now_seconds()
 
     def _range_callback(self, side: str, msg: Range) -> None:
         distance = float(msg.range)
@@ -404,6 +433,40 @@ class SafetySupervisor(Node):
 
         return reasons, distances, scales
 
+    def _surface_state(
+        self, now: float
+    ) -> Tuple[List[str], float, int, float]:
+        if self._last_surface is None:
+            reasons = ['surface_missing'] if self._require_surface else []
+            return reasons, 1.0, SurfaceCondition.UNKNOWN, math.nan
+        if self._age(now, self._last_surface_time) > self._surface_timeout:
+            reasons = ['surface_stale'] if self._require_surface else []
+            return reasons, 1.0, SurfaceCondition.UNKNOWN, math.nan
+
+        surface = self._last_surface
+        confidence = float(surface.confidence)
+        scale = float(surface.recommended_speed_scale)
+        known_classifications = {
+            SurfaceCondition.SMOOTH,
+            SurfaceCondition.ROUGH,
+            SurfaceCondition.WET,
+            SurfaceCondition.GRAVEL,
+            SurfaceCondition.STEP,
+            SurfaceCondition.HOLE,
+        }
+        valid = (
+            bool(surface.valid)
+            and surface.classification in known_classifications
+            and math.isfinite(confidence)
+            and 0.0 <= confidence <= 1.0
+            and math.isfinite(scale)
+            and 0.0 <= scale <= 1.0
+        )
+        if not valid:
+            reasons = ['surface_invalid'] if self._require_surface else []
+            return reasons, 1.0, surface.classification, confidence
+        return [], scale, surface.classification, confidence
+
     @staticmethod
     def _slew(
         current: float,
@@ -421,7 +484,9 @@ class SafetySupervisor(Node):
         return current + _clamp(target - current, -max_change, max_change)
 
     def _desired_command(
-        self, range_scales: Dict[str, float]
+        self,
+        range_scales: Dict[str, float],
+        surface_scale: float,
     ) -> Tuple[float, float, List[str]]:
         assert self._last_command is not None
         requested_linear = float(self._last_command.twist.linear.x)
@@ -457,6 +522,9 @@ class SafetySupervisor(Node):
             )
             angular *= turn_scale
 
+        linear *= surface_scale
+        angular *= surface_scale
+
         notes: List[str] = []
         active_scale = min(
             limiting_scale,
@@ -468,6 +536,12 @@ class SafetySupervisor(Node):
             notes.append('obstacle_stop')
         elif active_scale < 1.0:
             notes.append('obstacle_slowdown')
+        if surface_scale <= 0.0 and (
+            requested_linear != 0.0 or requested_angular != 0.0
+        ):
+            notes.append('surface_stop')
+        elif surface_scale < 1.0:
+            notes.append('surface_slowdown')
 
         return linear, angular, notes
 
@@ -482,6 +556,13 @@ class SafetySupervisor(Node):
         hard_stop_reasons.extend(self._status_reasons(now))
         range_reasons, distances, range_scales = self._range_state(now)
         hard_stop_reasons.extend(range_reasons)
+        (
+            surface_reasons,
+            surface_scale,
+            surface_classification,
+            surface_confidence,
+        ) = self._surface_state(now)
+        hard_stop_reasons.extend(surface_reasons)
         motion_stop_reasons = [
             reason for reason in hard_stop_reasons
             if reason != 'disarmed'
@@ -494,10 +575,14 @@ class SafetySupervisor(Node):
             self._output_angular = 0.0
         else:
             desired_linear, desired_angular, operating_notes = (
-                self._desired_command(range_scales)
+                self._desired_command(range_scales, surface_scale)
             )
-            if 'obstacle_stop' in operating_notes:
-                # Stop-zone entry is immediate and requires release-to-resume.
+            if (
+                'obstacle_stop' in operating_notes
+                or 'surface_stop' in operating_notes
+            ):
+                # Hazard entry is immediate; a valid clear result is required
+                # before motion can resume.
                 self._output_linear = 0.0
                 self._output_angular = 0.0
             else:
@@ -551,6 +636,9 @@ class SafetySupervisor(Node):
                 operating_notes,
                 distances,
                 range_scales,
+                surface_scale,
+                surface_classification,
+                surface_confidence,
             )
             self._last_diagnostic_time = now
 
@@ -561,6 +649,9 @@ class SafetySupervisor(Node):
         operating_notes: List[str],
         distances: Dict[str, float],
         range_scales: Dict[str, float],
+        surface_scale: float,
+        surface_classification: int,
+        surface_confidence: float,
     ) -> None:
         diagnostic = DiagnosticStatus()
         diagnostic.name = 'SafeStride/Safety Supervisor'
@@ -577,6 +668,9 @@ class SafetySupervisor(Node):
             'status_stale',
             'telemetry_stale',
             'command_nonfinite',
+            'surface_missing',
+            'surface_stale',
+            'surface_invalid',
         }
         if any(reason in severe for reason in hard_stop_reasons):
             diagnostic.level = DiagnosticStatus.ERROR
@@ -628,6 +722,30 @@ class SafetySupervisor(Node):
             KeyValue(
                 key='right_range_scale',
                 value='%.3f' % range_scales['right'],
+            ),
+            KeyValue(
+                key='surface_required',
+                value=_bool_text(self._require_surface),
+            ),
+            KeyValue(
+                key='surface_age_s',
+                value='%.3f' % self._age(now, self._last_surface_time),
+            ),
+            KeyValue(
+                key='surface_classification',
+                value=str(surface_classification),
+            ),
+            KeyValue(
+                key='surface_confidence',
+                value=(
+                    'unavailable'
+                    if not math.isfinite(surface_confidence)
+                    else '%.3f' % surface_confidence
+                ),
+            ),
+            KeyValue(
+                key='surface_speed_scale',
+                value='%.3f' % surface_scale,
             ),
             KeyValue(
                 key='output_linear_mps',
