@@ -63,6 +63,11 @@ source "${workspace}/install/setup.bash"
 set -u
 
 if [[ "${enable_perception}" == "true" ]]; then
+  # Torch/OpenCV may otherwise consume every Pi core and starve the serial and
+  # safety timers that enforce command freshness.
+  export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
+  export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-1}"
+  export MKL_NUM_THREADS="${MKL_NUM_THREADS:-1}"
   perception_venv="${SAFESTRIDE_PERCEPTION_VENV:-${workspace}/.venv-perception}"
   if [[ -x "${perception_venv}/bin/python" ]]; then
     perception_site_packages="$(

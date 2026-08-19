@@ -74,7 +74,7 @@ safety_supervisor:
     status_timeout: 0.50
     max_telemetry_age: 0.50
     range_timeout: 0.35
-    surface_timeout: 1.0
+    surface_timeout: 2.5
     # The terrain TOF faces downward and cannot replace front obstacle ranges.
     require_range_sensors: false
     # launch overrides this to true whenever surface perception is enabled.
@@ -120,7 +120,7 @@ surface_perception:
       confidence_threshold: 0.65
       ema_alpha: 0.75
       version: ''
-    inference_rate_hz: 5.0
+    inference_rate_hz: 1.0
     diagnostic_rate_hz: 1.0
     surface_topic: /perception/surface_condition
     diagnostics_topic: /diagnostics

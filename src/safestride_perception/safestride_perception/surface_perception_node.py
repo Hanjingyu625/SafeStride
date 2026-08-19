@@ -67,7 +67,7 @@ class SurfacePerceptionNode(Node):
         self.declare_parameter('model.confidence_threshold', 0.65)
         self.declare_parameter('model.ema_alpha', 0.75)
         self.declare_parameter('model.version', '')
-        self.declare_parameter('inference_rate_hz', 5.0)
+        self.declare_parameter('inference_rate_hz', 1.0)
         self.declare_parameter('diagnostic_rate_hz', 1.0)
         self.declare_parameter(
             'surface_topic', '/perception/surface_condition'

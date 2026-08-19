@@ -40,7 +40,7 @@ class SafetySupervisor(Node):
         self.declare_parameter('status_timeout', 0.50)
         self.declare_parameter('max_telemetry_age', 0.50)
         self.declare_parameter('range_timeout', 0.35)
-        self.declare_parameter('surface_timeout', 1.0)
+        self.declare_parameter('surface_timeout', 2.5)
         self.declare_parameter('require_range_sensors', True)
         self.declare_parameter('require_surface_condition', False)
         self.declare_parameter('require_deadman', True)
