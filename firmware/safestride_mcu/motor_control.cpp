@@ -381,6 +381,9 @@ void DriveController::updateHallPlausibility(
           output_allowed)) {
     hall_fault_mask_ |= HALL_FAULT_LEFT;
   }
+  if (cfg::USE_SINGLE_HALL_SENSOR) {
+    return;
+  }
   if (updateHallMonitor(
           right_hall_monitor_,
           right_hall.pulse_count,

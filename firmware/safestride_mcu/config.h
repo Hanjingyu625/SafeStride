@@ -31,10 +31,10 @@ constexpr int32_t MAX_DECEL_MRAD_S2 = 2500L;
 constexpr int32_t ARM_MAX_MEASURED_SPEED_MRAD_S = 100L;
 constexpr uint16_t ARM_STATIONARY_DWELL_MS = 250U;
 
-// One single-output Hall sensor is installed per wheel. The interrupt counts
-// falling edges and the controller estimates speed from the pulse period.
-// A single channel cannot measure direction independently; velocity sign is
-// derived from the commanded direction of the shared motor driver.
+// Current hardware uses one Hall sensor as shared wheel-speed feedback. The
+// firmware mirrors that sensor into both telemetry channels so the ROS bridge
+// and odometry path keep their existing two-wheel message shape.
+constexpr bool USE_SINGLE_HALL_SENSOR = true;
 constexpr uint8_t LEFT_HALL_PIN = 2U;
 constexpr uint8_t RIGHT_HALL_PIN = 3U;
 constexpr uint8_t HALL_ACTIVE_LEVEL = LOW;
@@ -147,6 +147,9 @@ static_assert(
 static_assert(
     HALL_PULSES_PER_WHEEL_REV > 0UL,
     "Hall pulses per wheel revolution must be positive");
+static_assert(
+    !USE_SINGLE_HALL_SENSOR || LEFT_HALL_PIN == 2U || LEFT_HALL_PIN == 3U,
+    "single Hall sensor must use an Arduino Uno interrupt pin");
 static_assert(
     HALL_MIN_PULSE_INTERVAL_US > 0UL &&
         HALL_ZERO_TIMEOUT_US > HALL_MIN_PULSE_INTERVAL_US,

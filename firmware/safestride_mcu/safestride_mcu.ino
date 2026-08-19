@@ -144,11 +144,17 @@ void readHallSamples(
   uint32_t right_last_us = 0UL;
   noInterrupts();
   left.pulse_count = g_left_hall_pulse_count;
-  right.pulse_count = g_right_hall_pulse_count;
   left.period_us = g_left_hall_period_us;
-  right.period_us = g_right_hall_period_us;
   left_last_us = g_left_hall_last_pulse_us;
-  right_last_us = g_right_hall_last_pulse_us;
+  if (cfg::USE_SINGLE_HALL_SENSOR) {
+    right.pulse_count = left.pulse_count;
+    right.period_us = left.period_us;
+    right_last_us = left_last_us;
+  } else {
+    right.pulse_count = g_right_hall_pulse_count;
+    right.period_us = g_right_hall_period_us;
+    right_last_us = g_right_hall_last_pulse_us;
+  }
   interrupts();
   left.age_us = left_last_us == 0UL
       ? 0xFFFFFFFFUL
@@ -269,7 +275,10 @@ uint16_t currentStatusBits() {
   if (digitalRead(cfg::LEFT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL) {
     status |= STATUS_LEFT_HALL_ACTIVE;
   }
-  if (digitalRead(cfg::RIGHT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL) {
+  const bool right_hall_active = cfg::USE_SINGLE_HALL_SENSOR
+      ? (digitalRead(cfg::LEFT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL)
+      : (digitalRead(cfg::RIGHT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL);
+  if (right_hall_active) {
     status |= STATUS_RIGHT_HALL_ACTIVE;
   }
   return status;
@@ -625,12 +634,12 @@ void setup() {
     pinMode(cfg::DRIVER_FAULT_PIN, INPUT_PULLUP);
   }
   pinMode(cfg::LEFT_HALL_PIN, INPUT_PULLUP);
-  pinMode(cfg::RIGHT_HALL_PIN, INPUT_PULLUP);
+  if (!cfg::USE_SINGLE_HALL_SENSOR) {
+    pinMode(cfg::RIGHT_HALL_PIN, INPUT_PULLUP);
+  }
 
   const int left_interrupt =
       digitalPinToInterrupt(cfg::LEFT_HALL_PIN);
-  const int right_interrupt =
-      digitalPinToInterrupt(cfg::RIGHT_HALL_PIN);
   if (left_interrupt == NOT_AN_INTERRUPT) {
     g_fault_bits |= FAULT_LEFT_HALL;
   } else {
@@ -639,13 +648,17 @@ void setup() {
         leftHallIsr,
         cfg::HALL_ACTIVE_LEVEL == LOW ? FALLING : RISING);
   }
-  if (right_interrupt == NOT_AN_INTERRUPT) {
-    g_fault_bits |= FAULT_RIGHT_HALL;
-  } else {
-    attachInterrupt(
-        right_interrupt,
-        rightHallIsr,
-        cfg::HALL_ACTIVE_LEVEL == LOW ? FALLING : RISING);
+  if (!cfg::USE_SINGLE_HALL_SENSOR) {
+    const int right_interrupt =
+        digitalPinToInterrupt(cfg::RIGHT_HALL_PIN);
+    if (right_interrupt == NOT_AN_INTERRUPT) {
+      g_fault_bits |= FAULT_RIGHT_HALL;
+    } else {
+      attachInterrupt(
+          right_interrupt,
+          rightHallIsr,
+          cfg::HALL_ACTIVE_LEVEL == LOW ? FALLING : RISING);
+    }
   }
 
   Serial.begin(cfg::SERIAL_BAUD);
