@@ -13,8 +13,8 @@ serial_bridge:
       ttl_ms: 200
       arm_max_wheel_speed_rad_s: 0.10
       max_abs_angular_z_rad_s: 0.0
-      # Temporary no-wheel test. Must match firmware MAGNET_BENCH_MODE.
-      allow_magnet_bench_mode: true
+      # Legacy pulse-gated bench firmware must never arm in normal operation.
+      allow_magnet_bench_mode: false
       arm_confirmation_timeout_s: 1.0
     telemetry: {timeout_s: 0.30}
     diagnostics: {publish_rate_hz: 1.0}
@@ -53,11 +53,14 @@ terrain_bridge:
       reconnect_period_s: 1.0
     transport: {poll_rate_hz: 100.0}
     telemetry: {timeout_s: 0.30}
+    gps: {enabled: true, timeout_s: 2.0}
     diagnostics: {publish_rate_hz: 1.0}
     range: {min_m: 0.10, max_m: 2.0, field_of_view_rad: 0.052}
-    frames: {tof: terrain_tof_link}
+    frames: {tof: terrain_tof_link, gps: gps_link}
     topics:
       tof: /terrain/tof
+      gps_fix: /gps/fix
+      gps_speed: /gps/speed
       status: /terrain/status
       diagnostics: /diagnostics
 
@@ -78,6 +81,7 @@ safety_supervisor:
     max_forward_velocity: 0.15
     max_reverse_velocity: 0.08
     max_angular_velocity: 0.0
+    max_surface_speed_scale: 1.25
     max_linear_acceleration: 0.20
     max_linear_deceleration: 0.50
     max_angular_acceleration: 0.50
@@ -92,6 +96,13 @@ safety_supervisor:
     status_topic: /walker/status
     diagnostics_topic: /diagnostics
     output_frame_id: base_link
+
+cruise_command:
+  ros__parameters:
+    speed_mps: 0.08
+    publish_rate_hz: 20.0
+    command_topic: /cmd_vel
+    frame_id: base_link
 
 surface_perception:
   ros__parameters:
@@ -115,6 +126,7 @@ surface_perception:
 
 gps_node:
   ros__parameters:
+    # Optional direct-to-Pi fallback. Do not start alongside Terrain Uno GPS.
     port: /dev/serial/by-id/CHANGE_ME_BE220
     baudrate: 115200
     poll_rate_hz: 50.0

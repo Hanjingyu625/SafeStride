@@ -41,25 +41,19 @@ constexpr uint8_t HALL_ACTIVE_LEVEL = LOW;
 // Reject sub-millisecond electrical chatter without discarding valid pulses
 // if the measured pulse-per-revolution value is increased later.
 constexpr uint32_t HALL_MIN_PULSE_INTERVAL_US = 500UL;
-constexpr uint32_t HALL_ZERO_TIMEOUT_US = 1500000UL;
-// Measure this with the standalone sensor bench. Keep HALL_CALIBRATED false
-// until both channels produce the verified number of pulses per wheel turn.
+// With one magnet per revolution the interval can be several seconds. Keep the
+// last period estimate long enough for a 0.5 rad/s wheel to produce a new pulse.
+constexpr uint32_t HALL_ZERO_TIMEOUT_US = 15000000UL;
+// The current wheel setup has one magnet and therefore one pulse per complete
+// wheel revolution. Change this value in both MCU and ROS configuration if the
+// number of magnets or the sensing geometry changes.
 constexpr uint32_t HALL_PULSES_PER_WHEEL_REV = 1UL;
-constexpr bool HALL_CALIBRATED = false;
-
-// Temporary no-wheel hardware test. When enabled, either Hall input pulse
-// opens a short, low-PWM motor window after an explicit ROS arm request.
-// This deliberately bypasses Hall calibration, pressure dead-man, stationary
-// dwell, and Hall plausibility checks. Session and command watchdogs remain
-// active. Set this false before fitting wheels or beginning normal operation.
-constexpr bool MAGNET_BENCH_MODE = true;
-constexpr uint8_t MAGNET_BENCH_PWM = 60U;
-constexpr uint16_t MAGNET_BENCH_PULSE_HOLD_MS = 750U;
+constexpr bool HALL_CALIBRATED = true;
 
 // Runtime Hall plausibility monitor. Tune from lifted-wheel logs. A fault
 // latches until MCU reset so an intermittent sensor cannot silently re-arm.
-constexpr int32_t HALL_STALL_TARGET_MIN_MRAD_S = 300L;
-constexpr uint16_t HALL_STALL_TIMEOUT_MS = 1500U;
+constexpr int32_t HALL_STALL_TARGET_MIN_MRAD_S = 500L;
+constexpr uint16_t HALL_STALL_TIMEOUT_MS = 15000U;
 constexpr int32_t HALL_MAX_PLAUSIBLE_MRAD_S = 5000L;
 constexpr uint16_t HALL_OVERSPEED_TIMEOUT_MS = 100U;
 
@@ -70,6 +64,10 @@ constexpr uint8_t MOTOR_IN1_PIN = 6U;
 constexpr uint8_t MOTOR_IN2_PIN = 8U;
 constexpr int8_t MOTOR_SIGN = 1;
 constexpr uint16_t MAX_PWM = 100U;  // deliberately low for first lifted test
+// The tested motor/driver pair does not start reliably below this PWM. The
+// closed-loop controller applies this as dead-zone compensation, then uses Hall
+// feedback to coast when measured speed reaches or exceeds the target.
+constexpr uint8_t MOTOR_MIN_ACTIVE_PWM = 90U;
 
 // E-stop hardware is not implemented in the current build. Keep this false so
 // the input is not configured, the reported state stays normal, and the
@@ -81,7 +79,9 @@ constexpr uint8_t ESTOP_ACTIVE_LEVEL = HIGH;
 
 // The two FSR channels replace the single digital dead-man switch. Each FSR
 // must be wired as a voltage divider that reads near zero when released.
-constexpr bool REQUIRE_DEADMAN = true;
+// Temporary hardware-test setting requested for the current build. Pressure is
+// still published, but deadmanActive() remains true while this is false.
+constexpr bool REQUIRE_DEADMAN = false;
 constexpr uint8_t PRESSURE_LEFT_PIN = A1;
 constexpr uint8_t PRESSURE_RIGHT_PIN = A2;
 constexpr uint16_t PRESSURE_SAMPLE_PERIOD_MS = 100U;
@@ -142,12 +142,8 @@ static_assert(
     MAX_PWM > 0U && MAX_PWM <= 255U,
     "MAX_PWM must fit the Arduino analogue output range");
 static_assert(
-    MAGNET_BENCH_PWM > 0U && MAGNET_BENCH_PWM <= MAX_PWM,
-    "magnet bench PWM must be positive and no higher than MAX_PWM");
-static_assert(
-    MAGNET_BENCH_PULSE_HOLD_MS > 0U &&
-        MAGNET_BENCH_PULSE_HOLD_MS <= 1000U,
-    "magnet bench pulse hold must be between 1 and 1000 ms");
+    MOTOR_MIN_ACTIVE_PWM > 0U && MOTOR_MIN_ACTIVE_PWM <= MAX_PWM,
+    "minimum active motor PWM must be positive and no higher than MAX_PWM");
 static_assert(
     HALL_PULSES_PER_WHEEL_REV > 0UL,
     "Hall pulses per wheel revolution must be positive");
@@ -158,6 +154,25 @@ static_assert(
 static_assert(
     COMMAND_WATCHDOG_MAX_MS >= COMMAND_TTL_MIN_MS,
     "command TTL range is invalid");
+static_assert(
+    TELEMETRY_PERIOD_MS < SESSION_LOSS_TIMEOUT_MS,
+    "telemetry period must be shorter than session timeout");
+static_assert(
+    MOTOR_PWM_PIN == 3U || MOTOR_PWM_PIN == 5U ||
+        MOTOR_PWM_PIN == 6U || MOTOR_PWM_PIN == 9U ||
+        MOTOR_PWM_PIN == 10U || MOTOR_PWM_PIN == 11U,
+    "motor PWM pin must support PWM on Arduino Uno");
+static_assert(
+    MOTOR_PWM_PIN != MOTOR_IN1_PIN &&
+        MOTOR_PWM_PIN != MOTOR_IN2_PIN &&
+        MOTOR_IN1_PIN != MOTOR_IN2_PIN,
+    "motor control pins must be distinct");
+static_assert(
+    PRESSURE_LEFT_PIN == A1 && PRESSURE_RIGHT_PIN == A2,
+    "current Drive Uno must use A1/A2 because A0 is unavailable");
+static_assert(
+    PRESSURE_LEFT_PIN != PRESSURE_RIGHT_PIN,
+    "pressure sensor pins must be distinct");
 static_assert(
     ARM_MAX_MEASURED_SPEED_MRAD_S >= 0L,
     "arming stationary-speed threshold must not be negative");

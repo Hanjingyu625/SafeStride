@@ -26,8 +26,9 @@ constexpr uint16_t STATUS_ESTOP_ACTIVE = 1U << 3U;
 constexpr uint16_t STATUS_WATCHDOG_TIMEOUT = 1U << 4U;
 constexpr uint16_t STATUS_VALID_COMMAND_SEEN = 1U << 5U;
 constexpr uint16_t STATUS_HALL_CALIBRATED = 1U << 6U;
-constexpr uint16_t STATUS_MAGNET_BENCH_MODE = 1U << 7U;
 constexpr uint8_t STATUS_STATE_SHIFT = 8U;
+constexpr uint16_t STATUS_LEFT_HALL_ACTIVE = 1U << 11U;
+constexpr uint16_t STATUS_RIGHT_HALL_ACTIVE = 1U << 12U;
 
 // Fault values match safestride_interfaces/msg/WalkerStatus.msg.
 constexpr uint16_t FAULT_MOTOR_DRIVER = 1U << 1U;
@@ -41,7 +42,6 @@ constexpr uint32_t CAP_TWO_CURRENTS = 1UL << 3U;
 constexpr uint32_t CAP_DEADMAN = 1UL << 4U;
 constexpr uint32_t CAP_ESTOP = 1UL << 5U;
 constexpr uint32_t CAP_PRESSURE_TELEMETRY = 1UL << 6U;
-constexpr uint32_t CAP_MAGNET_BENCH_MODE = 1UL << 7U;
 
 constexpr uint8_t PRESSURE_FLAG_LEFT_PRESENT = 1U << 0U;
 constexpr uint8_t PRESSURE_FLAG_RIGHT_PRESENT = 1U << 1U;
@@ -93,7 +93,7 @@ bool estopActive() {
 }
 
 bool deadmanActive() {
-  if (cfg::MAGNET_BENCH_MODE || !cfg::REQUIRE_DEADMAN) {
+  if (!cfg::REQUIRE_DEADMAN) {
     return true;
   }
   return g_pressure.bothHandsPresent();
@@ -265,10 +265,13 @@ uint16_t currentStatusBits() {
   if (cfg::HALL_CALIBRATED) {
     status |= STATUS_HALL_CALIBRATED;
   }
-  if (cfg::MAGNET_BENCH_MODE) {
-    status |= STATUS_MAGNET_BENCH_MODE;
-  }
   status |= static_cast<uint16_t>(g_state) << STATUS_STATE_SHIFT;
+  if (digitalRead(cfg::LEFT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL) {
+    status |= STATUS_LEFT_HALL_ACTIVE;
+  }
+  if (digitalRead(cfg::RIGHT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL) {
+    status |= STATUS_RIGHT_HALL_ACTIVE;
+  }
   return status;
 }
 
@@ -331,9 +334,6 @@ void sendHello() {
   }
   if (cfg::ENABLE_CURRENT_SENSE) {
     capabilities |= CAP_TWO_CURRENTS;
-  }
-  if (cfg::MAGNET_BENCH_MODE) {
-    capabilities |= CAP_MAGNET_BENCH_MODE;
   }
   proto::writeU32(payload, g_boot_id);
   proto::writeU32(payload + 4U, capabilities);
@@ -491,7 +491,7 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   // An enable command is not accepted while a hardware interlock or a latched
   // stop state is active. Releasing the input alone never restarts motion; the
   // host must first send a disabled command and explicitly arm again.
-  if ((!cfg::MAGNET_BENCH_MODE && !cfg::HALL_CALIBRATED) ||
+  if (!cfg::HALL_CALIBRATED ||
       estopActive() || !deadmanActive() || g_watchdog_timed_out ||
       g_fault_bits != 0U ||
       g_state == ControllerState::ESTOP ||
@@ -501,7 +501,7 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   }
 
   if (g_state == ControllerState::DISARMED) {
-    if (!cfg::MAGNET_BENCH_MODE && !stationaryDwellMet()) {
+    if (!stationaryDwellMet()) {
       return false;
     }
     markAcceptedCommand(frame, ttl_ms);
@@ -571,26 +571,12 @@ void runControlLoop(uint32_t now_us) {
       !estopActive() &&
       deadmanActive() &&
       g_fault_bits == 0U;
-  if (cfg::MAGNET_BENCH_MODE) {
-    const uint32_t pulse_hold_us =
-        static_cast<uint32_t>(cfg::MAGNET_BENCH_PULSE_HOLD_MS) * 1000UL;
-    const bool magnet_pulse_recent =
-        left_hall.age_us <= pulse_hold_us ||
-        right_hall.age_us <= pulse_hold_us;
-    g_drive.updateMagnetBench(
-        elapsed_us,
-        left_hall,
-        right_hall,
-        g_requested_mrad_s,
-        output_allowed && magnet_pulse_recent);
-  } else {
-    g_drive.update(
-        elapsed_us,
-        left_hall,
-        right_hall,
-        g_requested_mrad_s,
-        output_allowed);
-  }
+  g_drive.update(
+      elapsed_us,
+      left_hall,
+      right_hall,
+      g_requested_mrad_s,
+      output_allowed);
   const uint8_t hall_faults = g_drive.hallFaultMask();
   if (hall_faults != 0U) {
     if ((hall_faults & DriveController::HALL_FAULT_LEFT) != 0U) {

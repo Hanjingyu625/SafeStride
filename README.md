@@ -17,19 +17,19 @@ Python 3.12 환경을 대상으로 개발하는 스마트 보행기 ROS 2 워크
 ## 시스템 구성
 
 ```text
-BE-220 GPS -----> Raspberry Pi 4 <----- camera / YOLO
-                         |
-              ROS 2 safety supervisor
-                    /           \
-         USB serial               USB serial
-        Drive Uno                Terrain Uno
-   shared motor / Hall       TOF / MPU / BNO055 /
-   pressure / Hall           step-leg actuator
+camera / road model --------> Raspberry Pi 4 <-------- USB serial
+                                      |                  Terrain Uno
+                           ROS 2 safety supervisor       TOF + BE-220 GPS
+                                      |
+                                  USB serial
+                                  Drive Uno
+                         shared motor + Hall + pressure
 ```
 
 - Drive Uno가 단일 드라이버에 함께 연결된 두 바퀴 모터의 최종 제어 권한을 가진다.
 - Terrain Uno가 계단용 다리 actuator의 최종 제어 권한을 가진다.
-- YOLO 판단은 보조 정보이며 허용 속도를 낮추는 방향으로만 사용한다.
+- 노면 판단은 기본 속도에 제한된 배율을 적용하며 최종 속도는 절대 상한을
+  넘지 않는다.
 - timeout, 유효하지 않은 센서값, 알 수 없는 노면 또는 serial session 단절이
   발생하면 정지하거나 속도 배율을 0으로 만든다.
 - 시스템을 시작할 때 actuator를 자동으로 활성화하지 않는다.
@@ -44,6 +44,7 @@ BE-220 GPS -----> Raspberry Pi 4 <----- camera / YOLO
 git clone <repository-url> ~/SafeStride
 cd ~/SafeStride
 bash scripts/install_ubuntu_24_04.sh
+bash scripts/install_arduino_libraries.sh
 ```
 
 설치 스크립트가 사용자의 `dialout`, `video` 그룹을 변경하면 로그아웃한 뒤 다시
@@ -62,14 +63,27 @@ bash scripts/test.sh
 bash scripts/run.sh
 ```
 
-노면 인식을 함께 실행하려면 한 번만 PyTorch 환경을 만들고 USB 카메라를 확인한
-뒤 기능을 명시적으로 켠다. 노면 결과가 없거나 오래되면 safety supervisor가
-진행 명령을 차단한다.
+기본 실행은 0.08 m/s 정속 요청과 노면 인식을 함께 시작한다. PyTorch 환경은
+한 번 설치해야 하며, 노면 결과가 없거나 오래되면 safety supervisor가 진행
+명령을 차단한다. 시작만으로 모터가 활성화되지는 않는다.
 
 ```bash
 bash scripts/install_perception.sh
-SAFESTRIDE_ENABLE_PERCEPTION=true bash scripts/run.sh
+bash scripts/run.sh
 ```
+
+기본 요청 0.08 m/s에 적용되는 노면별 목표는 다음과 같다. 모든 값은 ROS의
+가감속 제한과 최종 0.15 m/s 상한을 다시 통과한다.
+
+| 모델 노면 | 배율 | 기본 목표 속도 |
+|---|---:|---:|
+| `smooth_paved` | 1.20 | 0.096 m/s |
+| `rough_paved` | 0.70 | 0.056 m/s |
+| `block_paved` | 0.65 | 0.052 m/s |
+| `gravel` | 0.55 | 0.044 m/s |
+| `unpaved_mixed`, `wet_paved` | 0.50 | 0.040 m/s |
+| `mud_dirt`, `wet_unpaved` | 0.40 | 0.032 m/s |
+| `snow_ice`, 미확인·낮은 신뢰도 | 0.00 | 정지 |
 
 기본 운영 설정은 `/dev/safestride-drive`와 `/dev/safestride-terrain`을 사용한다.
 실물 센서와 모터를 단계별로 확인할 때는
@@ -85,6 +99,9 @@ ros2 topic echo /handle/pressure --once
 ros2 topic echo /wheel/hall --once
 ros2 topic echo /terrain/tof --once
 ros2 topic echo /terrain/status --once
+ros2 topic echo /gps/fix --once
+ros2 topic echo /gps/speed --once
+ros2 topic echo /perception/surface_condition --once
 ros2 topic echo /walker/status --once
 ```
 
@@ -94,12 +111,10 @@ ros2 topic echo /walker/status --once
 
 모터는 시작 시 항상 disarmed다. 현재 E-stop은 미구현이므로 별도의 물리 전원
 차단 수단을 즉시 사용할 수 있고 바퀴를 지면에서 든 상태에서만 한 터미널로
-아주 작은 속도 명령을 계속 발행하고, 다른 터미널에서
-명시적으로 enable한다.
+기본 정속 명령과 안전 제한값을 확인하고 다른 터미널에서 명시적으로 enable한다.
 
 ```bash
-ros2 topic pub --rate 20 /cmd_vel geometry_msgs/msg/TwistStamped \
-  "{header: {frame_id: base_link}, twist: {linear: {x: 0.03}}}"
+ros2 topic echo /cmd_vel_safe --once
 ros2 service call /walker/set_enabled std_srvs/srv/SetBool "{data: true}"
 # 시험 직후
 ros2 service call /walker/set_enabled std_srvs/srv/SetBool "{data: false}"
@@ -110,7 +125,7 @@ ros2 service call /walker/set_enabled std_srvs/srv/SetBool "{data: false}"
 ```text
 src/                         ROS 2 Jazzy 패키지
 firmware/safestride_mcu/     Drive Uno 펌웨어
-firmware/terrain_mcu/        Terrain Uno TOF 센서 펌웨어
+firmware/terrain_mcu/        Terrain Uno TOF/GPS 센서 펌웨어
 config/                      하드웨어 및 실행 설정
 deploy/udev/                 고정 serial 장치 별칭
 deploy/systemd/              화면 없는 자동 시작 서비스
@@ -134,7 +149,7 @@ test/                        PC에서 실행하는 펌웨어 테스트
 | `docker/` | ROS 2 Jazzy 개발 환경을 재현하는 Docker 이미지 설정이다. |
 | `docs/` | 전체 구조, 하드웨어, 개발 절차와 향후 작업을 설명한다. |
 | `firmware/safestride_mcu/` | Drive Uno의 단일 모터 드라이버, 좌우 홀센서, deadman, watchdog 및 시리얼 프로토콜을 구현한다. E-stop은 예약 상태다. |
-| `firmware/terrain_mcu/` | TOF-10120을 읽고 CRC serial telemetry로 전송한다. IMU와 step-leg 출력은 아직 비활성이다. |
+| `firmware/terrain_mcu/` | TOF-10120과 BE-220 GPS를 읽고 CRC serial telemetry로 전송한다. IMU와 step-leg 출력은 아직 비활성이다. |
 | `logs/` | 주행, 센서, fault 및 ROS bag 로그를 저장할 자리다. |
 | `models/` | 향후 배포 모델과 관련 메타데이터를 둘 자리다. 현재 시험용 TorchScript 모델은 `raspberry_pi/road_surface_inference/`에 있다. |
 | `scripts/` | Ubuntu 설치, ROS 빌드, 테스트, 실행 및 systemd 설치를 자동화한다. |
@@ -146,9 +161,9 @@ test/                        PC에서 실행하는 펌웨어 테스트
 | ROS 패키지 | 역할과 현재 상태 |
 |---|---|
 | `safestride_interfaces` | `WalkerStatus`, `WheelHall`, `TerrainStatus`, `SurfaceCondition`, `HandlePressure`, `CrosswalkStatus` 메시지와 `SetLegState` 서비스를 정의한다. |
-| `safestride_bridge` | Drive/Terrain Uno와 각각 USB serial로 통신하고 압력·TOF·주행 텔레메트리를 표준 ROS 토픽으로 변환한다. |
+| `safestride_bridge` | Drive/Terrain Uno와 각각 USB serial로 통신하고 압력·TOF·GPS·주행 텔레메트리를 표준 ROS 토픽으로 변환한다. |
 | `safestride_control` | 일반 속도 명령에 timeout, 거리, deadman, fault와 가감속 제한을 적용한다. |
-| `safestride_sensors` | BE-220 NMEA를 파싱하고 `/gps/fix`, `/gps/speed`를 발행한다. |
+| `safestride_sensors` | BE-220을 Pi에 직접 연결할 때만 쓰는 선택적 NMEA 어댑터다. 기본 구성은 Terrain Uno가 GPS를 읽는다. |
 | `safestride_navigation` | GPS 위치, 횡단보도 지도와 보행신호 잔여시간으로 v6 상태기계를 실행하고 안전감독기 앞단에 속도 요청을 발행한다. |
 | `safestride_perception` | Pi 카메라와 TorchScript 모델로 노면을 분류하고 안전한 속도 배율을 발행한다. |
 | `safestride_terrain` | 지형 센서, 양손 감지, 바퀴 속도와 limit 상태를 이용해 향후 다리 전개 가능 여부를 판단하는 정책이다. |
@@ -179,8 +194,8 @@ Python ROS 패키지 내부의 `resource/`는 ROS 패키지 검색 등록용이�
 | `/walker/status` | `safestride_interfaces/msg/WalkerStatus` | Serial Bridge -> Safety Supervisor | MCU 상태, deadman, watchdog과 fault를 종합한다. E-stop 필드는 현재 항상 false다. |
 | `/terrain/tof` | `sensor_msgs/msg/Range` | Terrain Serial Bridge -> ROS | TOF-10120의 거리다. 무효 측정은 NaN이다. |
 | `/terrain/status` | `safestride_interfaces/msg/TerrainStatus` | Terrain Serial Bridge -> ROS | TOF 유효성, 링크 age와 terrain fault다. |
-| `/gps/fix` | `sensor_msgs/msg/NavSatFix` | BE-220 GPS -> Crosswalk Controller | 현재 GPS 위치다. |
-| `/gps/speed` | `std_msgs/msg/Float32` | BE-220 GPS -> Crosswalk Controller | RMC 문장의 지면 속도다. |
+| `/gps/fix` | `sensor_msgs/msg/NavSatFix` | Terrain Uno GPS -> Crosswalk Controller | 현재 GPS 위치다. |
+| `/gps/speed` | `std_msgs/msg/Float32` | Terrain Uno GPS -> Crosswalk Controller | NMEA 지면속도다. |
 | `/crosswalk/status` | `safestride_interfaces/msg/CrosswalkStatus` | Crosswalk Controller -> ROS | 횡단보도 상태, 거리, 신호시간, 진입 허용과 목표 속도다. |
 | `/diagnostics` | `diagnostic_msgs/msg/DiagnosticArray` | Bridge·Supervisor -> ROS | 통신, 센서 및 안전 상태 진단이다. |
 | `/tf` | `tf2_msgs/msg/TFMessage` | Serial Bridge 등 -> ROS | 기본적으로 `odom`에서 `base_footprint`로의 좌표 변환이다. |
@@ -193,13 +208,15 @@ Python ROS 패키지 내부의 `resource/`는 ROS 패키지 검색 등록용이�
 
 Drive Uno와 Terrain Uno는 각각 Raspberry Pi에 USB serial로 연결한다. 기본
 bringup은 `/dev/safestride-drive`와 `/dev/safestride-terrain`을 열고 두 bridge를
-함께 실행한다. 압력과 TOF 토픽은 구현되어 있고 아래 IMU·다리 항목은 후속
+함께 실행한다. 압력, TOF와 GPS 토픽은 구현되어 있고 아래 IMU·다리 항목은 후속
 하드웨어 확정 전까지 비활성이다.
 
 | 이름 | 형식 | 상태와 역할 |
 |---|---|---|
 | `/terrain/tof` | `sensor_msgs/msg/Range` | 구현됨: TOF-10120 거리 |
 | `/terrain/status` | `safestride_interfaces/msg/TerrainStatus` | 구현됨: TOF 유효성, telemetry age와 fault |
+| `/gps/fix` | `sensor_msgs/msg/NavSatFix` | 구현됨: Terrain Uno가 읽은 BE-220 위치 |
+| `/gps/speed` | `std_msgs/msg/Float32` | 구현됨: Terrain Uno가 읽은 GPS 지면속도 |
 | `/handle/pressure` | `safestride_interfaces/msg/HandlePressure` | 구현됨: 좌우 손잡이 ADC 값 및 손 감지 |
 | `/terrain/imu/mpu9250` | `sensor_msgs/msg/Imu` | 미구현: MPU-9250 자세·관성 데이터 |
 | `/terrain/imu/bno055` | `sensor_msgs/msg/Imu` | 미구현: BNO055 자세·관성 데이터 |

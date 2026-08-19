@@ -15,6 +15,7 @@ git clone <repository-url> ~/SafeStride
 cd ~/SafeStride
 bash scripts/install_ubuntu_24_04.sh
 # Log out and back in after group membership changes.
+bash scripts/install_arduino_libraries.sh
 bash scripts/build.sh
 bash scripts/test.sh
 ```
@@ -35,8 +36,9 @@ under `/dev/serial/by-id/`; never assume `ttyACM0` ordering.
 
 Copy and edit `deploy/udev/99-safestride.rules.example`, then install it only
 after checking the unique serial attribute of each device. The runtime config
-expects `/dev/safestride-drive` and `/dev/safestride-terrain`; GPS uses its own
-alias when enabled.
+expects `/dev/safestride-drive` and `/dev/safestride-terrain`. The default GPS
+path is BE-220 -> Terrain Uno D8 -> `/dev/safestride-terrain`; the separate
+Pi GPS serial node is only a fallback and must not run at the same time.
 
 Both Arduino sketches must be flashed after a wire-protocol change. Protocol
 v2 is intentionally incompatible with the old dual-wheel command payload, so
@@ -60,17 +62,20 @@ controller alongside ROS. See `docs/CROSSWALK.md` for data conversion,
 Ubuntu Server has no desktop requirement. Runtime perception must not call GUI
 functions such as `cv2.imshow`. The current prototype uses a CPU TorchScript
 model and a USB camera through Linux V4L2. Install its isolated Python
-environment and start it explicitly:
+environment. `scripts/run.sh` starts perception and the 0.08 m/s cruise request
+by default:
 
 ```bash
 bash scripts/install_perception.sh
-SAFESTRIDE_ENABLE_PERCEPTION=true bash scripts/run.sh
+bash scripts/run.sh
 ```
 
 Set `SAFESTRIDE_PERCEPTION_CAMERA_INDEX` if the camera is not `/dev/video0`.
 The perception node publishes `/perception/surface_condition`; when enabled,
 the safety supervisor requires a fresh valid message and applies its speed
-scale before `/cmd_vel_safe` reaches the Drive serial bridge. Camera failures,
+scale before `/cmd_vel_safe` reaches the Drive serial bridge. Smooth pavement
+may request up to 1.20x, but the final command remains clamped by the absolute
+0.15 m/s limit. Camera failures,
 low confidence and stale inference therefore inhibit motion. Benchmark
 worst-case latency and classification errors on the Pi before loaded tests.
 

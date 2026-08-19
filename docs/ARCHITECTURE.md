@@ -7,9 +7,9 @@ motion, but it must never be the only layer capable of stopping an actuator.
 
 | Controller | Connected hardware | Responsibility |
 |---|---|---|
-| Raspberry Pi | Camera, BE-220 GPS, two USB serial links | ROS 2, road-surface classification, crosswalk logic, logging and high-level requests |
+| Raspberry Pi | Camera, two USB serial links | ROS 2, road-surface classification, crosswalk logic, logging and high-level requests |
 | Drive Uno | Two Hall speed sensors, two handle pressure sensors, one shared motor driver | Final common wheel enable, velocity control and Hall watchdog; E-stop input is reserved but not implemented |
-| Terrain Uno | TOF-10120, MPU-9250, BNO055, leg limits, leg motor driver | Step detection, redundant attitude checks and leg state machine |
+| Terrain Uno | TOF-10120, BE-220 GPS, future IMUs/leg hardware | TOF/GPS acquisition; future step and leg state machine |
 
 The pressure sensors form a two-channel handle-presence/dead-man input, not a
 calibrated weight measurement. Losing either hand requests a safe stop unless a
@@ -18,14 +18,15 @@ later validated operating mode explicitly permits one-hand use.
 ## Data flow
 
 ```text
-BE-220 GPS -> navigation/crosswalk --------+
+Terrain Uno GPS -> navigation/crosswalk ---+
 Pi camera -> TorchScript surface estimate -+-> safety supervisor -> Drive Uno
 Terrain Uno -> step/attitude/state --------+          |
                                                       +-> terrain coordinator -> Terrain Uno
 ```
 
-Surface-classifier output is advisory. It may reduce permitted speed but may
-not write PWM, enable motors or bypass stale sensor checks. Unknown, stale or
+Surface-classifier output is advisory. It applies a bounded 0.0–1.25 speed
+scale but may not write PWM, enable motors or bypass stale sensor checks. The
+result is clamped again by the absolute ROS speed limits. Unknown, stale or
 low-confidence classification stops motion when perception is enabled.
 
 TOF may propose a step. Leg deployment additionally requires low wheel speed,

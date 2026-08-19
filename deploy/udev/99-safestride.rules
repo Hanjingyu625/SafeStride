@@ -1,0 +1,4 @@
+# SafeStride Arduino Uno assignments. These serial numbers are stable even if
+# Linux assigns ttyACM0 and ttyACM1 in a different order after reboot.
+SUBSYSTEM=="tty", ATTRS{serial}=="8583030333935131E120", SYMLINK+="safestride-drive", GROUP="dialout", MODE="0660"
+SUBSYSTEM=="tty", ATTRS{serial}=="75834353730351C07130", SYMLINK+="safestride-terrain", GROUP="dialout", MODE="0660"

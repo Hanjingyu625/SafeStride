@@ -116,6 +116,11 @@ int main() {
   namespace proto = safestride_protocol;
   setup();
   assert(!g_session_active);
+  assert(!g_session_offer_active);
+
+  sendHello();
+  assert(g_session_offer_active);
+  g_serial_tx_length = 0U;
 
   uint8_t payload[proto::SESSION_START_PAYLOAD_SIZE];
   proto::writeU32(payload, g_boot_id);
@@ -129,6 +134,23 @@ int main() {
       payload,
       sizeof(payload)));
   loadSerialRx(command.data(), command.length());
+  processHostProtocol();
+  assert(g_session_active);
+  assert(!g_session_offer_active);
+  assert(g_session_id == 0x12345678UL);
+
+  // A delayed start from an older host cannot replace a live session.
+  sendHello();
+  BufferStream stale_command;
+  assert(proto::sendFrame(
+      stale_command,
+      proto::TYPE_SESSION_START,
+      8U,
+      0x87654321UL,
+      0UL,
+      payload,
+      sizeof(payload)));
+  loadSerialRx(stale_command.data(), stale_command.length());
   processHostProtocol();
   assert(g_session_active);
   assert(g_session_id == 0x12345678UL);
@@ -150,6 +172,31 @@ int main() {
   assert(frame.payload_length == proto::TERRAIN_TELEMETRY_PAYLOAD_SIZE);
   assert(proto::readU16(frame.payload) == g_distance_mm);
   assert(frame.payload[2U] == 1U);
+
+  g_serial_tx_length = 0U;
+  sendGpsTelemetry(g_now_ms);
+  proto::FrameReceiver gps_receiver;
+  proto::FrameView gps_frame = {0U, 0U, 0U, 0U, 0UL, 0UL, NULL};
+  proto::ReceiveResult gps_result = proto::ReceiveResult::NONE;
+  for (size_t i = 0U; i < g_serial_tx_length; ++i) {
+    gps_result = gps_receiver.push(g_serial_tx[i], gps_frame);
+  }
+  assert(gps_result == proto::ReceiveResult::FRAME_READY);
+  assert(gps_frame.type == proto::TYPE_GPS_TELEMETRY);
+  assert(gps_frame.session_id == 0x12345678UL);
+  assert(gps_frame.payload_length == proto::GPS_TELEMETRY_PAYLOAD_SIZE);
+  assert(proto::readU32(gps_frame.payload + 0U) == 0UL);
+  assert(proto::readU32(gps_frame.payload + 4U) == 0UL);
+  assert(proto::readU32(gps_frame.payload + 8U) == 0UL);
+  assert(gps_frame.payload[12U] == 0U);
+  assert(gps_frame.payload[13U] == 0U);
+
+  g_now_ms = g_last_session_activity_ms +
+      cfg::SESSION_LOSS_TIMEOUT_MS + 1UL;
+  enforceHostSessionTimeout(g_now_ms);
+  assert(!g_session_active);
+  assert(!g_session_offer_active);
+  assert(g_session_id == 0UL);
 
   printf("firmware terrain session/telemetry tests: OK\n");
   return 0;

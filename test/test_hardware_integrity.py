@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DRIVE_CONFIG = ROOT / "firmware/safestride_mcu/config.h"
 DRIVE_FIRMWARE = ROOT / "firmware/safestride_mcu/safestride_mcu.ino"
 TERRAIN_FIRMWARE = ROOT / "firmware/terrain_mcu/terrain_mcu.ino"
+TERRAIN_CONFIG = ROOT / "firmware/terrain_mcu/config.h"
 DRIVE_SKETCH_DIR = ROOT / "firmware/safestride_mcu"
 TERRAIN_SKETCH_DIR = ROOT / "firmware/terrain_mcu"
 BRIDGE = (
@@ -38,6 +39,7 @@ class TestHardwareIntegrity(unittest.TestCase):
         cls.config = DRIVE_CONFIG.read_text(encoding="utf-8")
         cls.drive = DRIVE_FIRMWARE.read_text(encoding="utf-8")
         cls.terrain = TERRAIN_FIRMWARE.read_text(encoding="utf-8")
+        cls.terrain_config = TERRAIN_CONFIG.read_text(encoding="utf-8")
         cls.bridge = BRIDGE.read_text(encoding="utf-8")
 
     def test_drive_active_pins_are_unique(self):
@@ -58,8 +60,12 @@ class TestHardwareIntegrity(unittest.TestCase):
             len(owners),
             f"Drive Uno pin collision: {owners}",
         )
-        self.assertNotIn("0U", owners.values(), "D0 is reserved for USB serial")
-        self.assertNotIn("1U", owners.values(), "D1 is reserved for USB serial")
+        self.assertNotIn(
+            "0U", owners.values(), "D0 is reserved for USB serial"
+        )
+        self.assertNotIn(
+            "1U", owners.values(), "D1 is reserved for USB serial"
+        )
 
     def test_production_sketches_have_one_ino_entry_point(self):
         expected = {
@@ -100,28 +106,30 @@ class TestHardwareIntegrity(unittest.TestCase):
             r"capabilities\s*\|=\s*CAP_ESTOP;",
         )
 
-    def test_magnet_bench_mode_is_explicit_and_bounded(self):
+    def test_normal_hall_feedback_mode_is_enabled(self):
         self.assertEqual(
-            constant_expression(self.config, "MAGNET_BENCH_MODE"),
+            constant_expression(self.config, "HALL_CALIBRATED"),
             "true",
         )
-        pwm = int(
-            constant_expression(self.config, "MAGNET_BENCH_PWM")
+        pulses_per_revolution = int(
+            constant_expression(self.config, "HALL_PULSES_PER_WHEEL_REV")
+            .removesuffix("UL")
+        )
+        minimum_pwm = int(
+            constant_expression(self.config, "MOTOR_MIN_ACTIVE_PWM")
             .removesuffix("U")
         )
-        hold_ms = int(
-            constant_expression(
-                self.config, "MAGNET_BENCH_PULSE_HOLD_MS"
-            ).removesuffix("U")
+        maximum_pwm = int(
+            constant_expression(self.config, "MAX_PWM").removesuffix("U")
         )
-        self.assertGreater(pwm, 0)
-        self.assertLessEqual(pwm, 100)
-        self.assertGreater(hold_ms, 0)
-        self.assertLessEqual(hold_ms, 1000)
-        self.assertIn("output_allowed && magnet_pulse_recent", self.drive)
+        self.assertGreater(pulses_per_revolution, 0)
+        self.assertGreater(minimum_pwm, 0)
+        self.assertLessEqual(minimum_pwm, maximum_pwm)
+        self.assertNotIn("MAGNET_BENCH_MODE", self.config)
+        self.assertNotIn("updateMagnetBench", self.drive)
         self.assertIn("COMMAND_WATCHDOG_MAX_MS", self.config)
 
-    def test_ros_must_explicitly_allow_magnet_bench_mode(self):
+    def test_ros_blocks_legacy_magnet_bench_mode(self):
         self.assertIn(
             "('command.allow_magnet_bench_mode', False)", self.bridge
         )
@@ -129,12 +137,26 @@ class TestHardwareIntegrity(unittest.TestCase):
         self.assertIn("STATUS_MAGNET_BENCH_MODE", self.bridge)
         for path in ROS_CONFIGS:
             text = path.read_text(encoding="utf-8")
-            self.assertIn("allow_magnet_bench_mode: true", text)
+            self.assertIn("allow_magnet_bench_mode: false", text)
 
     def test_terrain_uses_i2c_without_gpio_actuator_outputs(self):
         self.assertIn("Wire.begin()", self.terrain)
         self.assertNotIn("analogWrite(", self.terrain)
         self.assertNotRegex(self.terrain, r"\battachInterrupt\s*\(")
+
+    def test_terrain_gps_uses_altsoftserial_pins(self):
+        self.assertEqual(
+            constant_expression(self.terrain_config, "GPS_RX_PIN"), "8U"
+        )
+        self.assertEqual(
+            constant_expression(self.terrain_config, "GPS_TX_PIN"), "9U"
+        )
+        self.assertEqual(
+            constant_expression(self.terrain_config, "GPS_BAUD"), "9600UL"
+        )
+        self.assertIn('constexpr bool ENABLE_GPS = true;', self.terrain_config)
+        self.assertIn('g_gps.poll()', self.terrain)
+        self.assertIn('TYPE_GPS_TELEMETRY', self.terrain)
 
 
 if __name__ == "__main__":

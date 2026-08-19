@@ -102,6 +102,7 @@ class SerialBridgeNode(Node):
         self._capabilities = 0
         self._session_started = False
         self._tx_sequence = 0
+        self._controller_capability_error: Optional[str] = None
 
         self._enabled_requested = False
         self._last_command_time: Optional[float] = None
@@ -441,20 +442,31 @@ class SerialBridgeNode(Node):
     def _serial_connected(self) -> bool:
         return self._serial is not None and bool(self._serial.is_open)
 
-    def _link_ok(self, now: Optional[float] = None) -> bool:
-        if not self._serial_connected() or not self._session_started:
-            return False
-        if (
-            self._last_telemetry_time is None
-            or self._last_telemetry is None
-            or not (
-                self._last_telemetry.status_bits & STATUS_SESSION
-            )
-        ):
-            return False
+    def _link_failure_reason(
+        self, now: Optional[float] = None
+    ) -> Optional[str]:
+        if not self._serial_connected():
+            return 'controller serial port is disconnected'
+        if self._controller_capability_error is not None:
+            return self._controller_capability_error
+        if not self._session_started:
+            return 'controller session is inactive'
+        if self._last_telemetry_time is None or self._last_telemetry is None:
+            return 'controller telemetry has not been received'
+        if not (self._last_telemetry.status_bits & STATUS_SESSION):
+            return 'controller telemetry reports an inactive session'
         if now is None:
             now = self._now_monotonic()
-        return (now - self._last_telemetry_time) <= self._telemetry_timeout
+        age = max(0.0, now - self._last_telemetry_time)
+        if age > self._telemetry_timeout:
+            return (
+                f'controller telemetry is stale ({age:.3f}s; '
+                f'limit {self._telemetry_timeout:.3f}s)'
+            )
+        return None
+
+    def _link_ok(self, now: Optional[float] = None) -> bool:
+        return self._link_failure_reason(now) is None
 
     @staticmethod
     def _firmware_state(telemetry: TelemetryPayload) -> int:
@@ -532,6 +544,7 @@ class SerialBridgeNode(Node):
         self._boot_id = 0
         self._capabilities = 0
         self._session_started = False
+        self._controller_capability_error = None
         self._clear_enable_request()
         self._last_command_time = None
         self._command_timed_out = True
@@ -669,6 +682,26 @@ class SerialBridgeNode(Node):
     def _handle_hello(
         self, hello: HelloPayload, hello_sequence: int
     ) -> None:
+        if not (hello.capabilities & CAP_TWO_HALL_SENSORS):
+            error = (
+                'device on the drive port is not Drive firmware '
+                '(two-Hall capability missing)'
+            )
+            self._session_id = 0
+            self._boot_id = hello.boot_id
+            self._capabilities = hello.capabilities
+            self._session_started = False
+            self._controller_capability_error = error
+            self._clear_enable_request()
+            self._last_telemetry_time = None
+            self._last_telemetry = None
+            self._last_telemetry_sequence = None
+            self.get_logger().error(
+                error,
+                throttle_duration_sec=5.0,
+            )
+            return
+        self._controller_capability_error = None
         if (
             hello.boot_id == self._boot_id
             and self._session_started
@@ -801,9 +834,10 @@ class SerialBridgeNode(Node):
                 )
             return response
 
-        if not self._link_ok(now):
+        link_failure = self._link_failure_reason(now)
+        if link_failure is not None:
             response.success = False
-            response.message = 'cannot enable: controller telemetry is stale'
+            response.message = f'cannot enable: {link_failure}'
             return response
         telemetry = self._last_telemetry
         if telemetry is None:
@@ -1311,6 +1345,9 @@ class SerialBridgeNode(Node):
         elif not self._serial_connected():
             status.level = DiagnosticStatus.ERROR
             status.message = 'serial port disconnected'
+        elif self._controller_capability_error is not None:
+            status.level = DiagnosticStatus.ERROR
+            status.message = self._controller_capability_error
         elif not self._session_started:
             status.level = DiagnosticStatus.WARN
             status.message = 'waiting for controller HELLO'

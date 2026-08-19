@@ -26,6 +26,10 @@ setup(
     entry_points={
         'console_scripts': [
             (
+                'cruise_command = '
+                'safestride_control.cruise_command_node:main'
+            ),
+            (
                 'safety_supervisor = '
                 'safestride_control.safety_supervisor_node:main'
             ),

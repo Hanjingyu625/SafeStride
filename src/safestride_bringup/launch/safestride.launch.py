@@ -28,6 +28,7 @@ def generate_launch_description() -> LaunchDescription:
     wheel_separation = LaunchConfiguration('wheel_separation')
     enable_gps = LaunchConfiguration('enable_gps')
     enable_crosswalk = LaunchConfiguration('enable_crosswalk')
+    enable_cruise = LaunchConfiguration('enable_cruise')
     enable_terrain = LaunchConfiguration('enable_terrain')
     enable_perception = LaunchConfiguration('enable_perception')
     perception_model_path = LaunchConfiguration('perception_model_path')
@@ -105,9 +106,20 @@ def generate_launch_description() -> LaunchDescription:
                 description='OpenCV camera backend: v4l2 or auto.',
             ),
             DeclareLaunchArgument(
+                'enable_cruise',
+                default_value='true',
+                description=(
+                    'Publish the default straight-line request; explicit '
+                    'motor enable remains required.'
+                ),
+            ),
+            DeclareLaunchArgument(
                 'enable_gps',
                 default_value='false',
-                description='Start the BE-220 serial GPS adapter.',
+                description=(
+                    'Start the optional direct-to-Pi BE-220 adapter; keep '
+                    'false when GPS is connected to Terrain Uno.'
+                ),
             ),
             DeclareLaunchArgument(
                 'enable_crosswalk',
@@ -120,6 +132,14 @@ def generate_launch_description() -> LaunchDescription:
                 name='robot_state_publisher',
                 output='screen',
                 parameters=[{'robot_description': robot_description}],
+            ),
+            Node(
+                package='safestride_control',
+                executable='cruise_command',
+                name='cruise_command',
+                output='screen',
+                condition=IfCondition(enable_cruise),
+                parameters=[config_file],
             ),
             Node(
                 package='safestride_bridge',

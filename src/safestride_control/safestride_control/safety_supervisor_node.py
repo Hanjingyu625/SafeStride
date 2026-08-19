@@ -48,6 +48,7 @@ class SafetySupervisor(Node):
         self.declare_parameter('max_forward_velocity', 0.15)
         self.declare_parameter('max_reverse_velocity', 0.08)
         self.declare_parameter('max_angular_velocity', 0.35)
+        self.declare_parameter('max_surface_speed_scale', 1.25)
         self.declare_parameter('max_linear_acceleration', 0.20)
         self.declare_parameter('max_linear_deceleration', 0.50)
         self.declare_parameter('max_angular_acceleration', 0.50)
@@ -142,6 +143,12 @@ class SafetySupervisor(Node):
             self.get_parameter('max_angular_velocity').value,
             minimum=0.0,
             maximum=20.0,
+        )
+        self._max_surface_scale = finite_parameter(
+            'max_surface_speed_scale',
+            self.get_parameter('max_surface_speed_scale').value,
+            minimum=1.0,
+            maximum=2.0,
         )
         self._linear_accel = finite_parameter(
             'max_linear_acceleration',
@@ -460,7 +467,7 @@ class SafetySupervisor(Node):
             and math.isfinite(confidence)
             and 0.0 <= confidence <= 1.0
             and math.isfinite(scale)
-            and 0.0 <= scale <= 1.0
+            and 0.0 <= scale <= self._max_surface_scale
         )
         if not valid:
             reasons = ['surface_invalid'] if self._require_surface else []
@@ -524,6 +531,8 @@ class SafetySupervisor(Node):
 
         linear *= surface_scale
         angular *= surface_scale
+        linear = _clamp(linear, -self._max_reverse, self._max_forward)
+        angular = _clamp(angular, -self._max_angular, self._max_angular)
 
         notes: List[str] = []
         active_scale = min(
@@ -542,6 +551,8 @@ class SafetySupervisor(Node):
             notes.append('surface_stop')
         elif surface_scale < 1.0:
             notes.append('surface_slowdown')
+        elif surface_scale > 1.0:
+            notes.append('surface_speedup')
 
         return linear, angular, notes
 

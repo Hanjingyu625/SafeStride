@@ -6,9 +6,6 @@ computers:
   terrain_uno:
     serial_by_id: /dev/serial/by-id/CHANGE_ME_TERRAIN_UNO
     baudrate: 115200
-  gps:
-    device: /dev/serial/by-id/CHANGE_ME_BE220
-    baudrate: 115200
 crosswalk:
   data_file: data/generated/standard_crosswalks.json
   api_key_file: /etc/safestride/signal_api_key.txt
@@ -27,6 +24,12 @@ drive:
     right_active_high: null
 terrain:
   leg_output_enabled: false
+  gps:
+    module: BE-220
+    uno_rx_pin: D8
+    uno_tx_pin: D9
+    baudrate: 9600
+    note: Configure the module to 9600 baud before normal operation.
   tof:
     interface: I2C
     address_7bit: 0x52

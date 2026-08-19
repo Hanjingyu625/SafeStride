@@ -10,7 +10,8 @@
 | E-stop | 미구현 | 현재 입력으로 설정하지 않음 |
 | TOF-10120 | Terrain Uno | I2C A4/A5, `0x52` |
 | MPU-9250/AK8963, BNO055 | Terrain Uno 예정 | 현재 운영 펌웨어 미구현 |
-| BE-220 GPS, 카메라 | Raspberry Pi | USB/UART, CSI/USB |
+| BE-220 GPS | Terrain Uno | GPS TX → D8, 선택적 GPS RX ← D9 |
+| 카메라 | Raspberry Pi | CSI/USB |
 
 ## Drive Uno 핀맵
 
@@ -56,11 +57,17 @@ PWM 입력에는 드라이버 COM 기준 외부 풀다운을 둔다.
 |---:|---|
 | A4 | I2C SDA |
 | A5 | I2C SCL |
+| D8 | AltSoftSerial RX, BE-220 TX 연결 |
+| D9 | AltSoftSerial TX, BE-220 RX 연결(설정 시에만 선택) |
 | GND | 모든 센서 공통 기준 |
 
 TOF, MPU-9250과 BNO055는 같은 I2C 버스에 병렬 연결한다. Uno는 5 V 계열이므로
 각 브레이크아웃의 5 V 입력과 SDA/SCL 레벨시프터 지원 여부를 확인한다. 원시
 3.3 V 센서 보드에는 5 V I2C를 직접 연결하지 않는다.
+
+BE-220은 Terrain Uno 연결 전에 `9600 baud`로 설정한다. 운영 중 NMEA 수신에는
+GPS TX→D8과 공통 GND만 필요하다. D9는 GPS 설정을 다시 보낼 때만 연결하며,
+Uno의 5 V UART 출력이 GPS RX에 허용되는지는 모듈 리비전 사양을 먼저 확인한다.
 
 ## 보정 필수값
 

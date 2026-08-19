@@ -12,7 +12,8 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from safestride_interfaces.msg import TerrainStatus
-from sensor_msgs.msg import Range
+from sensor_msgs.msg import NavSatFix, NavSatStatus, Range
+from std_msgs.msg import Float32
 
 try:
     import serial
@@ -22,6 +23,7 @@ except ImportError:  # pragma: no cover - target package dependency
 from .protocol import (
     Frame,
     FrameParser,
+    GpsTelemetryPayload,
     HelloPayload,
     PacketType,
     PayloadDecodeError,
@@ -30,6 +32,10 @@ from .protocol import (
     sequence_is_newer,
 )
 from .validation import bounded_int, finite_float
+
+
+CAP_TOF10120 = 1 << 8
+CAP_GPS_NMEA = 1 << 9
 
 
 class TerrainBridgeNode(Node):
@@ -51,15 +57,24 @@ class TerrainBridgeNode(Node):
         self._capabilities = 0
         self._session_started = False
         self._tx_sequence = 0
+        self._controller_capability_error: Optional[str] = None
         self._last_sequence: Optional[int] = None
         self._last_telemetry_time: Optional[float] = None
         self._last_telemetry: Optional[TerrainTelemetryPayload] = None
+        self._last_gps_time: Optional[float] = None
+        self._last_gps: Optional[GpsTelemetryPayload] = None
 
         self._tof_pub = self.create_publisher(
             Range, self._topic_tof, qos_profile_sensor_data
         )
         self._status_pub = self.create_publisher(
             TerrainStatus, self._topic_status, 10
+        )
+        self._gps_fix_pub = self.create_publisher(
+            NavSatFix, self._topic_gps_fix, 10
+        )
+        self._gps_speed_pub = self.create_publisher(
+            Float32, self._topic_gps_speed, 10
         )
         self._diagnostics_pub = self.create_publisher(
             DiagnosticArray, self._topic_diagnostics, 10
@@ -84,12 +99,17 @@ class TerrainBridgeNode(Node):
             ('serial.reconnect_period_s', 1.0),
             ('transport.poll_rate_hz', 100.0),
             ('telemetry.timeout_s', 0.30),
+            ('gps.enabled', True),
+            ('gps.timeout_s', 2.00),
             ('diagnostics.publish_rate_hz', 1.0),
             ('range.min_m', 0.10),
             ('range.max_m', 2.00),
             ('range.field_of_view_rad', 0.052),
             ('frames.tof', 'terrain_tof_link'),
+            ('frames.gps', 'gps_link'),
             ('topics.tof', '/terrain/tof'),
+            ('topics.gps_fix', '/gps/fix'),
+            ('topics.gps_speed', '/gps/speed'),
             ('topics.status', '/terrain/status'),
             ('topics.diagnostics', '/diagnostics'),
         )
@@ -128,6 +148,11 @@ class TerrainBridgeNode(Node):
             'telemetry.timeout_s', self._value('telemetry.timeout_s'),
             minimum=0.0, maximum=5.0, minimum_inclusive=False,
         )
+        self._gps_enabled = bool(self._value('gps.enabled'))
+        self._gps_timeout = finite_float(
+            'gps.timeout_s', self._value('gps.timeout_s'),
+            minimum=0.0, maximum=30.0, minimum_inclusive=False,
+        )
         self._diagnostic_rate_hz = finite_float(
             'diagnostics.publish_rate_hz',
             self._value('diagnostics.publish_rate_hz'),
@@ -153,9 +178,21 @@ class TerrainBridgeNode(Node):
                 'serial poll period must be shorter than telemetry timeout'
             )
         self._frame_tof = str(self._value('frames.tof'))
+        self._frame_gps = str(self._value('frames.gps'))
         self._topic_tof = str(self._value('topics.tof'))
+        self._topic_gps_fix = str(self._value('topics.gps_fix'))
+        self._topic_gps_speed = str(self._value('topics.gps_speed'))
         self._topic_status = str(self._value('topics.status'))
         self._topic_diagnostics = str(self._value('topics.diagnostics'))
+        required_names = (
+            self._frame_tof,
+            self._frame_gps,
+            self._topic_tof,
+            self._topic_gps_fix,
+            self._topic_gps_speed,
+        )
+        if any(not value.strip() for value in required_names):
+            raise ValueError('terrain frame and topic names must not be empty')
 
     @staticmethod
     def _now() -> float:
@@ -181,9 +218,12 @@ class TerrainBridgeNode(Node):
         self._boot_id = 0
         self._capabilities = 0
         self._session_started = False
+        self._controller_capability_error = None
         self._last_sequence = None
         self._last_telemetry_time = None
         self._last_telemetry = None
+        self._last_gps_time = None
+        self._last_gps = None
 
     def _close_serial(self, reason: str) -> None:
         port = self._serial
@@ -252,14 +292,20 @@ class TerrainBridgeNode(Node):
                 return
             self._handle_hello(hello)
             return
-        if frame.packet_type != PacketType.TERRAIN_TELEMETRY:
+        if frame.packet_type not in (
+            PacketType.TERRAIN_TELEMETRY,
+            PacketType.GPS_TELEMETRY,
+        ):
             self._payload_errors += 1
             return
         if not self._session_started or frame.session_id != self._session_id:
             self._session_errors += 1
             return
         try:
-            telemetry = TerrainTelemetryPayload.unpack(frame.payload)
+            if frame.packet_type == PacketType.TERRAIN_TELEMETRY:
+                payload = TerrainTelemetryPayload.unpack(frame.payload)
+            else:
+                payload = GpsTelemetryPayload.unpack(frame.payload)
         except PayloadDecodeError:
             self._payload_errors += 1
             return
@@ -270,11 +316,42 @@ class TerrainBridgeNode(Node):
             self._sequence_errors += 1
             return
         self._last_sequence = frame.sequence
-        self._last_telemetry_time = now
-        self._last_telemetry = telemetry
-        self._publish_telemetry(telemetry)
+        if isinstance(payload, TerrainTelemetryPayload):
+            self._last_telemetry_time = now
+            self._last_telemetry = payload
+            self._publish_telemetry(payload)
+        else:
+            self._last_gps_time = now
+            self._last_gps = payload
+            self._publish_gps(payload)
 
     def _handle_hello(self, hello: HelloPayload) -> None:
+        missing_capabilities = []
+        if not (hello.capabilities & CAP_TOF10120):
+            missing_capabilities.append('TOF-10120')
+        if self._gps_enabled and not (hello.capabilities & CAP_GPS_NMEA):
+            missing_capabilities.append('GPS NMEA')
+        if missing_capabilities:
+            error = (
+                'device on the terrain port is not Terrain firmware '
+                f'({", ".join(missing_capabilities)} capability missing)'
+            )
+            self._session_id = 0
+            self._boot_id = hello.boot_id
+            self._capabilities = hello.capabilities
+            self._session_started = False
+            self._controller_capability_error = error
+            self._last_sequence = None
+            self._last_telemetry_time = None
+            self._last_telemetry = None
+            self._last_gps_time = None
+            self._last_gps = None
+            self.get_logger().error(
+                error,
+                throttle_duration_sec=5.0,
+            )
+            return
+        self._controller_capability_error = None
         new_session = (
             not self._session_started or hello.boot_id != self._boot_id
         )
@@ -288,6 +365,8 @@ class TerrainBridgeNode(Node):
             self._last_sequence = None
             self._last_telemetry_time = None
             self._last_telemetry = None
+            self._last_gps_time = None
+            self._last_gps = None
         frame = Frame(
             packet_type=PacketType.SESSION_START,
             sequence=self._next_sequence(),
@@ -379,10 +458,36 @@ class TerrainBridgeNode(Node):
         message.deployed_limit = False
         self._status_pub.publish(message)
 
+    def _publish_gps(self, gps: GpsTelemetryPayload) -> None:
+        stamp = self.get_clock().now().to_msg()
+        fix_valid = bool(gps.flags & gps.FLAG_FIX_VALID)
+        speed_valid = bool(gps.flags & gps.FLAG_SPEED_VALID)
+
+        fix = NavSatFix()
+        fix.header.stamp = stamp
+        fix.header.frame_id = self._frame_gps
+        fix.status.status = (
+            NavSatStatus.STATUS_FIX
+            if fix_valid else NavSatStatus.STATUS_NO_FIX
+        )
+        fix.status.service = NavSatStatus.SERVICE_GPS
+        fix.latitude = gps.latitude_e7 / 10000000.0 if fix_valid else math.nan
+        fix.longitude = (
+            gps.longitude_e7 / 10000000.0 if fix_valid else math.nan
+        )
+        fix.altitude = math.nan
+        fix.position_covariance_type = NavSatFix.COVARIANCE_TYPE_UNKNOWN
+        self._gps_fix_pub.publish(fix)
+
+        speed = Float32()
+        speed.data = gps.speed_mm_s / 1000.0 if speed_valid else math.nan
+        self._gps_speed_pub.publish(speed)
+
     def _diagnostic_tick(self) -> None:
         self._publish_status()
         now = self._now()
         telemetry = self._last_telemetry
+        gps = self._last_gps
         status = DiagnosticStatus()
         status.name = 'SafeStride terrain serial bridge'
         status.hardware_id = (
@@ -395,6 +500,9 @@ class TerrainBridgeNode(Node):
         elif not self._connected():
             status.level = DiagnosticStatus.ERROR
             status.message = 'terrain serial port disconnected'
+        elif self._controller_capability_error is not None:
+            status.level = DiagnosticStatus.ERROR
+            status.message = self._controller_capability_error
         elif not self._session_started:
             status.level = DiagnosticStatus.WARN
             status.message = 'waiting for Terrain Uno HELLO'
@@ -413,9 +521,26 @@ class TerrainBridgeNode(Node):
         ):
             status.level = DiagnosticStatus.WARN
             status.message = 'terrain link active with malformed frames'
+        elif self._gps_enabled and (
+            self._last_gps_time is None
+            or now - self._last_gps_time > self._gps_timeout
+        ):
+            status.level = DiagnosticStatus.WARN
+            status.message = 'terrain active; GPS telemetry is stale'
+        elif self._gps_enabled and (
+            gps is None
+            or not (gps.flags & gps.FLAG_FIX_VALID)
+            or not (gps.flags & gps.FLAG_SPEED_VALID)
+        ):
+            status.level = DiagnosticStatus.WARN
+            status.message = 'terrain active; GPS is waiting for a fix'
         else:
             status.level = DiagnosticStatus.OK
-            status.message = 'terrain link and TOF-10120 active'
+            status.message = (
+                'terrain, TOF-10120 and GPS active'
+                if self._gps_enabled
+                else 'terrain link and TOF-10120 active'
+            )
         age = (
             float('inf') if self._last_telemetry_time is None
             else max(0.0, now - self._last_telemetry_time)
@@ -434,6 +559,30 @@ class TerrainBridgeNode(Node):
                 value=(
                     str(telemetry.tof_distance_mm)
                     if telemetry is not None else 'unknown'
+                ),
+            ),
+            KeyValue(
+                key='gps_fix_valid',
+                value=str(bool(
+                    gps and gps.flags & gps.FLAG_FIX_VALID
+                )).lower(),
+            ),
+            KeyValue(
+                key='gps_speed_valid',
+                value=str(bool(
+                    gps and gps.flags & gps.FLAG_SPEED_VALID
+                )).lower(),
+            ),
+            KeyValue(
+                key='gps_satellites',
+                value=str(gps.satellites if gps is not None else 0),
+            ),
+            KeyValue(
+                key='gps_speed_mps',
+                value=(
+                    f'{gps.speed_mm_s / 1000.0:.3f}'
+                    if gps is not None
+                    and gps.flags & gps.FLAG_SPEED_VALID else 'nan'
                 ),
             ),
             KeyValue(

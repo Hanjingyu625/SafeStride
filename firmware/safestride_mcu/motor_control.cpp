@@ -135,6 +135,33 @@ float DriveController::calculatePid(
          cfg::MOTOR_PID_KD * derivative;
 }
 
+float DriveController::compensateMotorDeadzone(
+    float controller_pwm,
+    float target_mrad_s) {
+  if (fabsf(target_mrad_s) < 20.0F) {
+    return 0.0F;
+  }
+
+  // Do not reverse the motor merely to correct a small overspeed. Coasting is
+  // safer for the current single-driver mechanical arrangement.
+  if (target_mrad_s > 0.0F) {
+    if (controller_pwm <= 0.0F) {
+      return 0.0F;
+    }
+    return clampFloat(
+        controller_pwm,
+        static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM),
+        static_cast<float>(cfg::MAX_PWM));
+  }
+  if (controller_pwm >= 0.0F) {
+    return 0.0F;
+  }
+  return clampFloat(
+      controller_pwm,
+      -static_cast<float>(cfg::MAX_PWM),
+      -static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM));
+}
+
 void DriveController::writeMotor(float pwm) {
   float signed_pwm = pwm * static_cast<float>(cfg::MOTOR_SIGN);
   signed_pwm = clampFloat(
@@ -156,29 +183,25 @@ void DriveController::writeMotor(float pwm) {
   analogWrite(cfg::MOTOR_PWM_PIN, magnitude);
 }
 
-float DriveController::hallSpeedMagnitude(
-    const HallSample& sample,
-    uint32_t pulse_delta,
-    uint32_t elapsed_us) {
+float DriveController::hallSpeedMagnitude(const HallSample& sample) {
   if (sample.age_us >= cfg::HALL_ZERO_TIMEOUT_US) {
     return 0.0F;
   }
   const float mrad_per_pulse =
       2000.0F * static_cast<float>(PI) /
       static_cast<float>(cfg::HALL_PULSES_PER_WHEEL_REV);
-  if (sample.period_us >= cfg::HALL_MIN_PULSE_INTERVAL_US) {
-    return mrad_per_pulse * 1000000.0F /
-        static_cast<float>(sample.period_us);
-  }
-  if (pulse_delta == 0UL || elapsed_us == 0UL) {
+  if (sample.period_us < cfg::HALL_MIN_PULSE_INTERVAL_US) {
+    // A period is unavailable until the second valid edge. Estimating one full
+    // revolution from a single 5 ms control interval creates a false overspeed.
     return 0.0F;
   }
-  return static_cast<float>(pulse_delta) * mrad_per_pulse * 1000000.0F /
-      static_cast<float>(elapsed_us);
+  const uint32_t effective_period_us =
+      sample.age_us > sample.period_us ? sample.age_us : sample.period_us;
+  return mrad_per_pulse * 1000000.0F /
+      static_cast<float>(effective_period_us);
 }
 
 void DriveController::updateHallFeedback(
-    uint32_t elapsed_us,
     const HallSample& left_hall,
     const HallSample& right_hall) {
   if (!feedback_initialized_) {
@@ -208,10 +231,8 @@ void DriveController::updateHallFeedback(
   }
 
   const float direction = static_cast<float>(feedback_direction_);
-  const float raw_left = direction * hallSpeedMagnitude(
-      left_hall, left_delta, elapsed_us);
-  const float raw_right = direction * hallSpeedMagnitude(
-      right_hall, right_delta, elapsed_us);
+  const float raw_left = direction * hallSpeedMagnitude(left_hall);
+  const float raw_right = direction * hallSpeedMagnitude(right_hall);
   const float alpha = clampFloat(
       cfg::VELOCITY_FILTER_ALPHA, 0.0F, 1.0F);
 
@@ -242,7 +263,7 @@ void DriveController::update(
     return;
   }
   const float dt_seconds = static_cast<float>(elapsed_us) / 1000000.0F;
-  updateHallFeedback(elapsed_us, left_hall, right_hall);
+  updateHallFeedback(left_hall, right_hall);
 
   if (!output_allowed) {
     updateHallPlausibility(
@@ -267,42 +288,10 @@ void DriveController::update(
 
   const float measured_average =
       0.5F * (filtered_left_mrad_s_ + filtered_right_mrad_s_);
-  writeMotor(calculatePid(
-      applied_target_mrad_s_, measured_average, dt_seconds, motor_pid_));
-}
-
-void DriveController::updateMagnetBench(
-    uint32_t elapsed_us,
-    const HallSample& left_hall,
-    const HallSample& right_hall,
-    int32_t requested_mrad_s,
-    bool output_allowed) {
-  if (elapsed_us == 0UL) {
-    return;
-  }
-
-  const float limited_target = clampFloat(
-      static_cast<float>(requested_mrad_s),
-      -static_cast<float>(cfg::MAX_WHEEL_TARGET_MRAD_S),
-      static_cast<float>(cfg::MAX_WHEEL_TARGET_MRAD_S));
-  applied_target_mrad_s_ = limited_target;
-  updateHallFeedback(elapsed_us, left_hall, right_hall);
-
-  // Calibration-dependent stall and overspeed checks are meaningless while
-  // a hand-held magnet, rather than a rotating wheel, produces the pulses.
-  hall_fault_mask_ = 0U;
-  left_hall_monitor_ = {false, 0UL, 0UL, 0UL};
-  right_hall_monitor_ = {false, 0UL, 0UL, 0UL};
-  motor_pid_ = {0.0F, 0.0F};
-
-  if (!output_allowed || limited_target == 0.0F) {
-    disableImmediately();
-    return;
-  }
-  writeMotor(
-      limited_target > 0.0F
-          ? static_cast<float>(cfg::MAGNET_BENCH_PWM)
-          : -static_cast<float>(cfg::MAGNET_BENCH_PWM));
+  const float controller_pwm = calculatePid(
+      applied_target_mrad_s_, measured_average, dt_seconds, motor_pid_);
+  writeMotor(compensateMotorDeadzone(
+      controller_pwm, applied_target_mrad_s_));
 }
 
 int32_t DriveController::leftVelocityMradS() const {

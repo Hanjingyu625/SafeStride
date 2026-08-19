@@ -20,27 +20,28 @@ Arduino Uno가 단일 SZH-GNP521을 통해 두 모터에 공통 속도 명령을
 D4, D7, D9, D10은 현재 사용하지 않는다. D12는 E-stop placeholder지만
 E-stop이 미구현이라 입력으로 설정되지 않는다. 상태 LED 출력도 사용하지 않는다.
 
-## 현재 자석 펄스 벤치 모드
+## 현재 홀 피드백 제어
 
-바퀴가 없는 회로 시험을 위해 `config.h`의 `MAGNET_BENCH_MODE=true`가 설정되어
-있다. ROS에서 최신 직진 속도 명령을 발행하고 명시적으로 enable한 뒤 D2 또는
-D3 홀센서에 자석을 통과시키면 PWM 60으로 두 모터가 750 ms 동안 함께 구동된다.
-펄스를 반복하면 마지막 펄스 기준으로 구동 시간이 연장된다. 이 모드는 홀 보정,
-압력 dead-man, 정지 대기, Hall stall/overspeed fault를 우회하지만 serial session과
-command watchdog은 유지한다. 정상 운용 전에는 펌웨어의
-`MAGNET_BENCH_MODE=false`와 두 ROS YAML의 `allow_magnet_bench_mode: false`를
-함께 적용해야 한다.
+자석을 한 번 대면 고정 시간 동안 모터를 켜던 임시 벤치 모드는 제거했다. 현재는
+ROS 또는 프로토콜의 목표 속도를 받은 뒤 D5에 PWM을 출력하고, D2/D3에서 측정한
+좌우 바퀴 속도의 평균을 PID 입력으로 사용한다. 모터의 기동 데드존 때문에 출력이
+필요할 때는 PWM 90부터 시작하며, 측정 속도가 목표에 도달하거나 초과하면 모터를
+역구동하지 않고 coast한다. 세션·명령 watchdog과 좌우 홀센서 stall/overspeed fault는
+항상 동작한다.
+
+현재 하드웨어 시험을 위해 `REQUIRE_DEADMAN=false`라서 dead-man 상태는 항상
+활성으로 보고하지만 압력센서 값은 계속 전송한다. 실제 주행 전에는 압력 임계값을
+보정한 뒤 `REQUIRE_DEADMAN=true`로 되돌려야 한다.
 
 ## 필수 보정
 
-1. `HALL_CALIBRATED=false`인 운영 펌웨어를 업로드하고 ROS bridge를 실행한다.
+1. 현재 설정은 각 휠에 자석 1개, 즉 `HALL_PULSES_PER_WHEEL_REV=1`을 가정한다.
 2. `/wheel/hall`의 시작 펄스 값을 기록한 뒤 각 휠을 정확히 10회 회전한다.
-3. 종료값과 시작값 차이의 절댓값을 10으로 나눠 실제 회전당 펄스 수를 얻는다.
-4. `config.h`와 두 ROS YAML의 회전당 펄스 수를 같은 값으로 수정한다. 두 센서가 다른
+3. 종료값과 시작값 차이의 절댓값을 10으로 나눠 실제 회전당 펄스 수를 확인한다.
+4. 값이 1이 아니면 `config.h`와 두 ROS YAML의 회전당 펄스 수를 같은 값으로 수정한다. 두 센서가 다른
    값을 내면 기구 또는 센서 설치를 먼저 수정한다.
-5. 속도와 fault 임계값을 들어 올린 휠에서 검증한 뒤
-   `HALL_CALIBRATED=true`로 변경한다. 정상 모드에서는 `false`이면 MCU와 ROS
-   브리지가 모두 모터 활성화를 거부한다.
+5. 속도와 fault 임계값을 들어 올린 휠에서 검증한다. `HALL_CALIBRATED=false`이면
+   MCU와 ROS 브리지가 모두 모터 활성화를 거부한다.
 6. 운영 펌웨어를 다시 업로드하고 `/handle/pressure` 로그로 좌우 압력 임계값도 보정한다.
 
 단일출력 홀센서는 회전 방향을 직접 측정하지 못하므로 부호는 드라이버 명령

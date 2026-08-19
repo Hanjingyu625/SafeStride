@@ -74,11 +74,20 @@ int main() {
       drive.update(5000UL, moving, moving, 1000L, true);
     }
     assert(drive.hallFaultMask() == 0U);
-    assert(g_motor_pwm > 0);
+    assert(g_motor_pwm >= cfg::MOTOR_MIN_ACTIVE_PWM);
+    assert(g_motor_pwm <= cfg::MAX_PWM);
     assert(g_motor_in1_level == HIGH);
     assert(g_motor_in2_level == LOW);
     assert(drive.leftHallPulsePosition() == 220L);
     assert(drive.rightHallPulsePosition() == 220L);
+    assert(drive.leftVelocityMradS() >= 990L);
+    assert(drive.leftVelocityMradS() <= 1010L);
+
+    const HallSample delayed_pulse = {
+        220UL, 6283185UL, 12566370UL};
+    drive.update(5000UL, delayed_pulse, delayed_pulse, 1000L, true);
+    assert(drive.leftVelocityMradS() < 1000L);
+    assert(drive.leftVelocityMradS() > 500L);
   }
 
   {
@@ -86,7 +95,10 @@ int main() {
     drive.begin();
     primeFeedback(drive);
     const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
-    for (int i = 0; i < 420; ++i) {
+    const uint32_t iterations =
+        static_cast<uint32_t>(cfg::HALL_STALL_TIMEOUT_MS) * 1000UL /
+        5000UL + 220UL;
+    for (uint32_t i = 0UL; i < iterations; ++i) {
       drive.update(5000UL, stopped, stopped, 3000L, true);
     }
     assert(
@@ -104,7 +116,10 @@ int main() {
     primeFeedback(drive);
     uint32_t right_count = 0UL;
     const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
-    for (int i = 0; i < 420; ++i) {
+    const uint32_t iterations =
+        static_cast<uint32_t>(cfg::HALL_STALL_TIMEOUT_MS) * 1000UL /
+        5000UL + 220UL;
+    for (uint32_t i = 0UL; i < iterations; ++i) {
       const HallSample right = sample(++right_count);
       drive.update(5000UL, stopped, right, 3000L, true);
     }
@@ -129,25 +144,34 @@ int main() {
   {
     DriveController drive;
     drive.begin();
+    primeFeedback(drive);
     const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
-    const HallSample magnet_pulse = sample(1UL);
-    drive.updateMagnetBench(
-        5000UL, magnet_pulse, stopped, 500L, true);
+    const HallSample first_pulse = {1UL, 0UL, 0UL};
+    for (int i = 0; i < 5; ++i) {
+      drive.update(5000UL, first_pulse, first_pulse, 1000L, true);
+    }
     assert(drive.hallFaultMask() == 0U);
-    assert(g_motor_pwm == cfg::MAGNET_BENCH_PWM);
+    assert(drive.leftVelocityMradS() == 0L);
+    assert(drive.rightVelocityMradS() == 0L);
+    assert(g_motor_pwm >= cfg::MOTOR_MIN_ACTIVE_PWM);
     assert(g_motor_in1_level == HIGH);
     assert(g_motor_in2_level == LOW);
-    assert(drive.leftHallPulsePosition() == 0L);
 
-    drive.updateMagnetBench(
-        5000UL, magnet_pulse, stopped, 500L, false);
+    drive.update(5000UL, stopped, stopped, 1000L, false);
     assert(g_motor_pwm == 0);
     assert(g_motor_in1_level == LOW);
     assert(g_motor_in2_level == LOW);
+  }
 
-    drive.updateMagnetBench(
-        5000UL, magnet_pulse, stopped, -500L, true);
-    assert(g_motor_pwm == cfg::MAGNET_BENCH_PWM);
+  {
+    DriveController drive;
+    drive.begin();
+    primeFeedback(drive);
+    const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
+    for (int i = 0; i < 5; ++i) {
+      drive.update(5000UL, stopped, stopped, -1000L, true);
+    }
+    assert(g_motor_pwm >= cfg::MOTOR_MIN_ACTIVE_PWM);
     assert(g_motor_in1_level == LOW);
     assert(g_motor_in2_level == HIGH);
   }

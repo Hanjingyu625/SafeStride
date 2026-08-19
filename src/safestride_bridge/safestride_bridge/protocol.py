@@ -26,6 +26,7 @@ SESSION_START_STRUCT = struct.Struct('<I')
 COMMAND_STRUCT = struct.Struct('<iHBB')
 TELEMETRY_STRUCT = struct.Struct('<iiiiHHHhhHHHHHBB')
 TERRAIN_TELEMETRY_STRUCT = struct.Struct('<HBBHHhhH')
+GPS_TELEMETRY_STRUCT = struct.Struct('<iiIBB')
 
 
 class ProtocolError(ValueError):
@@ -56,6 +57,7 @@ class PacketType(IntEnum):
     COMMAND = 0x10
     TELEMETRY = 0x20
     TERRAIN_TELEMETRY = 0x21
+    GPS_TELEMETRY = 0x22
 
 
 def crc16_ccitt_false(data: bytes) -> int:
@@ -440,6 +442,10 @@ class TelemetryPayload:
     TYPE: ClassVar[PacketType] = PacketType.TELEMETRY
 
     def pack(self) -> bytes:
+        if self.pressure_flags & ~0x07:
+            raise ValueError('pressure_flags contain reserved bits')
+        if self.pressure_alert not in (0, 1, 2):
+            raise ValueError('pressure_alert must be 0, 1, or 2')
         return TELEMETRY_STRUCT.pack(
             int(self.hall_left_pulses),
             int(self.hall_right_pulses),
@@ -462,7 +468,16 @@ class TelemetryPayload:
     @classmethod
     def unpack(cls, data: bytes) -> 'TelemetryPayload':
         _require_size('TELEMETRY', data, TELEMETRY_STRUCT.size)
-        return cls(*TELEMETRY_STRUCT.unpack(data))
+        payload = cls(*TELEMETRY_STRUCT.unpack(data))
+        if payload.pressure_flags & ~0x07:
+            raise PayloadDecodeError(
+                'TELEMETRY pressure flags contain reserved bits'
+            )
+        if payload.pressure_alert not in (0, 1, 2):
+            raise PayloadDecodeError(
+                'TELEMETRY pressure alert must be 0, 1, or 2'
+            )
+        return payload
 
 
 @dataclass(frozen=True)
@@ -482,6 +497,8 @@ class TerrainTelemetryPayload:
     def pack(self) -> bytes:
         if self.tof_valid not in (0, 1):
             raise ValueError('tof_valid must be 0 or 1')
+        if self.tof_alert not in (0, 1, 2, 3):
+            raise ValueError('tof_alert must be between 0 and 3')
         return TERRAIN_TELEMETRY_STRUCT.pack(
             _u16('tof_distance_mm', self.tof_distance_mm),
             _u8('tof_valid', self.tof_valid),
@@ -501,4 +518,69 @@ class TerrainTelemetryPayload:
         payload = cls(*TERRAIN_TELEMETRY_STRUCT.unpack(data))
         if payload.tof_valid not in (0, 1):
             raise PayloadDecodeError('tof_valid must be 0 or 1')
+        if payload.tof_alert not in (0, 1, 2, 3):
+            raise PayloadDecodeError('tof_alert must be between 0 and 3')
+        return payload
+
+
+@dataclass(frozen=True)
+class GpsTelemetryPayload:
+    """Position and ground speed returned by the Terrain Uno GPS input."""
+
+    latitude_e7: int
+    longitude_e7: int
+    speed_mm_s: int
+    flags: int
+    satellites: int
+    TYPE: ClassVar[PacketType] = PacketType.GPS_TELEMETRY
+
+    FLAG_FIX_VALID: ClassVar[int] = 1 << 0
+    FLAG_SPEED_VALID: ClassVar[int] = 1 << 1
+
+    def pack(self) -> bytes:
+        if self.flags & ~0x03:
+            raise ValueError('GPS flags contain reserved bits')
+        if not -900000000 <= int(self.latitude_e7) <= 900000000:
+            raise ValueError('latitude_e7 is outside the valid range')
+        if not -1800000000 <= int(self.longitude_e7) <= 1800000000:
+            raise ValueError('longitude_e7 is outside the valid range')
+        if not self.flags & self.FLAG_FIX_VALID and (
+            self.latitude_e7 != 0 or self.longitude_e7 != 0
+        ):
+            raise ValueError('invalid GPS fix must contain zero coordinates')
+        if not self.flags & self.FLAG_SPEED_VALID and self.speed_mm_s != 0:
+            raise ValueError('invalid GPS speed must be zero')
+        if self.speed_mm_s > 500000:
+            raise ValueError('GPS speed exceeds the receiver limit')
+        return GPS_TELEMETRY_STRUCT.pack(
+            int(self.latitude_e7),
+            int(self.longitude_e7),
+            _u32('speed_mm_s', self.speed_mm_s),
+            _u8('flags', self.flags),
+            _u8('satellites', self.satellites),
+        )
+
+    @classmethod
+    def unpack(cls, data: bytes) -> 'GpsTelemetryPayload':
+        _require_size('GPS_TELEMETRY', data, GPS_TELEMETRY_STRUCT.size)
+        payload = cls(*GPS_TELEMETRY_STRUCT.unpack(data))
+        if payload.flags & ~0x03:
+            raise PayloadDecodeError('GPS flags contain reserved bits')
+        if not -900000000 <= payload.latitude_e7 <= 900000000:
+            raise PayloadDecodeError('latitude_e7 is outside valid range')
+        if not -1800000000 <= payload.longitude_e7 <= 1800000000:
+            raise PayloadDecodeError('longitude_e7 is outside valid range')
+        if not payload.flags & payload.FLAG_FIX_VALID and (
+            payload.latitude_e7 != 0 or payload.longitude_e7 != 0
+        ):
+            raise PayloadDecodeError(
+                'invalid GPS fix must contain zero coordinates'
+            )
+        if (
+            not payload.flags & payload.FLAG_SPEED_VALID
+            and payload.speed_mm_s != 0
+        ):
+            raise PayloadDecodeError('invalid GPS speed must be zero')
+        if payload.speed_mm_s > 500000:
+            raise PayloadDecodeError('GPS speed exceeds receiver limit')
         return payload
