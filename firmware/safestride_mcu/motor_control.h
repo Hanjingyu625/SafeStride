@@ -72,6 +72,7 @@ class DriveController {
   static float compensateMotorDeadzone(
       float controller_pwm,
       float target_mrad_s);
+  static float openLoopPwm(float target_mrad_s);
   static void writeMotor(float pwm);
   static float hallSpeedMagnitude(const HallSample& sample);
   static bool updateHallMonitor(

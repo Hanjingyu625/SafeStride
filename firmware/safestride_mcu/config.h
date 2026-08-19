@@ -31,9 +31,11 @@ constexpr int32_t MAX_DECEL_MRAD_S2 = 2500L;
 constexpr int32_t ARM_MAX_MEASURED_SPEED_MRAD_S = 100L;
 constexpr uint16_t ARM_STATIONARY_DWELL_MS = 250U;
 
-// Current hardware uses one Hall sensor as shared wheel-speed feedback. The
-// firmware mirrors that sensor into both telemetry channels so the ROS bridge
-// and odometry path keep their existing two-wheel message shape.
+// Hall feedback is temporarily disabled. The current motor is driven open-loop
+// from ROS velocity commands until the Hall hardware is replaced by an encoder.
+// Keep the pin definitions for the future encoder integration, but do not
+// configure or sample them while this flag is false.
+constexpr bool ENABLE_HALL_FEEDBACK = false;
 constexpr bool USE_SINGLE_HALL_SENSOR = true;
 constexpr uint8_t LEFT_HALL_PIN = 2U;
 constexpr uint8_t RIGHT_HALL_PIN = 3U;
@@ -48,7 +50,7 @@ constexpr uint32_t HALL_ZERO_TIMEOUT_US = 15000000UL;
 // wheel revolution. Change this value in both MCU and ROS configuration if the
 // number of magnets or the sensing geometry changes.
 constexpr uint32_t HALL_PULSES_PER_WHEEL_REV = 1UL;
-constexpr bool HALL_CALIBRATED = true;
+constexpr bool HALL_CALIBRATED = false;
 
 // Runtime Hall plausibility monitor. Tune from lifted-wheel logs. A fault
 // latches until MCU reset so an intermittent sensor cannot silently re-arm.
@@ -64,9 +66,9 @@ constexpr uint8_t MOTOR_IN1_PIN = 6U;
 constexpr uint8_t MOTOR_IN2_PIN = 8U;
 constexpr int8_t MOTOR_SIGN = 1;
 constexpr uint16_t MAX_PWM = 100U;  // deliberately low for first lifted test
-// The tested motor/driver pair does not start reliably below this PWM. The
-// closed-loop controller applies this as dead-zone compensation, then uses Hall
-// feedback to coast when measured speed reaches or exceeds the target.
+// The tested motor/driver pair does not start reliably below this PWM. In the
+// temporary open-loop mode, non-zero ROS targets map linearly from this value
+// to MAX_PWM. This controls electrical output, not measured wheel speed.
 constexpr uint8_t MOTOR_MIN_ACTIVE_PWM = 90U;
 
 // E-stop hardware is not implemented in the current build. Keep this false so

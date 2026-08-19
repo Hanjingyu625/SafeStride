@@ -106,14 +106,14 @@ class TestHardwareIntegrity(unittest.TestCase):
             r"capabilities\s*\|=\s*CAP_ESTOP;",
         )
 
-    def test_normal_hall_feedback_mode_is_enabled(self):
+    def test_temporary_open_loop_mode_is_explicit(self):
+        self.assertEqual(
+            constant_expression(self.config, "ENABLE_HALL_FEEDBACK"),
+            "false",
+        )
         self.assertEqual(
             constant_expression(self.config, "HALL_CALIBRATED"),
-            "true",
-        )
-        pulses_per_revolution = int(
-            constant_expression(self.config, "HALL_PULSES_PER_WHEEL_REV")
-            .removesuffix("UL")
+            "false",
         )
         minimum_pwm = int(
             constant_expression(self.config, "MOTOR_MIN_ACTIVE_PWM")
@@ -122,9 +122,19 @@ class TestHardwareIntegrity(unittest.TestCase):
         maximum_pwm = int(
             constant_expression(self.config, "MAX_PWM").removesuffix("U")
         )
-        self.assertGreater(pulses_per_revolution, 0)
         self.assertGreater(minimum_pwm, 0)
         self.assertLessEqual(minimum_pwm, maximum_pwm)
+        self.assertIn("if (cfg::ENABLE_HALL_FEEDBACK)", self.drive)
+        self.assertIn("openLoopPwm", (
+            ROOT / "firmware/safestride_mcu/motor_control.cpp"
+        ).read_text(encoding="utf-8"))
+        self.assertIn(
+            "('command.require_hall_feedback', False)",
+            self.bridge,
+        )
+        for path in ROS_CONFIGS:
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("require_hall_feedback: false", text)
         self.assertNotIn("MAGNET_BENCH_MODE", self.config)
         self.assertNotIn("updateMagnetBench", self.drive)
         self.assertIn("COMMAND_WATCHDOG_MAX_MS", self.config)

@@ -193,6 +193,7 @@ class SerialBridgeNode(Node):
             ('command.ttl_ms', 200),
             ('command.arm_max_wheel_speed_rad_s', 0.10),
             ('command.max_abs_angular_z_rad_s', 0.0),
+            ('command.require_hall_feedback', False),
             ('command.allow_magnet_bench_mode', False),
             ('command.arm_confirmation_timeout_s', 1.0),
             ('telemetry.timeout_s', 0.30),
@@ -298,6 +299,9 @@ class SerialBridgeNode(Node):
             self._value('command.max_abs_angular_z_rad_s'),
             minimum=0.0,
             maximum=10.0,
+        )
+        self._require_hall_feedback = bool(
+            self._value('command.require_hall_feedback')
         )
         self._allow_magnet_bench_mode = bool(
             self._value('command.allow_magnet_bench_mode')
@@ -514,6 +518,15 @@ class SerialBridgeNode(Node):
     def _remote_allows_enable(self, telemetry: TelemetryPayload) -> bool:
         firmware_state = self._firmware_state(telemetry)
         magnet_bench_mode = self._magnet_bench_mode_active(telemetry)
+        hall_feedback_ready = (
+            not self._require_hall_feedback
+            or (
+                bool(
+                    telemetry.status_bits & STATUS_HALL_CALIBRATED
+                )
+                and bool(self._capabilities & CAP_TWO_HALL_SENSORS)
+            )
+        )
         return (
             self._firmware_status_consistent(telemetry)
             and bool(telemetry.status_bits & STATUS_SESSION)
@@ -521,11 +534,7 @@ class SerialBridgeNode(Node):
                 bool(telemetry.status_bits & STATUS_DEADMAN)
                 or magnet_bench_mode
             )
-            and (
-                bool(telemetry.status_bits & STATUS_HALL_CALIBRATED)
-                or magnet_bench_mode
-            )
-            and bool(self._capabilities & CAP_TWO_HALL_SENSORS)
+            and (hall_feedback_ready or magnet_bench_mode)
             and not bool(telemetry.status_bits & STATUS_ESTOP)
             and not bool(
                 telemetry.status_bits & STATUS_WATCHDOG_TIMEOUT
@@ -682,7 +691,10 @@ class SerialBridgeNode(Node):
     def _handle_hello(
         self, hello: HelloPayload, hello_sequence: int
     ) -> None:
-        if not (hello.capabilities & CAP_TWO_HALL_SENSORS):
+        if (
+            self._require_hall_feedback
+            and not (hello.capabilities & CAP_TWO_HALL_SENSORS)
+        ):
             error = (
                 'device on the drive port is not Drive firmware '
                 '(two-Hall capability missing)'
@@ -887,7 +899,10 @@ class SerialBridgeNode(Node):
             response.success = False
             response.message = 'cannot enable: controller session is inactive'
             return response
-        if not (self._capabilities & CAP_TWO_HALL_SENSORS):
+        if (
+            self._require_hall_feedback
+            and not (self._capabilities & CAP_TWO_HALL_SENSORS)
+        ):
             response.success = False
             response.message = 'cannot enable: Hall feedback is unavailable'
             return response
@@ -904,7 +919,8 @@ class SerialBridgeNode(Node):
             return response
         magnet_bench_mode = self._magnet_bench_mode_active(telemetry)
         if (
-            not magnet_bench_mode
+            self._require_hall_feedback
+            and not magnet_bench_mode
             and not (telemetry.status_bits & STATUS_HALL_CALIBRATED)
         ):
             response.success = False
@@ -923,7 +939,8 @@ class SerialBridgeNode(Node):
             round(self._arm_max_wheel_speed * 1000.0)
         )
         if (
-            not magnet_bench_mode
+            self._require_hall_feedback
+            and not magnet_bench_mode
             and (
                 abs(telemetry.velocity_left_mrad_s)
                 > maximum_measured_speed_mrad_s
@@ -1370,7 +1387,10 @@ class SerialBridgeNode(Node):
         ):
             status.level = DiagnosticStatus.ERROR
             status.message = 'emergency stop is active'
-        elif not (self._capabilities & CAP_TWO_HALL_SENSORS):
+        elif (
+            self._require_hall_feedback
+            and not (self._capabilities & CAP_TWO_HALL_SENSORS)
+        ):
             status.level = DiagnosticStatus.ERROR
             status.message = 'drive firmware lacks Hall feedback'
         elif (
@@ -1391,11 +1411,18 @@ class SerialBridgeNode(Node):
             status.message = (
                 'magnet-trigger motor bench mode is active'
             )
-        elif self._last_telemetry and not (
-            self._last_telemetry.status_bits & STATUS_HALL_CALIBRATED
+        elif (
+            self._require_hall_feedback
+            and self._last_telemetry
+            and not (
+                self._last_telemetry.status_bits & STATUS_HALL_CALIBRATED
+            )
         ):
             status.level = DiagnosticStatus.WARN
             status.message = 'Hall pulses per revolution are not calibrated'
+        elif not self._require_hall_feedback:
+            status.level = DiagnosticStatus.WARN
+            status.message = 'open-loop drive active; speed feedback disabled'
         elif not (self._capabilities & CAP_PRESSURE_TELEMETRY):
             status.level = DiagnosticStatus.WARN
             status.message = 'drive firmware lacks pressure telemetry'
@@ -1453,6 +1480,10 @@ class SerialBridgeNode(Node):
             KeyValue(
                 key='enabled_requested',
                 value=str(self._enabled_requested).lower(),
+            ),
+            KeyValue(
+                key='hall_feedback_required',
+                value=str(self._require_hall_feedback).lower(),
             ),
             KeyValue(
                 key='hall_left_pulses',

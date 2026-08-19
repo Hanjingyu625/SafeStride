@@ -162,6 +162,22 @@ float DriveController::compensateMotorDeadzone(
       -static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM));
 }
 
+float DriveController::openLoopPwm(float target_mrad_s) {
+  if (fabsf(target_mrad_s) < 20.0F) {
+    return 0.0F;
+  }
+
+  const float normalized = clampFloat(
+      fabsf(target_mrad_s) /
+          static_cast<float>(cfg::MAX_WHEEL_TARGET_MRAD_S),
+      0.0F,
+      1.0F);
+  const float pwm = static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM) +
+      normalized * static_cast<float>(
+          cfg::MAX_PWM - cfg::MOTOR_MIN_ACTIVE_PWM);
+  return target_mrad_s > 0.0F ? pwm : -pwm;
+}
+
 void DriveController::writeMotor(float pwm) {
   float signed_pwm = pwm * static_cast<float>(cfg::MOTOR_SIGN);
   signed_pwm = clampFloat(
@@ -262,12 +278,13 @@ void DriveController::update(
   if (elapsed_us == 0UL) {
     return;
   }
-  const float dt_seconds = static_cast<float>(elapsed_us) / 1000000.0F;
-  updateHallFeedback(left_hall, right_hall);
 
   if (!output_allowed) {
-    updateHallPlausibility(
-        left_hall, right_hall, elapsed_us, false);
+    if (cfg::ENABLE_HALL_FEEDBACK) {
+      updateHallFeedback(left_hall, right_hall);
+      updateHallPlausibility(
+          left_hall, right_hall, elapsed_us, false);
+    }
     disableImmediately();
     return;
   }
@@ -276,6 +293,16 @@ void DriveController::update(
       static_cast<float>(requested_mrad_s),
       -static_cast<float>(cfg::MAX_WHEEL_TARGET_MRAD_S),
       static_cast<float>(cfg::MAX_WHEEL_TARGET_MRAD_S));
+
+  if (!cfg::ENABLE_HALL_FEEDBACK) {
+    applied_target_mrad_s_ = limited_target;
+    motor_pid_ = {0.0F, 0.0F};
+    writeMotor(openLoopPwm(applied_target_mrad_s_));
+    return;
+  }
+
+  const float dt_seconds = static_cast<float>(elapsed_us) / 1000000.0F;
+  updateHallFeedback(left_hall, right_hall);
   applied_target_mrad_s_ = rampTarget(
       applied_target_mrad_s_, limited_target, dt_seconds);
 

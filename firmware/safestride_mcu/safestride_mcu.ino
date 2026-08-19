@@ -268,18 +268,20 @@ uint16_t currentStatusBits() {
   if (g_valid_command_seen) {
     status |= STATUS_VALID_COMMAND_SEEN;
   }
-  if (cfg::HALL_CALIBRATED) {
+  if (cfg::ENABLE_HALL_FEEDBACK && cfg::HALL_CALIBRATED) {
     status |= STATUS_HALL_CALIBRATED;
   }
   status |= static_cast<uint16_t>(g_state) << STATUS_STATE_SHIFT;
-  if (digitalRead(cfg::LEFT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL) {
-    status |= STATUS_LEFT_HALL_ACTIVE;
-  }
-  const bool right_hall_active = cfg::USE_SINGLE_HALL_SENSOR
-      ? (digitalRead(cfg::LEFT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL)
-      : (digitalRead(cfg::RIGHT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL);
-  if (right_hall_active) {
-    status |= STATUS_RIGHT_HALL_ACTIVE;
+  if (cfg::ENABLE_HALL_FEEDBACK) {
+    if (digitalRead(cfg::LEFT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL) {
+      status |= STATUS_LEFT_HALL_ACTIVE;
+    }
+    const bool right_hall_active = cfg::USE_SINGLE_HALL_SENSOR
+        ? (digitalRead(cfg::LEFT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL)
+        : (digitalRead(cfg::RIGHT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL);
+    if (right_hall_active) {
+      status |= STATUS_RIGHT_HALL_ACTIVE;
+    }
   }
   return status;
 }
@@ -330,8 +332,10 @@ int16_t readCurrentMa(uint8_t pin) {
 
 void sendHello() {
   uint8_t payload[proto::HELLO_PAYLOAD_SIZE];
-  uint32_t capabilities = CAP_TWO_HALL_SENSORS | CAP_DEADMAN |
-                          CAP_PRESSURE_TELEMETRY;
+  uint32_t capabilities = CAP_DEADMAN | CAP_PRESSURE_TELEMETRY;
+  if (cfg::ENABLE_HALL_FEEDBACK) {
+    capabilities |= CAP_TWO_HALL_SENSORS;
+  }
   if (cfg::ENABLE_ESTOP) {
     capabilities |= CAP_ESTOP;
   }
@@ -500,7 +504,7 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   // An enable command is not accepted while a hardware interlock or a latched
   // stop state is active. Releasing the input alone never restarts motion; the
   // host must first send a disabled command and explicitly arm again.
-  if (!cfg::HALL_CALIBRATED ||
+  if ((cfg::ENABLE_HALL_FEEDBACK && !cfg::HALL_CALIBRATED) ||
       estopActive() || !deadmanActive() || g_watchdog_timed_out ||
       g_fault_bits != 0U ||
       g_state == ControllerState::ESTOP ||
@@ -573,7 +577,9 @@ void runControlLoop(uint32_t now_us) {
 
   HallSample left_hall = {0UL, 0UL, 0xFFFFFFFFUL};
   HallSample right_hall = {0UL, 0UL, 0xFFFFFFFFUL};
-  readHallSamples(now_us, left_hall, right_hall);
+  if (cfg::ENABLE_HALL_FEEDBACK) {
+    readHallSamples(now_us, left_hall, right_hall);
+  }
   const bool output_allowed =
       g_session_active &&
       g_state == ControllerState::ARMED &&
@@ -586,6 +592,14 @@ void runControlLoop(uint32_t now_us) {
       right_hall,
       g_requested_mrad_s,
       output_allowed);
+  if (!cfg::ENABLE_HALL_FEEDBACK) {
+    if (!g_stationary_tracking) {
+      g_stationary_tracking = true;
+      g_stationary_since_ms = millis();
+    }
+    return;
+  }
+
   const uint8_t hall_faults = g_drive.hallFaultMask();
   if (hall_faults != 0U) {
     if ((hall_faults & DriveController::HALL_FAULT_LEFT) != 0U) {
@@ -633,31 +647,33 @@ void setup() {
   if (cfg::USE_DRIVER_FAULT_PIN) {
     pinMode(cfg::DRIVER_FAULT_PIN, INPUT_PULLUP);
   }
-  pinMode(cfg::LEFT_HALL_PIN, INPUT_PULLUP);
-  if (!cfg::USE_SINGLE_HALL_SENSOR) {
-    pinMode(cfg::RIGHT_HALL_PIN, INPUT_PULLUP);
-  }
+  if (cfg::ENABLE_HALL_FEEDBACK) {
+    pinMode(cfg::LEFT_HALL_PIN, INPUT_PULLUP);
+    if (!cfg::USE_SINGLE_HALL_SENSOR) {
+      pinMode(cfg::RIGHT_HALL_PIN, INPUT_PULLUP);
+    }
 
-  const int left_interrupt =
-      digitalPinToInterrupt(cfg::LEFT_HALL_PIN);
-  if (left_interrupt == NOT_AN_INTERRUPT) {
-    g_fault_bits |= FAULT_LEFT_HALL;
-  } else {
-    attachInterrupt(
-        left_interrupt,
-        leftHallIsr,
-        cfg::HALL_ACTIVE_LEVEL == LOW ? FALLING : RISING);
-  }
-  if (!cfg::USE_SINGLE_HALL_SENSOR) {
-    const int right_interrupt =
-        digitalPinToInterrupt(cfg::RIGHT_HALL_PIN);
-    if (right_interrupt == NOT_AN_INTERRUPT) {
-      g_fault_bits |= FAULT_RIGHT_HALL;
+    const int left_interrupt =
+        digitalPinToInterrupt(cfg::LEFT_HALL_PIN);
+    if (left_interrupt == NOT_AN_INTERRUPT) {
+      g_fault_bits |= FAULT_LEFT_HALL;
     } else {
       attachInterrupt(
-          right_interrupt,
-          rightHallIsr,
+          left_interrupt,
+          leftHallIsr,
           cfg::HALL_ACTIVE_LEVEL == LOW ? FALLING : RISING);
+    }
+    if (!cfg::USE_SINGLE_HALL_SENSOR) {
+      const int right_interrupt =
+          digitalPinToInterrupt(cfg::RIGHT_HALL_PIN);
+      if (right_interrupt == NOT_AN_INTERRUPT) {
+        g_fault_bits |= FAULT_RIGHT_HALL;
+      } else {
+        attachInterrupt(
+            right_interrupt,
+            rightHallIsr,
+            cfg::HALL_ACTIVE_LEVEL == LOW ? FALLING : RISING);
+      }
     }
   }
 

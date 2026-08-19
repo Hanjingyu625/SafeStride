@@ -14,18 +14,6 @@ int g_motor_pwm = 0;
 uint8_t g_motor_in1_level = LOW;
 uint8_t g_motor_in2_level = LOW;
 
-HallSample sample(uint32_t pulses, uint32_t period_us = 6283185UL) {
-  HallSample value = {pulses, period_us, 0UL};
-  return value;
-}
-
-void primeFeedback(DriveController& drive) {
-  const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
-  drive.update(5000UL, stopped, stopped, 0L, false);
-  drive.update(5000UL, stopped, stopped, 0L, false);
-  assert(drive.feedbackReady());
-}
-
 }  // namespace
 
 void pinMode(uint8_t, uint8_t) {}
@@ -65,117 +53,44 @@ size_t HardwareSerial::print(const char*) { return 1U; }
 size_t HardwareSerial::println(const char*) { return 1U; }
 
 int main() {
-  {
-    DriveController drive;
-    drive.begin();
-    primeFeedback(drive);
-    for (uint32_t count = 1UL; count <= 220UL; ++count) {
-      const HallSample moving = sample(count);
-      drive.update(5000UL, moving, moving, 1000L, true);
-    }
-    assert(drive.hallFaultMask() == 0U);
-    assert(g_motor_pwm >= cfg::MOTOR_MIN_ACTIVE_PWM);
-    assert(g_motor_pwm <= cfg::MAX_PWM);
-    assert(g_motor_in1_level == HIGH);
-    assert(g_motor_in2_level == LOW);
-    assert(drive.leftHallPulsePosition() == 220L);
-    assert(drive.rightHallPulsePosition() == 220L);
-    assert(drive.leftVelocityMradS() >= 990L);
-    assert(drive.leftVelocityMradS() <= 1010L);
+  static_assert(!cfg::ENABLE_HALL_FEEDBACK, "test expects open-loop mode");
+  const HallSample unused_hall = {0UL, 0UL, 0xFFFFFFFFUL};
+  DriveController drive;
+  drive.begin();
 
-    const HallSample delayed_pulse = {
-        220UL, 6283185UL, 12566370UL};
-    drive.update(5000UL, delayed_pulse, delayed_pulse, 1000L, true);
-    assert(drive.leftVelocityMradS() < 1000L);
-    assert(drive.leftVelocityMradS() > 500L);
+  drive.update(5000UL, unused_hall, unused_hall, 1500L, false);
+  assert(g_motor_pwm == 0);
+  assert(g_motor_in1_level == LOW);
+  assert(g_motor_in2_level == LOW);
+
+  drive.update(5000UL, unused_hall, unused_hall, 1500L, true);
+  assert(drive.appliedTargetMradS() == 1500L);
+  assert(g_motor_pwm == 95);
+  assert(g_motor_in1_level == HIGH);
+  assert(g_motor_in2_level == LOW);
+
+  for (uint32_t i = 0UL; i < 10000UL; ++i) {
+    drive.update(5000UL, unused_hall, unused_hall, 3000L, true);
   }
+  assert(drive.hallFaultMask() == 0U);
+  assert(g_motor_pwm == cfg::MAX_PWM);
+  assert(g_motor_in1_level == HIGH);
+  assert(g_motor_in2_level == LOW);
 
-  {
-    DriveController drive;
-    drive.begin();
-    primeFeedback(drive);
-    const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
-    const uint32_t iterations =
-        static_cast<uint32_t>(cfg::HALL_STALL_TIMEOUT_MS) * 1000UL /
-        5000UL + 220UL;
-    for (uint32_t i = 0UL; i < iterations; ++i) {
-      drive.update(5000UL, stopped, stopped, 3000L, true);
-    }
-    assert(
-        drive.hallFaultMask() ==
-        (DriveController::HALL_FAULT_LEFT |
-         DriveController::HALL_FAULT_RIGHT));
-    assert(g_motor_pwm == 0);
-    assert(g_motor_in1_level == LOW);
-    assert(g_motor_in2_level == LOW);
-  }
+  drive.update(5000UL, unused_hall, unused_hall, -1500L, true);
+  assert(drive.appliedTargetMradS() == -1500L);
+  assert(g_motor_pwm == 95);
+  assert(g_motor_in1_level == LOW);
+  assert(g_motor_in2_level == HIGH);
 
-  {
-    DriveController drive;
-    drive.begin();
-    primeFeedback(drive);
-    uint32_t right_count = 0UL;
-    const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
-    const uint32_t iterations =
-        static_cast<uint32_t>(cfg::HALL_STALL_TIMEOUT_MS) * 1000UL /
-        5000UL + 220UL;
-    for (uint32_t i = 0UL; i < iterations; ++i) {
-      const HallSample right = sample(++right_count);
-      drive.update(5000UL, stopped, right, 3000L, true);
-    }
-    assert(
-        drive.hallFaultMask() == DriveController::HALL_FAULT_LEFT);
-  }
+  drive.update(5000UL, unused_hall, unused_hall, 0L, true);
+  assert(g_motor_pwm == 0);
+  assert(g_motor_in1_level == LOW);
+  assert(g_motor_in2_level == LOW);
+  assert(drive.leftVelocityMradS() == 0L);
+  assert(drive.rightVelocityMradS() == 0L);
+  assert(!drive.feedbackReady());
 
-  {
-    DriveController drive;
-    drive.begin();
-    primeFeedback(drive);
-    for (uint32_t count = 1UL; count <= 40UL; ++count) {
-      const HallSample too_fast = sample(count, 1000UL);
-      drive.update(5000UL, too_fast, too_fast, 0L, true);
-    }
-    assert(
-        drive.hallFaultMask() ==
-        (DriveController::HALL_FAULT_LEFT |
-         DriveController::HALL_FAULT_RIGHT));
-  }
-
-  {
-    DriveController drive;
-    drive.begin();
-    primeFeedback(drive);
-    const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
-    const HallSample first_pulse = {1UL, 0UL, 0UL};
-    for (int i = 0; i < 5; ++i) {
-      drive.update(5000UL, first_pulse, first_pulse, 1000L, true);
-    }
-    assert(drive.hallFaultMask() == 0U);
-    assert(drive.leftVelocityMradS() == 0L);
-    assert(drive.rightVelocityMradS() == 0L);
-    assert(g_motor_pwm >= cfg::MOTOR_MIN_ACTIVE_PWM);
-    assert(g_motor_in1_level == HIGH);
-    assert(g_motor_in2_level == LOW);
-
-    drive.update(5000UL, stopped, stopped, 1000L, false);
-    assert(g_motor_pwm == 0);
-    assert(g_motor_in1_level == LOW);
-    assert(g_motor_in2_level == LOW);
-  }
-
-  {
-    DriveController drive;
-    drive.begin();
-    primeFeedback(drive);
-    const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
-    for (int i = 0; i < 5; ++i) {
-      drive.update(5000UL, stopped, stopped, -1000L, true);
-    }
-    assert(g_motor_pwm >= cfg::MOTOR_MIN_ACTIVE_PWM);
-    assert(g_motor_in1_level == LOW);
-    assert(g_motor_in2_level == HIGH);
-  }
-
-  printf("firmware Hall feedback and single-driver tests: OK\n");
+  printf("firmware open-loop single-driver tests: OK\n");
   return 0;
 }
