@@ -50,10 +50,10 @@ check_serial_role() {
 if [[ "${config}" == "${workspace}/config/raspberry_pi.yaml" &&
       "${SAFESTRIDE_SKIP_PORT_CHECK:-false}" != "true" ]]; then
   check_serial_role \
-    /dev/safestride-drive 8583030333935131E120 Drive
+    /dev/safestride-drive 75834353730351C07130 Drive
   if [[ "${enable_terrain}" == "true" ]]; then
     check_serial_role \
-      /dev/safestride-terrain 75834353730351C07130 Terrain
+      /dev/safestride-terrain 8583030333935131E120 Terrain
   fi
 fi
 
