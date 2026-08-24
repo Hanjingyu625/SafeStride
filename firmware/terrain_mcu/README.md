@@ -1,6 +1,6 @@
 # Terrain MCU 펌웨어
 
-Arduino Uno가 TOF-10120과 BE-220 GPS를 읽고 프로토콜 v2 텔레메트리로
+Arduino Uno가 TOF-10120과 BE-220 GPS를 읽고 프로토콜 v3 텔레메트리로
 Raspberry Pi에 전송한다. 결과는 `/terrain/tof`, `/terrain/status`,
 `/gps/fix`, `/gps/speed`, `/diagnostics`에서 확인한다.
 

@@ -6,7 +6,7 @@
 // SafeStride example hardware configuration
 // ---------------------------------------------------------------------------
 // Every value in this file is a placeholder. Verify pin voltage, polarity,
-// PWM capability, interrupt capability, Hall pulse count, and gearbox ratio
+// PWM capability, interrupt capability, encoder resolution, and gearbox ratio
 // against the actual hardware before connecting motor power.
 
 namespace safestride_config {
@@ -31,33 +31,28 @@ constexpr int32_t MAX_DECEL_MRAD_S2 = 2500L;
 constexpr int32_t ARM_MAX_MEASURED_SPEED_MRAD_S = 100L;
 constexpr uint16_t ARM_STATIONARY_DWELL_MS = 250U;
 
-// Hall feedback is temporarily disabled. The current motor is driven open-loop
-// from ROS velocity commands until the Hall hardware is replaced by an encoder.
-// Keep the pin definitions for the future encoder integration, but do not
-// configure or sample them while this flag is false.
-constexpr bool ENABLE_HALL_FEEDBACK = false;
-constexpr bool USE_SINGLE_HALL_SENSOR = true;
-constexpr uint8_t LEFT_HALL_PIN = 2U;
-constexpr uint8_t RIGHT_HALL_PIN = 3U;
-constexpr uint8_t HALL_ACTIVE_LEVEL = LOW;
-// Reject sub-millisecond electrical chatter without discarding valid pulses
-// if the measured pulse-per-revolution value is increased later.
-constexpr uint32_t HALL_MIN_PULSE_INTERVAL_US = 500UL;
-// With one magnet per revolution the interval can be several seconds. Keep the
-// last period estimate long enough for a 0.5 rad/s wheel to produce a new pulse.
-constexpr uint32_t HALL_ZERO_TIMEOUT_US = 15000000UL;
-// The current wheel setup has one magnet and therefore one pulse per complete
-// wheel revolution. Change this value in both MCU and ROS configuration if the
-// number of magnets or the sensing geometry changes.
-constexpr uint32_t HALL_PULSES_PER_WHEEL_REV = 1UL;
-constexpr bool HALL_CALIBRATED = false;
+// Encoder hardware has not been selected. D2/D3 are reserved because both are
+// external-interrupt pins on an Uno, but their eventual meaning (quadrature
+// A/B, or one channel per wheel), input mode, edge polarity, voltage level,
+// resolution and gearbox ratio must come from the purchased encoder datasheet.
+// encoder_feedback.cpp deliberately reports no data until that driver exists.
+constexpr bool ENABLE_ENCODER_FEEDBACK = false;
+constexpr bool ENCODER_CALIBRATED = false;
+constexpr uint8_t ENCODER_INPUT_1_PIN = 2U;
+constexpr uint8_t ENCODER_INPUT_2_PIN = 3U;
+constexpr uint32_t ENCODER_COUNTS_PER_WHEEL_REV = 0UL;
 
-// Runtime Hall plausibility monitor. Tune from lifted-wheel logs. A fault
-// latches until MCU reset so an intermittent sensor cannot silently re-arm.
-constexpr int32_t HALL_STALL_TARGET_MIN_MRAD_S = 500L;
-constexpr uint16_t HALL_STALL_TIMEOUT_MS = 15000U;
-constexpr int32_t HALL_MAX_PLAUSIBLE_MRAD_S = 5000L;
-constexpr uint16_t HALL_OVERSPEED_TIMEOUT_MS = 100U;
+// Explicit temporary bench policy. When false (the required production value),
+// an unavailable encoder prevents arming. Open-loop output still remains behind
+// the session, explicit enable, fresh command, dead-man and fault gates.
+constexpr bool ALLOW_OPEN_LOOP_MOTOR = true;
+
+// Generic feedback plausibility limits. Tune only after the encoder adapter,
+// resolution and wheel conversion have been validated with lifted wheels.
+constexpr int32_t ENCODER_STALL_TARGET_MIN_MRAD_S = 500L;
+constexpr uint16_t ENCODER_STALL_TIMEOUT_MS = 15000U;
+constexpr int32_t ENCODER_MAX_PLAUSIBLE_MRAD_S = 5000L;
+constexpr uint16_t ENCODER_OVERSPEED_TIMEOUT_MS = 100U;
 
 // One SZH-GNP521 drives the two motors as one electrical load. The wiring must
 // be checked independently for voltage, polarity and combined stall current.
@@ -116,20 +111,19 @@ constexpr uint8_t RIGHT_CURRENT_SENSE_PIN = A4;
 constexpr float CURRENT_ZERO_V = 2.5F;
 constexpr float CURRENT_MA_PER_V = 1000.0F;
 
-// The v2 telemetry layout reserves two front-range fields, but no such sensors
+// The v3 telemetry layout reserves two front-range fields, but no such sensors
 // are installed in the current pin map. Do not advertise the capability or
 // require the ROS topics until real non-blocking drivers replace the sentinels.
 constexpr bool ENABLE_FRONT_RANGE_SENSORS = false;
 
 // PID output is PWM counts. Keep both wheels lifted, tune the shared output,
-// and keep integrator gain at zero until direction and both Hall channels are
+// and keep integrator gain at zero until encoder direction and scaling are
 // proven. These example gains are intentionally mild.
 constexpr float MOTOR_PID_KP = 12.0F;
 constexpr float MOTOR_PID_KI = 0.0F;
 constexpr float MOTOR_PID_KD = 0.0F;
 constexpr float MOTOR_FEEDFORWARD = 10.0F;
 constexpr float PID_INTEGRAL_LIMIT = 30.0F;
-constexpr float VELOCITY_FILTER_ALPHA = 0.35F;
 
 // AVR's hardware watchdog protects against a frozen main loop. The driver's
 // PWM input still needs an external pull-down while the MCU resets.
@@ -147,15 +141,17 @@ static_assert(
     MOTOR_MIN_ACTIVE_PWM > 0U && MOTOR_MIN_ACTIVE_PWM <= MAX_PWM,
     "minimum active motor PWM must be positive and no higher than MAX_PWM");
 static_assert(
-    HALL_PULSES_PER_WHEEL_REV > 0UL,
-    "Hall pulses per wheel revolution must be positive");
+    !ENCODER_CALIBRATED || ENCODER_COUNTS_PER_WHEEL_REV > 0UL,
+    "a calibrated encoder needs a positive count-per-wheel-revolution value");
 static_assert(
-    !USE_SINGLE_HALL_SENSOR || LEFT_HALL_PIN == 2U || LEFT_HALL_PIN == 3U,
-    "single Hall sensor must use an Arduino Uno interrupt pin");
+    !ENCODER_CALIBRATED || ENABLE_ENCODER_FEEDBACK,
+    "encoder calibration cannot be enabled while feedback is disabled");
 static_assert(
-    HALL_MIN_PULSE_INTERVAL_US > 0UL &&
-        HALL_ZERO_TIMEOUT_US > HALL_MIN_PULSE_INTERVAL_US,
-    "Hall timing limits are invalid");
+    ENCODER_INPUT_1_PIN != ENCODER_INPUT_2_PIN,
+    "reserved encoder inputs must be distinct");
+static_assert(
+    ENCODER_INPUT_1_PIN == 2U && ENCODER_INPUT_2_PIN == 3U,
+    "Drive Uno encoder inputs are reserved on D2/D3 interrupt pins");
 static_assert(
     COMMAND_WATCHDOG_MAX_MS >= COMMAND_TTL_MIN_MS,
     "command TTL range is invalid");
@@ -185,18 +181,18 @@ static_assert(
     ARM_STATIONARY_DWELL_MS > 0U,
     "arming stationary dwell must be positive");
 static_assert(
-    HALL_STALL_TARGET_MIN_MRAD_S > 0L &&
-        HALL_STALL_TARGET_MIN_MRAD_S <=
+    ENCODER_STALL_TARGET_MIN_MRAD_S > 0L &&
+        ENCODER_STALL_TARGET_MIN_MRAD_S <=
             MAX_WHEEL_TARGET_MRAD_S,
-    "Hall stall target threshold is invalid");
+    "encoder stall target threshold is invalid");
 static_assert(
-    HALL_STALL_TIMEOUT_MS > 0U &&
-        HALL_OVERSPEED_TIMEOUT_MS > 0U,
-    "Hall plausibility timeouts must be positive");
+    ENCODER_STALL_TIMEOUT_MS > 0U &&
+        ENCODER_OVERSPEED_TIMEOUT_MS > 0U,
+    "encoder plausibility timeouts must be positive");
 static_assert(
-    HALL_MAX_PLAUSIBLE_MRAD_S >
+    ENCODER_MAX_PLAUSIBLE_MRAD_S >
         MAX_WHEEL_TARGET_MRAD_S,
-    "Hall plausible speed must exceed maximum target");
+    "encoder plausible speed must exceed maximum target");
 static_assert(
     AVR_BOOT_COUNTER_EEPROM_ADDRESS >= 0,
     "boot-counter EEPROM address must not be negative");

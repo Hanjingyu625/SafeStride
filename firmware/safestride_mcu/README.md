@@ -1,51 +1,55 @@
 # SafeStride Drive MCU 펌웨어
 
 Arduino Uno가 단일 SZH-GNP521을 통해 두 모터에 공통 속도 명령을 내리고,
-좌우 홀센서·압력센서를 독립 감시한다. E-stop은 현재 미구현이며 항상 정상으로
-보고한다. 직렬 포트는 텍스트가 아닌
-[프로토콜 v2](../../PROTOCOL.md)를 사용하므로 운영 중에는 ROS 토픽으로
-상태를 확인한다.
+향후 휠 엔코더 피드백과 좌우 압력센서를 감시한다. E-stop은 현재 미구현이다.
+직렬 통신은 [프로토콜 v3](../../PROTOCOL.md)를 사용한다.
 
 ## 핀맵
 
 | 기능 | Uno 핀 |
 |---|---:|
-| 왼쪽 홀센서 출력 | D2 (interrupt) |
-| 오른쪽 홀센서 출력 | D3 (interrupt) |
+| 엔코더 입력 1/2 예약 | D2 / D3 (interrupt 가능) |
 | 단일 드라이버 PWM / INA(IN1) / INB(IN2) | D5 / D6 / D8 |
 | 왼쪽/오른쪽 압력센서 | A1 / A2 |
-| E-stop | 현재 미구현·미사용, 핀 미할당 |
+| E-stop | 현재 미구현·미사용, D12 예약 |
 | 드라이버 fault(기본 비활성) | D13 |
 
-D4, D7, D9, D10은 현재 사용하지 않는다. D12는 E-stop placeholder지만
-E-stop이 미구현이라 입력으로 설정되지 않는다. 상태 LED 출력도 사용하지 않는다.
+D2/D3의 실제 역할은 엔코더 선정 후 확정한다. 하나의 quadrature 엔코더 A/B로
+쓸지, 좌우 단채널 입력으로 쓸지 아직 정해지지 않았으므로 현재 코드는 핀 모드나
+인터럽트 에지를 설정하지 않는다. D4, D7, D9, D10은 비어 있다.
 
-## 현재 홀 피드백 제어
+## 현재 제어 조건
 
-자석을 한 번 대면 고정 시간 동안 모터를 켜던 임시 벤치 모드는 제거했다. 현재는
-ROS 또는 프로토콜의 목표 속도를 받은 뒤 D5에 PWM을 출력하고, D2/D3에서 측정한
-좌우 바퀴 속도의 평균을 PID 입력으로 사용한다. 모터의 기동 데드존 때문에 출력이
-필요할 때는 PWM 90부터 시작하며, 측정 속도가 목표에 도달하거나 초과하면 모터를
-역구동하지 않고 coast한다. 세션·명령 watchdog과 좌우 홀센서 stall/overspeed fault는
-항상 동작한다.
+`encoder_feedback.cpp`는 하드웨어 중립 인터페이스만 제공하며 현재 항상 invalid
+샘플을 반환한다. `ENABLE_ENCODER_FEEDBACK=false`와
+`ALLOW_OPEN_LOOP_MOTOR=true`인 현재 설정은 들어 올린 바퀴의 임시 시험을 위한
+open-loop 모드다. 이때도 세션, 명시적 ROS enable, 최신 속도 명령, dead-man,
+watchdog, fault 조건을 모두 통과해야 PWM이 출력된다.
 
-현재 하드웨어 시험을 위해 `REQUIRE_DEADMAN=false`라서 dead-man 상태는 항상
-활성으로 보고하지만 압력센서 값은 계속 전송한다. 실제 주행 전에는 압력 임계값을
-보정한 뒤 `REQUIRE_DEADMAN=true`로 되돌려야 한다.
+엔코더 피드백을 켜면 firmware는 다음 조건을 모두 만족하지 않는 한 모터 출력을
+차단한다.
 
-## 필수 보정
+1. 구매한 엔코더용 adapter가 초기화되어 capability를 광고한다.
+2. `ENCODER_CALIBRATED=true`이고 회전당 카운트, 기어비, 방향이 검증됐다.
+3. 매 control cycle의 샘플이 valid다.
+4. 정지 상태 dwell, dead-man, session, command watchdog, fault 조건이 정상이다.
 
-1. 현재 설정은 각 휠에 자석 1개, 즉 `HALL_PULSES_PER_WHEEL_REV=1`을 가정한다.
-2. `/wheel/hall`의 시작 펄스 값을 기록한 뒤 각 휠을 정확히 10회 회전한다.
-3. 종료값과 시작값 차이의 절댓값을 10으로 나눠 실제 회전당 펄스 수를 확인한다.
-4. 값이 1이 아니면 `config.h`와 두 ROS YAML의 회전당 펄스 수를 같은 값으로 수정한다. 두 센서가 다른
-   값을 내면 기구 또는 센서 설치를 먼저 수정한다.
-5. 속도와 fault 임계값을 들어 올린 휠에서 검증한다. `HALL_CALIBRATED=false`이면
-   MCU와 ROS 브리지가 모두 모터 활성화를 거부한다.
-6. 운영 펌웨어를 다시 업로드하고 `/handle/pressure` 로그로 좌우 압력 임계값도 보정한다.
+실제 운용 전에는 `ALLOW_OPEN_LOOP_MOTOR=false`, ROS의
+`require_encoder_feedback=true`로 바꿔 MCU와 Raspberry Pi 양쪽에서 피드백 없는
+구동을 차단한다.
 
-단일출력 홀센서는 회전 방향을 직접 측정하지 못하므로 부호는 드라이버 명령
-방향을 따른다. 외력으로 역회전하는 상황의 signed 위치는 보장되지 않는다.
+## 엔코더 선정 후 구현할 항목
+
+- 전원/논리 전압과 level shifting
+- 출력 방식(push-pull/open-collector/line-driver), pull-up 및 edge polarity
+- single/dual channel 또는 quadrature decoding 방식
+- 축 1회전당 카운트, 감속비, 휠 출력축 환산값
+- 정·역방향 부호와 좌우 배선
+- 저속 샘플링/속도 필터, overflow 처리, stall/overspeed 임계값
+
+어댑터는 `WheelEncoderSample`의 위치(mrad), 속도(mrad/s), valid를 채우도록
+구현한다. 최초 시험은 바퀴를 든 상태에서 수행하고 PID 적분 게인은 방향과
+스케일이 검증되기 전까지 0으로 둔다.
 
 ## 빌드
 
@@ -55,9 +59,6 @@ arduino-cli upload --fqbn arduino:avr:uno -p /dev/safestride-drive \
   firmware/safestride_mcu
 ```
 
-두 모터를 하나의 드라이버 출력에 연결하는 설계는 코드만으로 안전성을
-보장할 수 없다. 동일 정격 모터인지, 병렬/극성 연결이 맞는지, 두 모터의
-합산 정지전류를 드라이버·배터리·퓨즈·배선이 견디는지 전원 인가 전에 확인한다.
-현재 E-stop 입력은 동작하지 않으므로 시험 중에는 별도의 물리 전원 차단 수단을
-준비해야 한다. 향후 E-stop을 구현할 때는 MCU 입력뿐 아니라 구동 전원 또는
-드라이버 enable을 하드웨어로 차단해야 한다.
+두 모터를 하나의 드라이버 출력에 연결하는 설계는 코드만으로 안전성을 보장할
+수 없다. 모터 합산 정지전류, 드라이버/배터리/퓨즈/배선 정격을 확인하고, E-stop이
+구현되기 전에는 별도의 물리 전원 차단 수단을 준비한다.

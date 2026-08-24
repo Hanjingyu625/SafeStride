@@ -110,7 +110,7 @@ if ! grep -Eq 'success(=|: )[Tt]rue' <<<"${response}"; then
   exit 1
 fi
 
-echo "Drive armed for ${duration}s at 0.10 m/s in Hall-feedback mode."
-echo "Both wheels must keep producing Hall pulses or the firmware will fault-stop."
+echo "Drive armed for ${duration}s at 0.10 m/s. Keep both wheels lifted."
+echo "If encoder feedback is required, invalid feedback will fault-stop the motor."
 sleep "${duration}"
 echo "Test complete; sending disable command."

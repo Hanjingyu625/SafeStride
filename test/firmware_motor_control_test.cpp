@@ -53,37 +53,38 @@ size_t HardwareSerial::print(const char*) { return 1U; }
 size_t HardwareSerial::println(const char*) { return 1U; }
 
 int main() {
-  static_assert(!cfg::ENABLE_HALL_FEEDBACK, "test expects open-loop mode");
-  const HallSample unused_hall = {0UL, 0UL, 0xFFFFFFFFUL};
+  static_assert(!cfg::ENABLE_ENCODER_FEEDBACK, "test expects open-loop mode");
+  static_assert(cfg::ALLOW_OPEN_LOOP_MOTOR, "test expects bench open-loop mode");
+  const WheelEncoderSample unavailable_encoder = {0L, 0L, 0L, 0L, false};
   DriveController drive;
   drive.begin();
 
-  drive.update(5000UL, unused_hall, unused_hall, 1500L, false);
+  drive.update(5000UL, unavailable_encoder, 1500L, false);
   assert(g_motor_pwm == 0);
   assert(g_motor_in1_level == LOW);
   assert(g_motor_in2_level == LOW);
 
-  drive.update(5000UL, unused_hall, unused_hall, 1500L, true);
+  drive.update(5000UL, unavailable_encoder, 1500L, true);
   assert(drive.appliedTargetMradS() == 1500L);
   assert(g_motor_pwm == 95);
   assert(g_motor_in1_level == HIGH);
   assert(g_motor_in2_level == LOW);
 
   for (uint32_t i = 0UL; i < 10000UL; ++i) {
-    drive.update(5000UL, unused_hall, unused_hall, 3000L, true);
+    drive.update(5000UL, unavailable_encoder, 3000L, true);
   }
-  assert(drive.hallFaultMask() == 0U);
+  assert(drive.encoderFaultMask() == 0U);
   assert(g_motor_pwm == cfg::MAX_PWM);
   assert(g_motor_in1_level == HIGH);
   assert(g_motor_in2_level == LOW);
 
-  drive.update(5000UL, unused_hall, unused_hall, -1500L, true);
+  drive.update(5000UL, unavailable_encoder, -1500L, true);
   assert(drive.appliedTargetMradS() == -1500L);
   assert(g_motor_pwm == 95);
   assert(g_motor_in1_level == LOW);
   assert(g_motor_in2_level == HIGH);
 
-  drive.update(5000UL, unused_hall, unused_hall, 0L, true);
+  drive.update(5000UL, unavailable_encoder, 0L, true);
   assert(g_motor_pwm == 0);
   assert(g_motor_in1_level == LOW);
   assert(g_motor_in2_level == LOW);

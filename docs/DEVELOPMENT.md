@@ -41,7 +41,7 @@ path is BE-220 -> Terrain Uno D8 -> `/dev/safestride-terrain`; the separate
 Pi GPS serial node is only a fallback and must not run at the same time.
 
 Both Arduino sketches must be flashed after a wire-protocol change. Protocol
-v2 is intentionally incompatible with the old dual-wheel command payload, so
+v3 is intentionally incompatible with the earlier wheel-feedback payloads, so
 the Drive MCU, Terrain MCU and ROS bridge must be updated together.
 
 For unattended startup, first review `config/raspberry_pi.yaml`, install the

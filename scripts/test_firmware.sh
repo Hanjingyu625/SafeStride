@@ -34,6 +34,7 @@ common=(
 "${cxx}" "${common[@]}" \
   -I"${workspace}/firmware/safestride_mcu" \
   "${workspace}/test/firmware_state_machine_test.cpp" \
+  "${workspace}/firmware/safestride_mcu/encoder_feedback.cpp" \
   "${workspace}/firmware/safestride_mcu/motor_control.cpp" \
   "${workspace}/firmware/safestride_mcu/pressure_sensor.cpp" \
   "${workspace}/firmware/safestride_mcu/protocol.cpp" \

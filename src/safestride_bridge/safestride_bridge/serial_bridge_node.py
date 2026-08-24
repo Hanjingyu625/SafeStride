@@ -14,7 +14,7 @@ from nav_msgs.msg import Odometry
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from safestride_interfaces.msg import HandlePressure, WalkerStatus, WheelHall
+from safestride_interfaces.msg import HandlePressure, WalkerStatus, WheelEncoder
 from sensor_msgs.msg import BatteryState, JointState, Range
 from std_srvs.srv import SetBool
 from tf2_ros import TransformBroadcaster
@@ -45,17 +45,16 @@ STATUS_DEADMAN = 1 << 2
 STATUS_ESTOP = 1 << 3
 STATUS_WATCHDOG_TIMEOUT = 1 << 4
 STATUS_COMMAND_SEEN = 1 << 5
-STATUS_HALL_CALIBRATED = 1 << 6
-STATUS_MAGNET_BENCH_MODE = 1 << 7
+STATUS_ENCODER_CALIBRATED = 1 << 6
 STATUS_STATE_SHIFT = 8
 STATUS_STATE_MASK = 0x7
+STATUS_ENCODER_SAMPLE_VALID = 1 << 11
 
 PRESSURE_LEFT_PRESENT = 1 << 0
 PRESSURE_RIGHT_PRESENT = 1 << 1
 PRESSURE_CALIBRATED = 1 << 2
 CAP_PRESSURE_TELEMETRY = 1 << 6
-CAP_TWO_HALL_SENSORS = 1 << 0
-CAP_MAGNET_BENCH_MODE = 1 << 7
+CAP_WHEEL_ENCODER = 1 << 0
 
 # Firmware state values encoded in status_bits[10:8].
 FW_BOOT = 0
@@ -114,8 +113,8 @@ class SerialBridgeNode(Node):
         self._last_telemetry_time: Optional[float] = None
         self._last_telemetry: Optional[TelemetryPayload] = None
         self._last_telemetry_sequence: Optional[int] = None
-        self._last_hall_left: Optional[int] = None
-        self._last_hall_right: Optional[int] = None
+        self._last_encoder_left: Optional[int] = None
+        self._last_encoder_right: Optional[int] = None
         self._joint_left = 0.0
         self._joint_right = 0.0
         self._odom_x = 0.0
@@ -140,8 +139,8 @@ class SerialBridgeNode(Node):
         self._pressure_pub = self.create_publisher(
             HandlePressure, self._topic_pressure, qos_profile_sensor_data
         )
-        self._hall_pub = self.create_publisher(
-            WheelHall, self._topic_hall, qos_profile_sensor_data
+        self._encoder_pub = self.create_publisher(
+            WheelEncoder, self._topic_encoder, qos_profile_sensor_data
         )
         self._status_pub = self.create_publisher(
             WalkerStatus, self._topic_status, 10
@@ -193,14 +192,12 @@ class SerialBridgeNode(Node):
             ('command.ttl_ms', 200),
             ('command.arm_max_wheel_speed_rad_s', 0.10),
             ('command.max_abs_angular_z_rad_s', 0.0),
-            ('command.require_hall_feedback', False),
-            ('command.allow_magnet_bench_mode', False),
+            ('command.require_encoder_feedback', False),
             ('command.arm_confirmation_timeout_s', 1.0),
             ('telemetry.timeout_s', 0.30),
             ('diagnostics.publish_rate_hz', 1.0),
             ('base.wheel_radius_m', 0.15),
             ('base.wheel_separation_m', 0.55),
-            ('base.hall_pulses_per_revolution', 1),
             ('base.max_wheel_speed_rad_s', 3.0),
             ('range.min_m', 0.02),
             ('range.max_m', 4.0),
@@ -220,7 +217,7 @@ class SerialBridgeNode(Node):
             ('topics.range_right', '/range/front_right'),
             ('topics.battery', '/battery_state'),
             ('topics.pressure', '/handle/pressure'),
-            ('topics.hall', '/wheel/hall'),
+            ('topics.encoder', '/wheel/encoder'),
             ('topics.status', '/walker/status'),
             ('topics.diagnostics', '/diagnostics'),
             ('services.set_enabled', '/walker/set_enabled'),
@@ -300,11 +297,8 @@ class SerialBridgeNode(Node):
             minimum=0.0,
             maximum=10.0,
         )
-        self._require_hall_feedback = bool(
-            self._value('command.require_hall_feedback')
-        )
-        self._allow_magnet_bench_mode = bool(
-            self._value('command.allow_magnet_bench_mode')
+        self._require_encoder_feedback = bool(
+            self._value('command.require_encoder_feedback')
         )
         self._arm_confirmation_timeout = finite_float(
             'command.arm_confirmation_timeout_s',
@@ -340,13 +334,6 @@ class SerialBridgeNode(Node):
             self._value('base.wheel_separation_m'),
             minimum=0.0,
             maximum=10.0,
-            minimum_inclusive=False,
-        )
-        self._hall_pulses_per_revolution = finite_float(
-            'base.hall_pulses_per_revolution',
-            self._value('base.hall_pulses_per_revolution'),
-            minimum=0.0,
-            maximum=1.0e9,
             minimum_inclusive=False,
         )
         self._max_wheel_speed = finite_float(
@@ -429,7 +416,7 @@ class SerialBridgeNode(Node):
         self._topic_range_right = str(self._value('topics.range_right'))
         self._topic_battery = str(self._value('topics.battery'))
         self._topic_pressure = str(self._value('topics.pressure'))
-        self._topic_hall = str(self._value('topics.hall'))
+        self._topic_encoder = str(self._value('topics.encoder'))
         self._topic_status = str(self._value('topics.status'))
         self._topic_diagnostics = str(self._value('topics.diagnostics'))
         self._service_set_enabled = str(
@@ -485,12 +472,6 @@ class SerialBridgeNode(Node):
         motor_enabled = bool(
             telemetry.status_bits & STATUS_MOTOR_ENABLED
         )
-        bench_status = bool(
-            telemetry.status_bits & STATUS_MAGNET_BENCH_MODE
-        )
-        bench_capability = bool(
-            self._capabilities & CAP_MAGNET_BENCH_MODE
-        )
         return (
             firmware_state in (
                 FW_BOOT,
@@ -501,40 +482,27 @@ class SerialBridgeNode(Node):
                 FW_FAULT,
             )
             and motor_enabled == (firmware_state == FW_ARMED)
-            and bench_status == bench_capability
-        )
-
-    def _magnet_bench_mode_active(
-        self, telemetry: TelemetryPayload
-    ) -> bool:
-        return (
-            self._allow_magnet_bench_mode
-            and bool(
-                telemetry.status_bits & STATUS_MAGNET_BENCH_MODE
-            )
-            and bool(self._capabilities & CAP_MAGNET_BENCH_MODE)
         )
 
     def _remote_allows_enable(self, telemetry: TelemetryPayload) -> bool:
         firmware_state = self._firmware_state(telemetry)
-        magnet_bench_mode = self._magnet_bench_mode_active(telemetry)
-        hall_feedback_ready = (
-            not self._require_hall_feedback
+        encoder_feedback_ready = (
+            not self._require_encoder_feedback
             or (
                 bool(
-                    telemetry.status_bits & STATUS_HALL_CALIBRATED
+                    telemetry.status_bits & STATUS_ENCODER_CALIBRATED
                 )
-                and bool(self._capabilities & CAP_TWO_HALL_SENSORS)
+                and bool(self._capabilities & CAP_WHEEL_ENCODER)
+                and bool(
+                    telemetry.status_bits & STATUS_ENCODER_SAMPLE_VALID
+                )
             )
         )
         return (
             self._firmware_status_consistent(telemetry)
             and bool(telemetry.status_bits & STATUS_SESSION)
-            and (
-                bool(telemetry.status_bits & STATUS_DEADMAN)
-                or magnet_bench_mode
-            )
-            and (hall_feedback_ready or magnet_bench_mode)
+            and bool(telemetry.status_bits & STATUS_DEADMAN)
+            and encoder_feedback_ready
             and not bool(telemetry.status_bits & STATUS_ESTOP)
             and not bool(
                 telemetry.status_bits & STATUS_WATCHDOG_TIMEOUT
@@ -560,8 +528,8 @@ class SerialBridgeNode(Node):
         self._last_telemetry_time = None
         self._last_telemetry = None
         self._last_telemetry_sequence = None
-        self._last_hall_left = None
-        self._last_hall_right = None
+        self._last_encoder_left = None
+        self._last_encoder_right = None
         self._parser.reset()
 
     def _close_serial(self, reason: str) -> None:
@@ -692,12 +660,12 @@ class SerialBridgeNode(Node):
         self, hello: HelloPayload, hello_sequence: int
     ) -> None:
         if (
-            self._require_hall_feedback
-            and not (hello.capabilities & CAP_TWO_HALL_SENSORS)
+            self._require_encoder_feedback
+            and not (hello.capabilities & CAP_WHEEL_ENCODER)
         ):
             error = (
                 'device on the drive port is not Drive firmware '
-                '(two-Hall capability missing)'
+                '(wheel-encoder capability missing)'
             )
             self._session_id = 0
             self._boot_id = hello.boot_id
@@ -746,8 +714,8 @@ class SerialBridgeNode(Node):
             self._last_telemetry_time = None
             self._last_telemetry = None
             self._last_telemetry_sequence = None
-            self._last_hall_left = None
-            self._last_hall_right = None
+            self._last_encoder_left = None
+            self._last_encoder_right = None
 
         payload = SessionStartPayload(hello.boot_id).pack()
         frame = self._make_frame(
@@ -900,38 +868,29 @@ class SerialBridgeNode(Node):
             response.message = 'cannot enable: controller session is inactive'
             return response
         if (
-            self._require_hall_feedback
-            and not (self._capabilities & CAP_TWO_HALL_SENSORS)
+            self._require_encoder_feedback
+            and not (self._capabilities & CAP_WHEEL_ENCODER)
         ):
             response.success = False
-            response.message = 'cannot enable: Hall feedback is unavailable'
+            response.message = 'cannot enable: encoder feedback is unavailable'
             return response
-        firmware_magnet_bench_mode = bool(
-            telemetry.status_bits & STATUS_MAGNET_BENCH_MODE
-            and self._capabilities & CAP_MAGNET_BENCH_MODE
-        )
-        if firmware_magnet_bench_mode and not self._allow_magnet_bench_mode:
-            response.success = False
-            response.message = (
-                'cannot enable: firmware magnet bench mode is not allowed '
-                'by ROS configuration'
-            )
-            return response
-        magnet_bench_mode = self._magnet_bench_mode_active(telemetry)
         if (
-            self._require_hall_feedback
-            and not magnet_bench_mode
-            and not (telemetry.status_bits & STATUS_HALL_CALIBRATED)
+            self._require_encoder_feedback
+            and not (telemetry.status_bits & STATUS_ENCODER_CALIBRATED)
         ):
             response.success = False
             response.message = (
-                'cannot enable: Hall pulses per revolution are not calibrated'
+                'cannot enable: encoder scaling and polarity are not calibrated'
             )
             return response
         if (
-            not magnet_bench_mode
-            and not (telemetry.status_bits & STATUS_DEADMAN)
+            self._require_encoder_feedback
+            and not (telemetry.status_bits & STATUS_ENCODER_SAMPLE_VALID)
         ):
+            response.success = False
+            response.message = 'cannot enable: encoder sample is invalid'
+            return response
+        if not (telemetry.status_bits & STATUS_DEADMAN):
             response.success = False
             response.message = 'cannot enable: dead-man switch is not active'
             return response
@@ -939,8 +898,7 @@ class SerialBridgeNode(Node):
             round(self._arm_max_wheel_speed * 1000.0)
         )
         if (
-            self._require_hall_feedback
-            and not magnet_bench_mode
+            self._require_encoder_feedback
             and (
                 abs(telemetry.velocity_left_mrad_s)
                 > maximum_measured_speed_mrad_s
@@ -969,10 +927,7 @@ class SerialBridgeNode(Node):
             )
         response.success = True
         response.message = (
-            'magnet bench armed; each Hall pulse opens a short motor window'
-            if magnet_bench_mode
-            else 'enable gate opened; motion still requires fresh velocity '
-            'commands'
+            'enable gate opened; motion still requires fresh velocity commands'
         )
         return response
 
@@ -1051,18 +1006,15 @@ class SerialBridgeNode(Node):
         left_velocity = telemetry.velocity_left_mrad_s / 1000.0
         right_velocity = telemetry.velocity_right_mrad_s / 1000.0
 
-        if self._last_hall_left is not None:
-            left_delta = _int32_delta(
-                telemetry.hall_left_pulses, self._last_hall_left
+        if self._last_encoder_left is not None:
+            left_delta_mrad = _int32_delta(
+                telemetry.position_left_mrad, self._last_encoder_left
             )
-            right_delta = _int32_delta(
-                telemetry.hall_right_pulses, self._last_hall_right
+            right_delta_mrad = _int32_delta(
+                telemetry.position_right_mrad, self._last_encoder_right
             )
-            radians_per_pulse = (
-                2.0 * math.pi / self._hall_pulses_per_revolution
-            )
-            left_angle_delta = left_delta * radians_per_pulse
-            right_angle_delta = right_delta * radians_per_pulse
+            left_angle_delta = left_delta_mrad / 1000.0
+            right_angle_delta = right_delta_mrad / 1000.0
             self._joint_left += left_angle_delta
             self._joint_right += right_angle_delta
 
@@ -1080,20 +1032,23 @@ class SerialBridgeNode(Node):
                 math.cos(self._odom_yaw + yaw_delta),
             )
 
-        self._last_hall_left = telemetry.hall_left_pulses
-        self._last_hall_right = telemetry.hall_right_pulses
+        self._last_encoder_left = telemetry.position_left_mrad
+        self._last_encoder_right = telemetry.position_right_mrad
 
-        hall = WheelHall()
-        hall.header.stamp = stamp
-        hall.header.frame_id = self._frame_base
-        hall.left_pulses = telemetry.hall_left_pulses
-        hall.right_pulses = telemetry.hall_right_pulses
-        hall.left_velocity_rad_s = left_velocity
-        hall.right_velocity_rad_s = right_velocity
-        hall.calibrated = bool(
-            telemetry.status_bits & STATUS_HALL_CALIBRATED
+        encoder = WheelEncoder()
+        encoder.header.stamp = stamp
+        encoder.header.frame_id = self._frame_base
+        encoder.left_position_rad = telemetry.position_left_mrad / 1000.0
+        encoder.right_position_rad = telemetry.position_right_mrad / 1000.0
+        encoder.left_velocity_rad_s = left_velocity
+        encoder.right_velocity_rad_s = right_velocity
+        encoder.valid = bool(
+            telemetry.status_bits & STATUS_ENCODER_SAMPLE_VALID
         )
-        self._hall_pub.publish(hall)
+        encoder.calibrated = bool(
+            telemetry.status_bits & STATUS_ENCODER_CALIBRATED
+        )
+        self._encoder_pub.publish(encoder)
 
         joints = JointState()
         joints.header.stamp = stamp
@@ -1388,39 +1343,32 @@ class SerialBridgeNode(Node):
             status.level = DiagnosticStatus.ERROR
             status.message = 'emergency stop is active'
         elif (
-            self._require_hall_feedback
-            and not (self._capabilities & CAP_TWO_HALL_SENSORS)
+            self._require_encoder_feedback
+            and not (self._capabilities & CAP_WHEEL_ENCODER)
         ):
             status.level = DiagnosticStatus.ERROR
-            status.message = 'drive firmware lacks Hall feedback'
+            status.message = 'drive firmware lacks encoder feedback'
         elif (
-            self._last_telemetry
-            and self._last_telemetry.status_bits
-            & STATUS_MAGNET_BENCH_MODE
-            and not self._allow_magnet_bench_mode
-        ):
-            status.level = DiagnosticStatus.ERROR
-            status.message = (
-                'firmware magnet bench mode is blocked by ROS configuration'
-            )
-        elif (
-            self._last_telemetry
-            and self._magnet_bench_mode_active(self._last_telemetry)
-        ):
-            status.level = DiagnosticStatus.WARN
-            status.message = (
-                'magnet-trigger motor bench mode is active'
-            )
-        elif (
-            self._require_hall_feedback
+            self._require_encoder_feedback
             and self._last_telemetry
             and not (
-                self._last_telemetry.status_bits & STATUS_HALL_CALIBRATED
+                self._last_telemetry.status_bits
+                & STATUS_ENCODER_CALIBRATED
             )
         ):
             status.level = DiagnosticStatus.WARN
-            status.message = 'Hall pulses per revolution are not calibrated'
-        elif not self._require_hall_feedback:
+            status.message = 'encoder scaling and polarity are not calibrated'
+        elif (
+            self._require_encoder_feedback
+            and self._last_telemetry
+            and not (
+                self._last_telemetry.status_bits
+                & STATUS_ENCODER_SAMPLE_VALID
+            )
+        ):
+            status.level = DiagnosticStatus.ERROR
+            status.message = 'encoder sample is invalid'
+        elif not self._require_encoder_feedback:
             status.level = DiagnosticStatus.WARN
             status.message = 'open-loop drive active; speed feedback disabled'
         elif not (self._capabilities & CAP_PRESSURE_TELEMETRY):
@@ -1482,44 +1430,42 @@ class SerialBridgeNode(Node):
                 value=str(self._enabled_requested).lower(),
             ),
             KeyValue(
-                key='hall_feedback_required',
-                value=str(self._require_hall_feedback).lower(),
+                key='encoder_feedback_required',
+                value=str(self._require_encoder_feedback).lower(),
             ),
             KeyValue(
-                key='hall_left_pulses',
+                key='encoder_left_position_mrad',
                 value=(
-                    str(telemetry.hall_left_pulses)
+                    str(telemetry.position_left_mrad)
                     if telemetry is not None
                     else 'unknown'
                 ),
             ),
             KeyValue(
-                key='hall_right_pulses',
+                key='encoder_right_position_mrad',
                 value=(
-                    str(telemetry.hall_right_pulses)
+                    str(telemetry.position_right_mrad)
                     if telemetry is not None
                     else 'unknown'
                 ),
             ),
             KeyValue(
-                key='hall_calibrated',
+                key='encoder_calibrated',
                 value=str(
                     bool(
                         telemetry
-                        and telemetry.status_bits & STATUS_HALL_CALIBRATED
+                        and telemetry.status_bits
+                        & STATUS_ENCODER_CALIBRATED
                     )
                 ).lower(),
             ),
             KeyValue(
-                key='magnet_bench_mode_allowed',
-                value=str(self._allow_magnet_bench_mode).lower(),
-            ),
-            KeyValue(
-                key='magnet_bench_mode_active',
+                key='encoder_sample_valid',
                 value=str(
                     bool(
                         telemetry
-                        and self._magnet_bench_mode_active(telemetry)
+                        and telemetry.status_bits
+                        & STATUS_ENCODER_SAMPLE_VALID
                     )
                 ).lower(),
             ),

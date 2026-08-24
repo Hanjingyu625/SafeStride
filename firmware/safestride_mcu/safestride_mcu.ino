@@ -7,6 +7,7 @@
 
 #include "config.h"
 #include "controller_state.h"
+#include "encoder_feedback.h"
 #include "motor_control.h"
 #include "pressure_sensor.h"
 #include "protocol.h"
@@ -25,17 +26,16 @@ constexpr uint16_t STATUS_DEADMAN_ACTIVE = 1U << 2U;
 constexpr uint16_t STATUS_ESTOP_ACTIVE = 1U << 3U;
 constexpr uint16_t STATUS_WATCHDOG_TIMEOUT = 1U << 4U;
 constexpr uint16_t STATUS_VALID_COMMAND_SEEN = 1U << 5U;
-constexpr uint16_t STATUS_HALL_CALIBRATED = 1U << 6U;
+constexpr uint16_t STATUS_ENCODER_CALIBRATED = 1U << 6U;
 constexpr uint8_t STATUS_STATE_SHIFT = 8U;
-constexpr uint16_t STATUS_LEFT_HALL_ACTIVE = 1U << 11U;
-constexpr uint16_t STATUS_RIGHT_HALL_ACTIVE = 1U << 12U;
+constexpr uint16_t STATUS_ENCODER_SAMPLE_VALID = 1U << 11U;
 
 // Fault values match safestride_interfaces/msg/WalkerStatus.msg.
 constexpr uint16_t FAULT_MOTOR_DRIVER = 1U << 1U;
-constexpr uint16_t FAULT_LEFT_HALL = 1U << 3U;
-constexpr uint16_t FAULT_RIGHT_HALL = 1U << 4U;
+constexpr uint16_t FAULT_LEFT_ENCODER = 1U << 3U;
+constexpr uint16_t FAULT_RIGHT_ENCODER = 1U << 4U;
 
-constexpr uint32_t CAP_TWO_HALL_SENSORS = 1UL << 0U;
+constexpr uint32_t CAP_WHEEL_ENCODER = 1UL << 0U;
 constexpr uint32_t CAP_TWO_RANGES = 1UL << 1U;
 constexpr uint32_t CAP_BATTERY = 1UL << 2U;
 constexpr uint32_t CAP_TWO_CURRENTS = 1UL << 3U;
@@ -47,15 +47,9 @@ constexpr uint8_t PRESSURE_FLAG_LEFT_PRESENT = 1U << 0U;
 constexpr uint8_t PRESSURE_FLAG_RIGHT_PRESENT = 1U << 1U;
 constexpr uint8_t PRESSURE_FLAG_CALIBRATED = 1U << 2U;
 
-volatile uint32_t g_left_hall_pulse_count = 0UL;
-volatile uint32_t g_right_hall_pulse_count = 0UL;
-volatile uint32_t g_left_hall_last_pulse_us = 0UL;
-volatile uint32_t g_right_hall_last_pulse_us = 0UL;
-volatile uint32_t g_left_hall_period_us = 0UL;
-volatile uint32_t g_right_hall_period_us = 0UL;
-
 proto::FrameReceiver g_receiver;
 DriveController g_drive;
+EncoderFeedback g_encoder;
 PressureSensorPair g_pressure;
 
 ControllerState g_state = ControllerState::BOOT;
@@ -103,65 +97,6 @@ bool driverFaultActive() {
   return cfg::USE_DRIVER_FAULT_PIN &&
          digitalRead(cfg::DRIVER_FAULT_PIN) ==
              cfg::DRIVER_FAULT_ACTIVE_LEVEL;
-}
-
-void recordHallPulse(
-    volatile uint32_t& pulse_count,
-    volatile uint32_t& last_pulse_us,
-    volatile uint32_t& period_us) {
-  const uint32_t now_us = micros();
-  const uint32_t elapsed_us = now_us - last_pulse_us;
-  if (last_pulse_us != 0UL &&
-      elapsed_us < cfg::HALL_MIN_PULSE_INTERVAL_US) {
-    return;
-  }
-  if (last_pulse_us != 0UL) {
-    period_us = elapsed_us;
-  }
-  last_pulse_us = now_us;
-  ++pulse_count;
-}
-
-void leftHallIsr() {
-  recordHallPulse(
-      g_left_hall_pulse_count,
-      g_left_hall_last_pulse_us,
-      g_left_hall_period_us);
-}
-
-void rightHallIsr() {
-  recordHallPulse(
-      g_right_hall_pulse_count,
-      g_right_hall_last_pulse_us,
-      g_right_hall_period_us);
-}
-
-void readHallSamples(
-    uint32_t now_us,
-    HallSample& left,
-    HallSample& right) {
-  uint32_t left_last_us = 0UL;
-  uint32_t right_last_us = 0UL;
-  noInterrupts();
-  left.pulse_count = g_left_hall_pulse_count;
-  left.period_us = g_left_hall_period_us;
-  left_last_us = g_left_hall_last_pulse_us;
-  if (cfg::USE_SINGLE_HALL_SENSOR) {
-    right.pulse_count = left.pulse_count;
-    right.period_us = left.period_us;
-    right_last_us = left_last_us;
-  } else {
-    right.pulse_count = g_right_hall_pulse_count;
-    right.period_us = g_right_hall_period_us;
-    right_last_us = g_right_hall_last_pulse_us;
-  }
-  interrupts();
-  left.age_us = left_last_us == 0UL
-      ? 0xFFFFFFFFUL
-      : now_us - left_last_us;
-  right.age_us = right_last_us == 0UL
-      ? 0xFFFFFFFFUL
-      : now_us - right_last_us;
 }
 
 uint32_t makeBootId() {
@@ -268,20 +203,12 @@ uint16_t currentStatusBits() {
   if (g_valid_command_seen) {
     status |= STATUS_VALID_COMMAND_SEEN;
   }
-  if (cfg::ENABLE_HALL_FEEDBACK && cfg::HALL_CALIBRATED) {
-    status |= STATUS_HALL_CALIBRATED;
+  if (cfg::ENABLE_ENCODER_FEEDBACK && cfg::ENCODER_CALIBRATED) {
+    status |= STATUS_ENCODER_CALIBRATED;
   }
   status |= static_cast<uint16_t>(g_state) << STATUS_STATE_SHIFT;
-  if (cfg::ENABLE_HALL_FEEDBACK) {
-    if (digitalRead(cfg::LEFT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL) {
-      status |= STATUS_LEFT_HALL_ACTIVE;
-    }
-    const bool right_hall_active = cfg::USE_SINGLE_HALL_SENSOR
-        ? (digitalRead(cfg::LEFT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL)
-        : (digitalRead(cfg::RIGHT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL);
-    if (right_hall_active) {
-      status |= STATUS_RIGHT_HALL_ACTIVE;
-    }
+  if (g_drive.feedbackReady()) {
+    status |= STATUS_ENCODER_SAMPLE_VALID;
   }
   return status;
 }
@@ -333,8 +260,8 @@ int16_t readCurrentMa(uint8_t pin) {
 void sendHello() {
   uint8_t payload[proto::HELLO_PAYLOAD_SIZE];
   uint32_t capabilities = CAP_DEADMAN | CAP_PRESSURE_TELEMETRY;
-  if (cfg::ENABLE_HALL_FEEDBACK) {
-    capabilities |= CAP_TWO_HALL_SENSORS;
+  if (cfg::ENABLE_ENCODER_FEEDBACK && g_encoder.available()) {
+    capabilities |= CAP_WHEEL_ENCODER;
   }
   if (cfg::ENABLE_ESTOP) {
     capabilities |= CAP_ESTOP;
@@ -367,8 +294,8 @@ void sendTelemetry() {
     return;
   }
   uint8_t payload[proto::TELEMETRY_PAYLOAD_SIZE];
-  proto::writeI32(payload + 0U, g_drive.leftHallPulsePosition());
-  proto::writeI32(payload + 4U, g_drive.rightHallPulsePosition());
+  proto::writeI32(payload + 0U, g_drive.leftPositionMrad());
+  proto::writeI32(payload + 4U, g_drive.rightPositionMrad());
   proto::writeI32(payload + 8U, g_drive.leftVelocityMradS());
   proto::writeI32(payload + 12U, g_drive.rightVelocityMradS());
   proto::writeU16(payload + 16U, readRangeLeftMm());
@@ -504,7 +431,9 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   // An enable command is not accepted while a hardware interlock or a latched
   // stop state is active. Releasing the input alone never restarts motion; the
   // host must first send a disabled command and explicitly arm again.
-  if ((cfg::ENABLE_HALL_FEEDBACK && !cfg::HALL_CALIBRATED) ||
+  if ((!cfg::ENABLE_ENCODER_FEEDBACK && !cfg::ALLOW_OPEN_LOOP_MOTOR) ||
+      (cfg::ENABLE_ENCODER_FEEDBACK &&
+       (!cfg::ENCODER_CALIBRATED || !g_encoder.available())) ||
       estopActive() || !deadmanActive() || g_watchdog_timed_out ||
       g_fault_bits != 0U ||
       g_state == ControllerState::ESTOP ||
@@ -575,11 +504,7 @@ void runControlLoop(uint32_t now_us) {
   }
   g_last_control_us = now_us;
 
-  HallSample left_hall = {0UL, 0UL, 0xFFFFFFFFUL};
-  HallSample right_hall = {0UL, 0UL, 0xFFFFFFFFUL};
-  if (cfg::ENABLE_HALL_FEEDBACK) {
-    readHallSamples(now_us, left_hall, right_hall);
-  }
+  const WheelEncoderSample encoder = g_encoder.sample(now_us);
   const bool output_allowed =
       g_session_active &&
       g_state == ControllerState::ARMED &&
@@ -588,11 +513,10 @@ void runControlLoop(uint32_t now_us) {
       g_fault_bits == 0U;
   g_drive.update(
       elapsed_us,
-      left_hall,
-      right_hall,
+      encoder,
       g_requested_mrad_s,
       output_allowed);
-  if (!cfg::ENABLE_HALL_FEEDBACK) {
+  if (!cfg::ENABLE_ENCODER_FEEDBACK) {
     if (!g_stationary_tracking) {
       g_stationary_tracking = true;
       g_stationary_since_ms = millis();
@@ -600,13 +524,13 @@ void runControlLoop(uint32_t now_us) {
     return;
   }
 
-  const uint8_t hall_faults = g_drive.hallFaultMask();
-  if (hall_faults != 0U) {
-    if ((hall_faults & DriveController::HALL_FAULT_LEFT) != 0U) {
-      g_fault_bits |= FAULT_LEFT_HALL;
+  const uint8_t encoder_faults = g_drive.encoderFaultMask();
+  if (encoder_faults != 0U) {
+    if ((encoder_faults & DriveController::ENCODER_FAULT_LEFT) != 0U) {
+      g_fault_bits |= FAULT_LEFT_ENCODER;
     }
-    if ((hall_faults & DriveController::HALL_FAULT_RIGHT) != 0U) {
-      g_fault_bits |= FAULT_RIGHT_HALL;
+    if ((encoder_faults & DriveController::ENCODER_FAULT_RIGHT) != 0U) {
+      g_fault_bits |= FAULT_RIGHT_ENCODER;
     }
     immediateStop(ControllerState::FAULT, false);
     g_stationary_tracking = false;
@@ -641,42 +565,16 @@ void setup() {
   // The shared motor driver is driven to a zero/LOW state first.
   g_drive.begin();
 
+  if (!g_encoder.begin() && cfg::ENABLE_ENCODER_FEEDBACK) {
+    g_fault_bits |= FAULT_LEFT_ENCODER | FAULT_RIGHT_ENCODER;
+  }
+
   if (cfg::ENABLE_ESTOP) {
     pinMode(cfg::ESTOP_PIN, INPUT_PULLUP);
   }
   if (cfg::USE_DRIVER_FAULT_PIN) {
     pinMode(cfg::DRIVER_FAULT_PIN, INPUT_PULLUP);
   }
-  if (cfg::ENABLE_HALL_FEEDBACK) {
-    pinMode(cfg::LEFT_HALL_PIN, INPUT_PULLUP);
-    if (!cfg::USE_SINGLE_HALL_SENSOR) {
-      pinMode(cfg::RIGHT_HALL_PIN, INPUT_PULLUP);
-    }
-
-    const int left_interrupt =
-        digitalPinToInterrupt(cfg::LEFT_HALL_PIN);
-    if (left_interrupt == NOT_AN_INTERRUPT) {
-      g_fault_bits |= FAULT_LEFT_HALL;
-    } else {
-      attachInterrupt(
-          left_interrupt,
-          leftHallIsr,
-          cfg::HALL_ACTIVE_LEVEL == LOW ? FALLING : RISING);
-    }
-    if (!cfg::USE_SINGLE_HALL_SENSOR) {
-      const int right_interrupt =
-          digitalPinToInterrupt(cfg::RIGHT_HALL_PIN);
-      if (right_interrupt == NOT_AN_INTERRUPT) {
-        g_fault_bits |= FAULT_RIGHT_HALL;
-      } else {
-        attachInterrupt(
-            right_interrupt,
-            rightHallIsr,
-            cfg::HALL_ACTIVE_LEVEL == LOW ? FALLING : RISING);
-      }
-    }
-  }
-
   Serial.begin(cfg::SERIAL_BAUD);
   g_pressure.begin(millis());
   g_boot_id = makeBootId();

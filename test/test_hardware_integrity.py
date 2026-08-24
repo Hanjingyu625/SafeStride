@@ -8,6 +8,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 DRIVE_CONFIG = ROOT / "firmware/safestride_mcu/config.h"
 DRIVE_FIRMWARE = ROOT / "firmware/safestride_mcu/safestride_mcu.ino"
+ENCODER_DRIVER = ROOT / "firmware/safestride_mcu/encoder_feedback.cpp"
 TERRAIN_FIRMWARE = ROOT / "firmware/terrain_mcu/terrain_mcu.ino"
 TERRAIN_CONFIG = ROOT / "firmware/terrain_mcu/config.h"
 DRIVE_SKETCH_DIR = ROOT / "firmware/safestride_mcu"
@@ -38,14 +39,15 @@ class TestHardwareIntegrity(unittest.TestCase):
     def setUpClass(cls):
         cls.config = DRIVE_CONFIG.read_text(encoding="utf-8")
         cls.drive = DRIVE_FIRMWARE.read_text(encoding="utf-8")
+        cls.encoder_driver = ENCODER_DRIVER.read_text(encoding="utf-8")
         cls.terrain = TERRAIN_FIRMWARE.read_text(encoding="utf-8")
         cls.terrain_config = TERRAIN_CONFIG.read_text(encoding="utf-8")
         cls.bridge = BRIDGE.read_text(encoding="utf-8")
 
     def test_drive_active_pins_are_unique(self):
         names = (
-            "LEFT_HALL_PIN",
-            "RIGHT_HALL_PIN",
+            "ENCODER_INPUT_1_PIN",
+            "ENCODER_INPUT_2_PIN",
             "MOTOR_PWM_PIN",
             "MOTOR_IN1_PIN",
             "MOTOR_IN2_PIN",
@@ -108,11 +110,11 @@ class TestHardwareIntegrity(unittest.TestCase):
 
     def test_temporary_open_loop_mode_is_explicit(self):
         self.assertEqual(
-            constant_expression(self.config, "ENABLE_HALL_FEEDBACK"),
+            constant_expression(self.config, "ENABLE_ENCODER_FEEDBACK"),
             "false",
         )
         self.assertEqual(
-            constant_expression(self.config, "HALL_CALIBRATED"),
+            constant_expression(self.config, "ENCODER_CALIBRATED"),
             "false",
         )
         minimum_pwm = int(
@@ -124,30 +126,36 @@ class TestHardwareIntegrity(unittest.TestCase):
         )
         self.assertGreater(minimum_pwm, 0)
         self.assertLessEqual(minimum_pwm, maximum_pwm)
-        self.assertIn("if (cfg::ENABLE_HALL_FEEDBACK)", self.drive)
+        self.assertEqual(
+            constant_expression(self.config, "ALLOW_OPEN_LOOP_MOTOR"),
+            "true",
+        )
+        self.assertIn("if (!cfg::ENABLE_ENCODER_FEEDBACK)", self.drive)
         self.assertIn("openLoopPwm", (
             ROOT / "firmware/safestride_mcu/motor_control.cpp"
         ).read_text(encoding="utf-8"))
         self.assertIn(
-            "('command.require_hall_feedback', False)",
+            "('command.require_encoder_feedback', False)",
             self.bridge,
         )
         for path in ROS_CONFIGS:
             text = path.read_text(encoding="utf-8")
-            self.assertIn("require_hall_feedback: false", text)
-        self.assertNotIn("MAGNET_BENCH_MODE", self.config)
-        self.assertNotIn("updateMagnetBench", self.drive)
+            self.assertIn("require_encoder_feedback: false", text)
         self.assertIn("COMMAND_WATCHDOG_MAX_MS", self.config)
 
-    def test_ros_blocks_legacy_magnet_bench_mode(self):
+    def test_unselected_encoder_is_a_fail_safe_placeholder(self):
+        self.assertNotIn("pinMode(", self.encoder_driver)
+        self.assertNotIn("attachInterrupt(", self.encoder_driver)
+        self.assertIn("available_ = false", self.encoder_driver)
         self.assertIn(
-            "('command.allow_magnet_bench_mode', False)", self.bridge
+            "(!cfg::ENCODER_CALIBRATED || !g_encoder.available())",
+            self.drive,
         )
-        self.assertIn("CAP_MAGNET_BENCH_MODE", self.bridge)
-        self.assertIn("STATUS_MAGNET_BENCH_MODE", self.bridge)
-        for path in ROS_CONFIGS:
-            text = path.read_text(encoding="utf-8")
-            self.assertIn("allow_magnet_bench_mode: false", text)
+        self.assertIn(
+            "(!cfg::ENABLE_ENCODER_FEEDBACK && "
+            "!cfg::ALLOW_OPEN_LOOP_MOTOR)",
+            self.drive,
+        )
 
     def test_terrain_uses_i2c_without_gpio_actuator_outputs(self):
         self.assertIn("Wire.begin()", self.terrain)

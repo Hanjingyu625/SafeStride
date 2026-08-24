@@ -14,10 +14,9 @@ serial_bridge:
       ttl_ms: 200
       arm_max_wheel_speed_rad_s: 0.10
       max_abs_angular_z_rad_s: 0.0
-      # Temporary open-loop drive until wheel encoders are installed.
-      require_hall_feedback: false
-      # Legacy pulse-gated bench firmware must never arm in normal operation.
-      allow_magnet_bench_mode: false
+      # Temporary lifted-wheel open-loop drive until an encoder is selected,
+      # implemented and calibrated. Set true for production operation.
+      require_encoder_feedback: false
       arm_confirmation_timeout_s: 1.0
     telemetry:
       timeout_s: 0.30
@@ -26,7 +25,6 @@ serial_bridge:
     # Wheel radius/separation come from the launch arguments so URDF and
     # bridge kinematics cannot diverge.
     base:
-      hall_pulses_per_revolution: 1
       max_wheel_speed_rad_s: 3.0
     range:
       min_m: 0.02
@@ -51,7 +49,7 @@ serial_bridge:
       range_right: /range/front_right
       battery: /battery_state
       pressure: /handle/pressure
-      hall: /wheel/hall
+      encoder: /wheel/encoder
       status: /walker/status
       diagnostics: /diagnostics
     services:

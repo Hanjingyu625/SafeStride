@@ -14,7 +14,7 @@ import struct
 from typing import ClassVar, Iterable, List
 
 
-PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = 3
 FRAME_DELIMITER = 0x00
 MAX_RAW_FRAME_SIZE = 128
 
@@ -423,8 +423,8 @@ class CommandPayload:
 class TelemetryPayload:
     """TELEMETRY payload returned by the motor controller."""
 
-    hall_left_pulses: int
-    hall_right_pulses: int
+    position_left_mrad: int
+    position_right_mrad: int
     velocity_left_mrad_s: int
     velocity_right_mrad_s: int
     range_left_mm: int
@@ -447,8 +447,8 @@ class TelemetryPayload:
         if self.pressure_alert not in (0, 1, 2):
             raise ValueError('pressure_alert must be 0, 1, or 2')
         return TELEMETRY_STRUCT.pack(
-            int(self.hall_left_pulses),
-            int(self.hall_right_pulses),
+            int(self.position_left_mrad),
+            int(self.position_right_mrad),
             int(self.velocity_left_mrad_s),
             int(self.velocity_right_mrad_s),
             _u16('range_left_mm', self.range_left_mm),

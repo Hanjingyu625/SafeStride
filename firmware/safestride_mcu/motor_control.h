@@ -2,24 +2,18 @@
 
 #include <Arduino.h>
 
-struct HallSample {
-  uint32_t pulse_count;
-  uint32_t period_us;
-  uint32_t age_us;
-};
+#include "encoder_feedback.h"
 
 class DriveController {
  public:
-  static const uint8_t HALL_FAULT_LEFT = 1U << 0U;
-  static const uint8_t HALL_FAULT_RIGHT = 1U << 1U;
+  static const uint8_t ENCODER_FAULT_LEFT = 1U << 0U;
+  static const uint8_t ENCODER_FAULT_RIGHT = 1U << 1U;
 
   DriveController();
-
   void begin();
   void update(
       uint32_t elapsed_us,
-      const HallSample& left_hall,
-      const HallSample& right_hall,
+      const WheelEncoderSample& encoder,
       int32_t requested_mrad_s,
       bool output_allowed);
   void disableImmediately();
@@ -27,43 +21,35 @@ class DriveController {
   int32_t leftVelocityMradS() const;
   int32_t rightVelocityMradS() const;
   int32_t appliedTargetMradS() const;
-  int32_t leftHallPulsePosition() const;
-  int32_t rightHallPulsePosition() const;
+  int32_t leftPositionMrad() const;
+  int32_t rightPositionMrad() const;
   bool feedbackReady() const;
-  uint8_t hallFaultMask() const;
+  uint8_t encoderFaultMask() const;
 
  private:
   struct PidState {
     float integral;
     float previous_error;
   };
-
-  struct HallMonitorState {
+  struct EncoderMonitorState {
     bool initialized;
-    uint32_t previous_count;
-    uint32_t no_pulse_us;
+    int32_t previous_position_mrad;
+    uint32_t no_motion_us;
     uint32_t overspeed_us;
   };
 
-  bool feedback_initialized_;
-  uint8_t feedback_sample_count_;
-  uint32_t previous_left_pulse_count_;
-  uint32_t previous_right_pulse_count_;
-  uint32_t left_position_bits_;
-  uint32_t right_position_bits_;
-  int8_t feedback_direction_;
-  float filtered_left_mrad_s_;
-  float filtered_right_mrad_s_;
+  bool feedback_ready_;
+  int32_t left_position_mrad_;
+  int32_t right_position_mrad_;
+  int32_t left_velocity_mrad_s_;
+  int32_t right_velocity_mrad_s_;
   float applied_target_mrad_s_;
   PidState motor_pid_;
-  HallMonitorState left_hall_monitor_;
-  HallMonitorState right_hall_monitor_;
-  uint8_t hall_fault_mask_;
+  EncoderMonitorState left_encoder_monitor_;
+  EncoderMonitorState right_encoder_monitor_;
+  uint8_t encoder_fault_mask_;
 
-  static float rampTarget(
-      float current,
-      float requested,
-      float dt_seconds);
+  static float rampTarget(float current, float requested, float dt_seconds);
   static float calculatePid(
       float target_mrad_s,
       float measured_mrad_s,
@@ -74,20 +60,16 @@ class DriveController {
       float target_mrad_s);
   static float openLoopPwm(float target_mrad_s);
   static void writeMotor(float pwm);
-  static float hallSpeedMagnitude(const HallSample& sample);
-  static bool updateHallMonitor(
-      HallMonitorState& state,
-      uint32_t pulse_count,
+  static bool updateEncoderMonitor(
+      EncoderMonitorState& state,
+      int32_t position_mrad,
       int32_t target_mrad_s,
       int32_t measured_mrad_s,
       uint32_t elapsed_us,
       bool output_allowed);
-  void updateHallFeedback(
-      const HallSample& left_hall,
-      const HallSample& right_hall);
-  void updateHallPlausibility(
-      const HallSample& left_hall,
-      const HallSample& right_hall,
+  void updateEncoderFeedback(const WheelEncoderSample& encoder);
+  void updateEncoderPlausibility(
+      const WheelEncoderSample& encoder,
       uint32_t elapsed_us,
       bool output_allowed);
 };

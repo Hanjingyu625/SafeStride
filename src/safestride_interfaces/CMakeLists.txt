@@ -10,7 +10,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/SurfaceCondition.msg"
   "msg/TerrainStatus.msg"
   "msg/HandlePressure.msg"
-  "msg/WheelHall.msg"
+  "msg/WheelEncoder.msg"
   "msg/CrosswalkStatus.msg"
   "srv/SetLegState.srv"
   DEPENDENCIES std_msgs

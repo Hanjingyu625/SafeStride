@@ -2,7 +2,7 @@
 
 현재 운영 구성은 다음과 같다.
 
-- Drive Uno: 공통 모터 드라이버, 좌우 홀속도, 좌우 압력센서
+- Drive Uno: 공통 모터 드라이버, 엔코더 입력 예약, 좌우 압력센서
 - Terrain Uno: TOF-10120, BE-220 GPS
 - Raspberry Pi: ROS 2 Jazzy, 카메라 노면 분류, 안전감독기
 - 기본 속도 요청: 0.08 m/s, 시작 시 모터는 항상 disarmed
@@ -20,16 +20,16 @@ E-stop 입력은 미구현이므로 별도의 물리 전원 차단 수단을 손
 
 | Uno | 연결 |
 |---:|---|
-| D2 | 왼쪽 홀센서 출력 |
-| D3 | 오른쪽 홀센서 출력 |
+| D2 | 엔코더 입력 1 예약(현재 미연결) |
+| D3 | 엔코더 입력 2 예약(현재 미연결) |
 | D5 | 모터 드라이버 PWM |
 | D6 | 모터 드라이버 IN1 |
 | D8 | 모터 드라이버 IN2 |
 | A1/A2 | 좌우 압력센서 |
 | GND | 센서와 드라이버 공통 GND |
 
-홀센서는 모터 시작 스위치가 아니다. 회전할 때 발생하는 펄스로 실제 바퀴
-속도를 계산하며, 자석을 통과시키면 `/wheel/hall`의 누적 펄스가 증가해야 한다.
+엔코더 모델과 신호 방식이 정해지기 전까지 D2/D3는 연결하지 않는다. 현재
+firmware는 이 핀을 설정하지 않으며 `/wheel/encoder`는 보정되지 않은 상태다.
 
 ### Terrain Uno와 BE-220
 
@@ -103,7 +103,7 @@ export ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET
 
 ```bash
 ros2 topic echo /walker/status --once
-ros2 topic echo /wheel/hall --once
+ros2 topic echo /wheel/encoder --once
 ros2 topic echo /terrain/tof --once
 ros2 topic echo /gps/fix --once
 ros2 topic echo /gps/speed --once
@@ -113,7 +113,7 @@ ros2 topic echo /cmd_vel_safe --once
 정상 기준은 다음과 같다.
 
 - `/walker/status`: `link_ok: true`, `fault_bits: 0`, telemetry age가 작음
-- `/wheel/hall`: 자석 또는 휠 회전 때 해당 누적 pulse가 증가
+- `/wheel/encoder`: 현재 `valid: false`, `calibrated: false`; adapter 구현 후 휠 회전에 따라 위치·속도 갱신
 - `/terrain/tof`: 물체 거리를 바꾸면 `range`가 변함
 - `/gps/fix`: 실내/미수신은 `status: -1`과 NaN, 야외 fix는 유효 위·경도
 - `/gps/speed`: 미수신은 NaN, fix 후 정지는 약 0, 이동하면 m/s 값 증가
@@ -130,9 +130,10 @@ ros2 topic echo /cmd_vel_safe --once
 ros2 service call /walker/set_enabled std_srvs/srv/SetBool "{data: true}"
 ```
 
-`success=True`면 모터가 기본 0.08 m/s 목표로 계속 돌아야 한다. 홀센서 펄스와
-`velocity_rad_s`가 회전에 따라 갱신되어야 한다. 15초 동안 필요한 홀 피드백이
-없거나 명령·USB 연결이 끊기면 firmware가 출력을 정지한다.
+현재 임시 open-loop 설정에서는 `success=True`면 모터가 기본 0.08 m/s 목표로
+돌아야 한다. 바퀴를 든 시험에만 사용한다. 엔코더 adapter를 구현한 뒤에는
+`require_encoder_feedback=true`로 바꾸고 위치·속도 갱신과 stall/overspeed 정지를
+검증한다. 명령 timeout이나 USB 연결 단절 시에는 어느 모드에서도 정지해야 한다.
 
 시험을 끝낼 때는 먼저 비활성화한 뒤 배터리를 분리한다.
 
@@ -166,7 +167,7 @@ snow/ice, 낮은 신뢰도, 카메라 끊김은 0 m/s다. 실제 출력은 가�
 
 - `/dev/safestride-drive`와 `/dev/safestride-terrain` 역할이 바뀌지 않는다.
 - 두 bridge가 session을 시작하고 CRC/frame error가 계속 증가하지 않는다.
-- 홀센서는 모터 트리거가 아니라 속도 피드백으로 동작한다.
+- 엔코더 adapter 구현 후 실제 방향을 포함한 휠 속도 피드백으로 동작한다.
 - 기본 정속, 노면 배율, GPS 위치·속도가 각 ROS 토픽에 나타난다.
 - enable 전에는 모터가 돌지 않고, disable·명령 timeout·USB 분리 때 정지한다.
 - 실제 보행 시험 전 `REQUIRE_DEADMAN=true`와 압력 보정을 복원한다.

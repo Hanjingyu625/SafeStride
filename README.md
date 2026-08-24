@@ -23,7 +23,7 @@ camera / road model --------> Raspberry Pi 4 <-------- USB serial
                                       |
                                   USB serial
                                   Drive Uno
-                         shared motor + Hall + pressure
+                         shared motor + encoder + pressure
 ```
 
 - Drive Uno가 단일 드라이버에 함께 연결된 두 바퀴 모터의 최종 제어 권한을 가진다.
@@ -96,7 +96,7 @@ bringup 후 센서 링크는 다음처럼 각각 한 메시지를 받아 확인�
 
 ```bash
 ros2 topic echo /handle/pressure --once
-ros2 topic echo /wheel/hall --once
+ros2 topic echo /wheel/encoder --once
 ros2 topic echo /terrain/tof --once
 ros2 topic echo /terrain/status --once
 ros2 topic echo /gps/fix --once
@@ -148,7 +148,7 @@ test/                        PC에서 실행하는 펌웨어 테스트
 | `deploy/udev/` | 두 Arduino의 USB 포트를 `/dev/safestride-drive` 같은 고정 이름으로 지정한다. |
 | `docker/` | ROS 2 Jazzy 개발 환경을 재현하는 Docker 이미지 설정이다. |
 | `docs/` | 전체 구조, 하드웨어, 개발 절차와 향후 작업을 설명한다. |
-| `firmware/safestride_mcu/` | Drive Uno의 단일 모터 드라이버, 좌우 홀센서, deadman, watchdog 및 시리얼 프로토콜을 구현한다. E-stop은 예약 상태다. |
+| `firmware/safestride_mcu/` | Drive Uno의 단일 모터 드라이버, 엔코더 adapter 자리, deadman, watchdog 및 시리얼 프로토콜을 구현한다. E-stop은 예약 상태다. |
 | `firmware/terrain_mcu/` | TOF-10120과 BE-220 GPS를 읽고 CRC serial telemetry로 전송한다. IMU와 step-leg 출력은 아직 비활성이다. |
 | `logs/` | 주행, 센서, fault 및 ROS bag 로그를 저장할 자리다. |
 | `models/` | 향후 배포 모델과 관련 메타데이터를 둘 자리다. 현재 시험용 TorchScript 모델은 `raspberry_pi/road_surface_inference/`에 있다. |
@@ -160,7 +160,7 @@ test/                        PC에서 실행하는 펌웨어 테스트
 
 | ROS 패키지 | 역할과 현재 상태 |
 |---|---|
-| `safestride_interfaces` | `WalkerStatus`, `WheelHall`, `TerrainStatus`, `SurfaceCondition`, `HandlePressure`, `CrosswalkStatus` 메시지와 `SetLegState` 서비스를 정의한다. |
+| `safestride_interfaces` | `WalkerStatus`, `WheelEncoder`, `TerrainStatus`, `SurfaceCondition`, `HandlePressure`, `CrosswalkStatus` 메시지와 `SetLegState` 서비스를 정의한다. |
 | `safestride_bridge` | Drive/Terrain Uno와 각각 USB serial로 통신하고 압력·TOF·GPS·주행 텔레메트리를 표준 ROS 토픽으로 변환한다. |
 | `safestride_control` | 일반 속도 명령에 timeout, 거리, deadman, fault와 가감속 제한을 적용한다. |
 | `safestride_sensors` | BE-220을 Pi에 직접 연결할 때만 쓰는 선택적 NMEA 어댑터다. 기본 구성은 Terrain Uno가 GPS를 읽는다. |
@@ -184,9 +184,9 @@ Python ROS 패키지 내부의 `resource/`는 ROS 패키지 검색 등록용이�
 |---|---|---|---|
 | `/cmd_vel` | `geometry_msgs/msg/TwistStamped` | ROS -> Safety Supervisor | 일반 주행 속도 명령이다. |
 | `/cmd_vel_safe` | `geometry_msgs/msg/TwistStamped` | Safety Supervisor -> Serial Bridge | 안전 검사를 통과해 Drive Uno로 전달되는 속도 명령이다. |
-| `/wheel/hall` | `safestride_interfaces/msg/WheelHall` | Serial Bridge -> ROS | 좌우 홀센서의 누적 펄스, 추정 속도 및 보정 상태다. |
-| `/joint_states` | `sensor_msgs/msg/JointState` | Serial Bridge -> ROS | 좌우 홀센서 펄스로 계산한 바퀴 위치와 속도다. |
-| `/odom` | `nav_msgs/msg/Odometry` | Serial Bridge -> ROS | 홀센서로 계산한 보행기 위치와 속도다. 단일 출력 홀센서의 부호는 공통 모터 명령 방향을 따른다. |
+| `/wheel/encoder` | `safestride_interfaces/msg/WheelEncoder` | Serial Bridge -> ROS | 엔코더 기반 좌우 휠 위치·속도와 valid·보정 상태다. 현재 adapter 미구현으로 `valid=false`다. |
+| `/joint_states` | `sensor_msgs/msg/JointState` | Serial Bridge -> ROS | 엔코더 위치와 속도로 계산한 바퀴 상태다. |
+| `/odom` | `nav_msgs/msg/Odometry` | Serial Bridge -> ROS | 엔코더 위치와 속도로 계산한 보행기 위치와 속도다. |
 | `/range/front_left` | `sensor_msgs/msg/Range` | Serial Bridge -> Safety Supervisor | 왼쪽 전방 거리다. 토픽은 구현됐지만 실제 센서 드라이버는 아직 없다. |
 | `/range/front_right` | `sensor_msgs/msg/Range` | Serial Bridge -> Safety Supervisor | 오른쪽 전방 거리다. 토픽은 구현됐지만 실제 센서 드라이버는 아직 없다. |
 | `/battery_state` | `sensor_msgs/msg/BatteryState` | Serial Bridge -> ROS | Drive Uno가 보고한 배터리 상태다. |
@@ -232,7 +232,7 @@ bringup은 `/dev/safestride-drive`와 `/dev/safestride-terrain`을 열고 두 br
   사용하지 않는다.
 - 횡단보도 v6 로직은 ROS로 이식됐지만 원본이 참조한 `nearest_map.py`가 제공되지
   않아 시험 장소의 `itstId`를 설정하거나 횡단보도 JSON에 매핑해야 한다.
-- 바퀴 치수, 홀센서의 바퀴 1회전당 펄스 수, PID 및 압력 임계값은 예시 값이므로 실제 장비에서
+- 바퀴 치수, 엔코더 카운트/회전·감속비·방향, PID 및 압력 임계값은 예시 또는 미정 값이므로 실제 장비에서
   측정하고 조정해야 한다.
 
 ## 팀 작업 방법

@@ -15,8 +15,11 @@ drive:
   requires_explicit_ros_enable: true
   wheel_radius_m: 0.15
   wheel_separation_m: 0.55
-  hall_pulses_per_revolution: null
-  hall_calibrated: false
+  encoder_model: null
+  encoder_interface: null
+  encoder_counts_per_wheel_revolution: null
+  encoder_gear_ratio: null
+  encoder_direction_calibrated: false
   pressure:
     left_pressed_threshold: null
     right_pressed_threshold: null

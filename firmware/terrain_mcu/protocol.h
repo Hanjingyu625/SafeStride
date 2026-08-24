@@ -4,7 +4,7 @@
 
 namespace safestride_protocol {
 
-constexpr uint8_t VERSION = 2U;
+constexpr uint8_t VERSION = 3U;
 constexpr uint8_t TYPE_HELLO = 0x01U;
 constexpr uint8_t TYPE_SESSION_START = 0x02U;
 constexpr uint8_t TYPE_TERRAIN_TELEMETRY = 0x21U;

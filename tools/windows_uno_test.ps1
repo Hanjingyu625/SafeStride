@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('status', 'hall', 'motor')]
+    [ValidateSet('status', 'encoder', 'motor')]
     [string]$Mode = 'status',
     [string]$DrivePort = 'COM4',
     [string]$TerrainPort = 'COM3',
@@ -14,16 +14,16 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$ProtocolVersion = 2
+$ProtocolVersion = 3
 $TypeHello = 0x01
 $TypeSessionStart = 0x02
 $TypeCommand = 0x10
 $TypeTelemetry = 0x20
 $TypeTerrainTelemetry = 0x21
-$CapTwoHallSensors = 1
+$CapWheelEncoder = 1
+$CapPressureTelemetry = 0x40
 $CapTof10120 = 0x100
-$StatusLeftHallActive = 1 -shl 11
-$StatusRightHallActive = 1 -shl 12
+$StatusEncoderSampleValid = 1 -shl 11
 
 function Add-U16 {
     param([System.Collections.Generic.List[byte]]$List, [uint16]$Value)
@@ -337,7 +337,7 @@ function Test-DriveStatus {
     $port = Open-UnoPort $PortName
     try {
         $hello = Wait-Hello $port
-        if (($hello.Capabilities -band $CapTwoHallSensors) -eq 0) {
+        if (($hello.Capabilities -band $CapPressureTelemetry) -eq 0) {
             throw "$PortName is not Drive firmware"
         }
         $sessionId = New-SessionId
@@ -354,7 +354,8 @@ function Test-DriveStatus {
             Link = (($status -band 1) -ne 0)
             Armed = (($status -band 2) -ne 0)
             Deadman = (($status -band 4) -ne 0)
-            MagnetBench = (($status -band 0x80) -ne 0)
+            EncoderAvailable = (($hello.Capabilities -band $CapWheelEncoder) -ne 0)
+            EncoderSampleValid = (($status -band $StatusEncoderSampleValid) -ne 0)
             FaultBits = ('0x{0:x4}' -f $fault)
             PressureLeft = [BitConverter]::ToUInt16($frame.Payload, 32)
             PressureRight = [BitConverter]::ToUInt16($frame.Payload, 34)
@@ -394,15 +395,15 @@ function Test-TerrainStatus {
     }
 }
 
-function Watch-HallSensors {
+function Watch-WheelEncoder {
     param([string]$PortName, [int]$Seconds)
     $port = Open-UnoPort $PortName
     $sessionId = [uint32]0
     [uint16]$sequence = 0
     try {
         $hello = Wait-Hello $port
-        if (($hello.Capabilities -band $CapTwoHallSensors) -eq 0) {
-            throw "$PortName is not Drive firmware"
+        if (($hello.Capabilities -band $CapWheelEncoder) -eq 0) {
+            throw 'wheel encoder adapter is not enabled in Drive firmware'
         }
         $sessionId = New-SessionId
         Start-UnoSession $port $hello.BootId $sessionId $sequence
@@ -413,9 +414,9 @@ function Watch-HallSensors {
         $sequence++
         [void](Wait-Telemetry $port $TypeTelemetry $sessionId)
 
-        Write-Host 'Motor disabled. Pass a magnet over D2 or D3.'
+        Write-Host 'Motor disabled. Rotate the encoder-equipped wheels by hand.'
         Write-Host (
-            ' time  left_active right_active left_pulses right_pulses ' +
+            ' time sample_valid left_position right_position ' +
             'left_mrad_s right_mrad_s'
         )
         $timer = [Diagnostics.Stopwatch]::StartNew()
@@ -437,10 +438,9 @@ function Watch-HallSensors {
                 continue
             }
             $status = [BitConverter]::ToUInt16($frame.Payload, 26)
-            Write-Host ('{0,5:N1}s {1,11} {2,12} {3,11} {4,12} {5,11} {6,12}' -f
+            Write-Host ('{0,5:N1}s {1,12} {2,13} {3,14} {4,11} {5,12}' -f
                 $timer.Elapsed.TotalSeconds,
-                (($status -band $StatusLeftHallActive) -ne 0),
-                (($status -band $StatusRightHallActive) -ne 0),
+                (($status -band $StatusEncoderSampleValid) -ne 0),
                 [BitConverter]::ToInt32($frame.Payload, 0),
                 [BitConverter]::ToInt32($frame.Payload, 4),
                 [BitConverter]::ToInt32($frame.Payload, 8),
@@ -475,9 +475,6 @@ function Start-DriveMotorTest {
     [uint16]$sequence = 0
     try {
         $hello = Wait-Hello $port
-        if (($hello.Capabilities -band $CapTwoHallSensors) -eq 0) {
-            throw "$PortName is not Drive firmware"
-        }
         $sessionId = New-SessionId
         Start-UnoSession $port $hello.BootId $sessionId $sequence
         $sequence++
@@ -488,8 +485,7 @@ function Start-DriveMotorTest {
         [void](Wait-Telemetry $port $TypeTelemetry $sessionId)
         Write-Host ((
                 "Drive enabled for {0}s at target {1} mrad/s. " +
-                'Both wheels must rotate and keep producing Hall pulses. ' +
-                'A missing Hall channel causes a latched fault-stop.'
+                'Keep both wheels lifted and the physical power cutoff ready.'
             ) -f $Seconds, $Target)
         $timer = [Diagnostics.Stopwatch]::StartNew()
         while ($timer.Elapsed.TotalSeconds -lt $Seconds) {
@@ -522,8 +518,8 @@ switch ($Mode) {
         Test-DriveStatus $DrivePort | Format-List
         Test-TerrainStatus $TerrainPort | Format-List
     }
-    'hall' {
-        Watch-HallSensors $DrivePort $DurationSeconds
+    'encoder' {
+        Watch-WheelEncoder $DrivePort $DurationSeconds
     }
     'motor' {
         Start-DriveMotorTest $DrivePort $TargetMradS $DurationSeconds

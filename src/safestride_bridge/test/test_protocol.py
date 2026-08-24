@@ -210,8 +210,8 @@ class TestPayloads(unittest.TestCase):
 
     def test_telemetry_exact_layout(self):
         payload = TelemetryPayload(
-            hall_left_pulses=-123456,
-            hall_right_pulses=789012,
+            position_left_mrad=-123456,
+            position_right_mrad=789012,
             velocity_left_mrad_s=-2000,
             velocity_right_mrad_s=3000,
             range_left_mm=450,

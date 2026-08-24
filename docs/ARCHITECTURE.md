@@ -8,7 +8,7 @@ motion, but it must never be the only layer capable of stopping an actuator.
 | Controller | Connected hardware | Responsibility |
 |---|---|---|
 | Raspberry Pi | Camera, two USB serial links | ROS 2, road-surface classification, crosswalk logic, logging and high-level requests |
-| Drive Uno | Two Hall speed sensors, two handle pressure sensors, one shared motor driver | Final common wheel enable, velocity control and Hall watchdog; E-stop input is reserved but not implemented |
+| Drive Uno | Reserved wheel-encoder inputs, two handle pressure sensors, one shared motor driver | Final common wheel enable, velocity control and encoder-feedback gate; E-stop input is reserved but not implemented |
 | Terrain Uno | TOF-10120, BE-220 GPS, future IMUs/leg hardware | TOF/GPS acquisition; future step and leg state machine |
 
 The pressure sensors form a two-channel handle-presence/dead-man input, not a
