@@ -106,14 +106,22 @@ class TestHardwareIntegrity(unittest.TestCase):
             r"capabilities\s*\|=\s*CAP_ESTOP;",
         )
 
-    def test_temporary_open_loop_mode_is_explicit(self):
+    def test_single_hall_feedback_configuration_is_consistent(self):
         self.assertEqual(
             constant_expression(self.config, "ENABLE_HALL_FEEDBACK"),
-            "false",
+            "true",
         )
         self.assertEqual(
             constant_expression(self.config, "HALL_CALIBRATED"),
-            "false",
+            "true",
+        )
+        self.assertEqual(
+            constant_expression(self.config, "USE_SINGLE_HALL_SENSOR"),
+            "true",
+        )
+        self.assertEqual(
+            constant_expression(self.config, "HALL_PULSES_PER_WHEEL_REV"),
+            "6UL",
         )
         minimum_pwm = int(
             constant_expression(self.config, "MOTOR_MIN_ACTIVE_PWM")
@@ -129,15 +137,18 @@ class TestHardwareIntegrity(unittest.TestCase):
             ROOT / "firmware/safestride_mcu/motor_control.cpp"
         ).read_text(encoding="utf-8"))
         self.assertIn(
-            "('command.require_hall_feedback', False)",
+            "('command.require_hall_feedback', True)",
             self.bridge,
         )
         for path in ROS_CONFIGS:
             text = path.read_text(encoding="utf-8")
-            self.assertIn("require_hall_feedback: false", text)
+            self.assertIn("require_hall_feedback: true", text)
+            self.assertIn("hall_pulses_per_revolution: 6", text)
         self.assertNotIn("MAGNET_BENCH_MODE", self.config)
         self.assertNotIn("updateMagnetBench", self.drive)
         self.assertIn("COMMAND_WATCHDOG_MAX_MS", self.config)
+        self.assertIn("CAP_SINGLE_HALL_SENSOR", self.drive)
+        self.assertIn("CAP_SINGLE_HALL_SENSOR", self.bridge)
 
     def test_ros_blocks_legacy_magnet_bench_mode(self):
         self.assertIn(
@@ -148,6 +159,29 @@ class TestHardwareIntegrity(unittest.TestCase):
         for path in ROS_CONFIGS:
             text = path.read_text(encoding="utf-8")
             self.assertIn("allow_magnet_bench_mode: false", text)
+
+    def test_pressure_bench_interlock_is_explicit(self):
+        self.assertEqual(
+            constant_expression(self.config, "REQUIRE_DEADMAN"),
+            "true",
+        )
+        self.assertEqual(
+            constant_expression(
+                self.config, "PRESSURE_LEFT_PRESENT_THRESHOLD"
+            ),
+            "40.0F",
+        )
+        self.assertEqual(
+            constant_expression(
+                self.config, "PRESSURE_RIGHT_PRESENT_THRESHOLD"
+            ),
+            "40.0F",
+        )
+        for path in ROS_CONFIGS:
+            self.assertIn(
+                "require_deadman: true",
+                path.read_text(encoding="utf-8"),
+            )
 
     def test_terrain_uses_i2c_without_gpio_actuator_outputs(self):
         self.assertIn("Wire.begin()", self.terrain)

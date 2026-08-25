@@ -15,13 +15,17 @@ drive:
   requires_explicit_ros_enable: true
   wheel_radius_m: 0.15
   wheel_separation_m: 0.55
-  hall_pulses_per_revolution: null
-  hall_calibrated: false
+  # Current six-magnet left-wheel preset. Use 5 here and in both runtime
+  # configs if five magnets are installed on the sensed wheel.
+  hall_pulses_per_revolution: 6
+  hall_calibrated: true
+  hall_sensor_layout: single_left
   pressure:
-    left_pressed_threshold: null
-    right_pressed_threshold: null
-    left_active_high: null
-    right_active_high: null
+    # Light-touch bench values only; replace after handle calibration.
+    left_pressed_threshold: 40
+    right_pressed_threshold: 40
+    left_active_high: true
+    right_active_high: true
 terrain:
   leg_output_enabled: false
   gps:

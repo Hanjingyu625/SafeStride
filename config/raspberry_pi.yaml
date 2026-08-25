@@ -13,15 +13,15 @@ serial_bridge:
       ttl_ms: 200
       arm_max_wheel_speed_rad_s: 0.10
       max_abs_angular_z_rad_s: 0.0
-      # Temporary open-loop drive until wheel encoders are installed.
-      require_hall_feedback: false
+      # Require the installed left-wheel Hall channel before motor enable.
+      require_hall_feedback: true
       # Legacy pulse-gated bench firmware must never arm in normal operation.
       allow_magnet_bench_mode: false
       arm_confirmation_timeout_s: 1.0
     telemetry: {timeout_s: 0.30}
     diagnostics: {publish_rate_hz: 1.0}
     base:
-      hall_pulses_per_revolution: 1
+      hall_pulses_per_revolution: 6
       max_wheel_speed_rad_s: 3.0
     range: {min_m: 0.02, max_m: 4.0, field_of_view_rad: 0.35}
     battery: {empty_voltage: 0.0, full_voltage: 0.0}

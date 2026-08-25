@@ -224,6 +224,8 @@ class TestPayloads(unittest.TestCase):
             last_command_sequence=65535,
             pressure_left_raw=321,
             pressure_right_raw=654,
+            pressure_left_filtered=300,
+            pressure_right_filtered=600,
             pressure_flags=0x07,
             pressure_alert=1,
         )
@@ -232,7 +234,7 @@ class TestPayloads(unittest.TestCase):
         self.assertEqual(
             packed,
             struct.pack(
-                '<iiiiHHHhhHHHHHBB',
+                '<iiiiHHHhhHHHHHHHBB',
                 -123456,
                 789012,
                 -2000,
@@ -247,6 +249,8 @@ class TestPayloads(unittest.TestCase):
                 65535,
                 321,
                 654,
+                300,
+                600,
                 0x07,
                 1,
             ),
@@ -313,13 +317,13 @@ class TestPayloads(unittest.TestCase):
             )
 
     def test_telemetry_rejects_invalid_pressure_fields(self):
-        values = [0] * 16
-        values[14] = 0x08
+        values = [0] * 18
+        values[16] = 0x08
         with self.assertRaises(PayloadDecodeError):
             TelemetryPayload.unpack(TELEMETRY_STRUCT.pack(*values))
 
-        values[14] = 0
-        values[15] = 3
+        values[16] = 0
+        values[17] = 3
         with self.assertRaises(PayloadDecodeError):
             TelemetryPayload.unpack(TELEMETRY_STRUCT.pack(*values))
 

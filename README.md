@@ -105,9 +105,12 @@ ros2 topic echo /perception/surface_condition --once
 ros2 topic echo /walker/status --once
 ```
 
-압력 원시값을 손을 뗀 상태와 잡은 상태에서 기록한 뒤
+압력 raw/filtered 값을 손을 뗀 상태와 잡은 상태에서 기록한 뒤
 `firmware/safestride_mcu/config.h`의 좌우 polarity/threshold를 조정하고, 검증을
 마친 경우에만 `PRESSURE_THRESHOLDS_CALIBRATED`를 `true`로 바꿔 다시 flash한다.
+현재 벤치값은 40 ADC이며 양쪽 센서를 가볍게 눌러야 모터 enable이 허용된다.
+홀 자석은 센서가 달린 왼쪽 휠에 6개가 기본이며 5개를 붙이는 경우 펌웨어와 두 ROS YAML의
+`hall_pulses_per_revolution`을 모두 5로 맞춰야 한다.
 
 모터는 시작 시 항상 disarmed다. 현재 E-stop은 미구현이므로 별도의 물리 전원
 차단 수단을 즉시 사용할 수 있고 바퀴를 지면에서 든 상태에서만 한 터미널로
@@ -148,7 +151,7 @@ test/                        PC에서 실행하는 펌웨어 테스트
 | `deploy/udev/` | 두 Arduino의 USB 포트를 `/dev/safestride-drive` 같은 고정 이름으로 지정한다. |
 | `docker/` | ROS 2 Jazzy 개발 환경을 재현하는 Docker 이미지 설정이다. |
 | `docs/` | 전체 구조, 하드웨어, 개발 절차와 향후 작업을 설명한다. |
-| `firmware/safestride_mcu/` | Drive Uno의 단일 모터 드라이버, 좌우 홀센서, deadman, watchdog 및 시리얼 프로토콜을 구현한다. E-stop은 예약 상태다. |
+| `firmware/safestride_mcu/` | Drive Uno의 단일 모터 드라이버, 왼쪽 바퀴 홀센서 1개, deadman, watchdog 및 시리얼 프로토콜을 구현한다. E-stop은 예약 상태다. |
 | `firmware/terrain_mcu/` | TOF-10120과 BE-220 GPS를 읽고 CRC serial telemetry로 전송한다. IMU와 step-leg 출력은 아직 비활성이다. |
 | `logs/` | 주행, 센서, fault 및 ROS bag 로그를 저장할 자리다. |
 | `models/` | 향후 배포 모델과 관련 메타데이터를 둘 자리다. 현재 시험용 TorchScript 모델은 `raspberry_pi/road_surface_inference/`에 있다. |
@@ -184,13 +187,13 @@ Python ROS 패키지 내부의 `resource/`는 ROS 패키지 검색 등록용이�
 |---|---|---|---|
 | `/cmd_vel` | `geometry_msgs/msg/TwistStamped` | ROS -> Safety Supervisor | 일반 주행 속도 명령이다. |
 | `/cmd_vel_safe` | `geometry_msgs/msg/TwistStamped` | Safety Supervisor -> Serial Bridge | 안전 검사를 통과해 Drive Uno로 전달되는 속도 명령이다. |
-| `/wheel/hall` | `safestride_interfaces/msg/WheelHall` | Serial Bridge -> ROS | 좌우 홀센서의 누적 펄스, 추정 속도 및 보정 상태다. |
-| `/joint_states` | `sensor_msgs/msg/JointState` | Serial Bridge -> ROS | 좌우 홀센서 펄스로 계산한 바퀴 위치와 속도다. |
+| `/wheel/hall` | `safestride_interfaces/msg/WheelHall` | Serial Bridge -> ROS | 왼쪽 홀센서의 누적 펄스와 공통 구동계 추정 속도다. 오른쪽 필드는 복제 추정치이며 sensor-present 필드로 구분한다. |
+| `/joint_states` | `sensor_msgs/msg/JointState` | Serial Bridge -> ROS | 왼쪽 홀센서에서 얻은 공통 추정치를 양쪽 바퀴에 적용한 위치와 속도다. |
 | `/odom` | `nav_msgs/msg/Odometry` | Serial Bridge -> ROS | 홀센서로 계산한 보행기 위치와 속도다. 단일 출력 홀센서의 부호는 공통 모터 명령 방향을 따른다. |
 | `/range/front_left` | `sensor_msgs/msg/Range` | Serial Bridge -> Safety Supervisor | 왼쪽 전방 거리다. 토픽은 구현됐지만 실제 센서 드라이버는 아직 없다. |
 | `/range/front_right` | `sensor_msgs/msg/Range` | Serial Bridge -> Safety Supervisor | 오른쪽 전방 거리다. 토픽은 구현됐지만 실제 센서 드라이버는 아직 없다. |
 | `/battery_state` | `sensor_msgs/msg/BatteryState` | Serial Bridge -> ROS | Drive Uno가 보고한 배터리 상태다. |
-| `/handle/pressure` | `safestride_interfaces/msg/HandlePressure` | Drive Serial Bridge -> ROS | 좌우 FSR 원시값, 손 감지와 임계값 검증 상태다. |
+| `/handle/pressure` | `safestride_interfaces/msg/HandlePressure` | Drive Serial Bridge -> ROS | 좌우 FSR 원시/필터값, 손 감지, alert와 임계값 검증 상태다. |
 | `/walker/status` | `safestride_interfaces/msg/WalkerStatus` | Serial Bridge -> Safety Supervisor | MCU 상태, deadman, watchdog과 fault를 종합한다. E-stop 필드는 현재 항상 false다. |
 | `/terrain/tof` | `sensor_msgs/msg/Range` | Terrain Serial Bridge -> ROS | TOF-10120의 거리다. 무효 측정은 NaN이다. |
 | `/terrain/status` | `safestride_interfaces/msg/TerrainStatus` | Terrain Serial Bridge -> ROS | TOF 유효성, 링크 age와 terrain fault다. |
@@ -217,7 +220,7 @@ bringup은 `/dev/safestride-drive`와 `/dev/safestride-terrain`을 열고 두 br
 | `/terrain/status` | `safestride_interfaces/msg/TerrainStatus` | 구현됨: TOF 유효성, telemetry age와 fault |
 | `/gps/fix` | `sensor_msgs/msg/NavSatFix` | 구현됨: Terrain Uno가 읽은 BE-220 위치 |
 | `/gps/speed` | `std_msgs/msg/Float32` | 구현됨: Terrain Uno가 읽은 GPS 지면속도 |
-| `/handle/pressure` | `safestride_interfaces/msg/HandlePressure` | 구현됨: 좌우 손잡이 ADC 값 및 손 감지 |
+| `/handle/pressure` | `safestride_interfaces/msg/HandlePressure` | 구현됨: 좌우 손잡이 raw/filtered ADC 값 및 손 감지 |
 | `/terrain/imu/mpu9250` | `sensor_msgs/msg/Imu` | 미구현: MPU-9250 자세·관성 데이터 |
 | `/terrain/imu/bno055` | `sensor_msgs/msg/Imu` | 미구현: BNO055 자세·관성 데이터 |
 | `/perception/surface_condition` | `safestride_interfaces/msg/SurfaceCondition` | 카메라가 판단한 노면과 권장 속도 배율. 활성화 시 safety supervisor가 최신 유효값을 필수로 요구한다. |

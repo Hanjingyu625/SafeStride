@@ -56,6 +56,7 @@ PRESSURE_CALIBRATED = 1 << 2
 CAP_PRESSURE_TELEMETRY = 1 << 6
 CAP_TWO_HALL_SENSORS = 1 << 0
 CAP_MAGNET_BENCH_MODE = 1 << 7
+CAP_SINGLE_HALL_SENSOR = 1 << 10
 
 # Firmware state values encoded in status_bits[10:8].
 FW_BOOT = 0
@@ -193,14 +194,14 @@ class SerialBridgeNode(Node):
             ('command.ttl_ms', 200),
             ('command.arm_max_wheel_speed_rad_s', 0.10),
             ('command.max_abs_angular_z_rad_s', 0.0),
-            ('command.require_hall_feedback', False),
+            ('command.require_hall_feedback', True),
             ('command.allow_magnet_bench_mode', False),
             ('command.arm_confirmation_timeout_s', 1.0),
             ('telemetry.timeout_s', 0.30),
             ('diagnostics.publish_rate_hz', 1.0),
             ('base.wheel_radius_m', 0.15),
             ('base.wheel_separation_m', 0.55),
-            ('base.hall_pulses_per_revolution', 1),
+            ('base.hall_pulses_per_revolution', 6),
             ('base.max_wheel_speed_rad_s', 3.0),
             ('range.min_m', 0.02),
             ('range.max_m', 4.0),
@@ -478,6 +479,19 @@ class SerialBridgeNode(Node):
             telemetry.status_bits >> STATUS_STATE_SHIFT
         ) & STATUS_STATE_MASK
 
+    @staticmethod
+    def _hall_feedback_available(capabilities: int) -> bool:
+        return bool(
+            capabilities
+            & (CAP_TWO_HALL_SENSORS | CAP_SINGLE_HALL_SENSOR)
+        )
+
+    @staticmethod
+    def _single_hall_active(capabilities: int) -> bool:
+        return bool(capabilities & CAP_SINGLE_HALL_SENSOR) and not bool(
+            capabilities & CAP_TWO_HALL_SENSORS
+        )
+
     def _firmware_status_consistent(
         self, telemetry: TelemetryPayload
     ) -> bool:
@@ -524,7 +538,7 @@ class SerialBridgeNode(Node):
                 bool(
                     telemetry.status_bits & STATUS_HALL_CALIBRATED
                 )
-                and bool(self._capabilities & CAP_TWO_HALL_SENSORS)
+                and self._hall_feedback_available(self._capabilities)
             )
         )
         return (
@@ -691,13 +705,16 @@ class SerialBridgeNode(Node):
     def _handle_hello(
         self, hello: HelloPayload, hello_sequence: int
     ) -> None:
-        if (
+        conflicting_hall_capabilities = bool(
+            hello.capabilities & CAP_TWO_HALL_SENSORS
+        ) and bool(hello.capabilities & CAP_SINGLE_HALL_SENSOR)
+        if conflicting_hall_capabilities or (
             self._require_hall_feedback
-            and not (hello.capabilities & CAP_TWO_HALL_SENSORS)
+            and not self._hall_feedback_available(hello.capabilities)
         ):
             error = (
                 'device on the drive port is not Drive firmware '
-                '(two-Hall capability missing)'
+                '(valid Hall capability missing or conflicting)'
             )
             self._session_id = 0
             self._boot_id = hello.boot_id
@@ -901,7 +918,7 @@ class SerialBridgeNode(Node):
             return response
         if (
             self._require_hall_feedback
-            and not (self._capabilities & CAP_TWO_HALL_SENSORS)
+            and not self._hall_feedback_available(self._capabilities)
         ):
             response.success = False
             response.message = 'cannot enable: Hall feedback is unavailable'
@@ -1093,6 +1110,12 @@ class SerialBridgeNode(Node):
         hall.calibrated = bool(
             telemetry.status_bits & STATUS_HALL_CALIBRATED
         )
+        hall.left_sensor_present = self._hall_feedback_available(
+            self._capabilities
+        )
+        hall.right_sensor_present = bool(
+            self._capabilities & CAP_TWO_HALL_SENSORS
+        )
         self._hall_pub.publish(hall)
 
         joints = JointState()
@@ -1229,6 +1252,16 @@ class SerialBridgeNode(Node):
             if telemetry.pressure_right_raw == 0xFFFF
             else float(telemetry.pressure_right_raw)
         )
+        message.left_filtered = (
+            float('nan')
+            if telemetry.pressure_left_filtered == 0xFFFF
+            else float(telemetry.pressure_left_filtered)
+        )
+        message.right_filtered = (
+            float('nan')
+            if telemetry.pressure_right_filtered == 0xFFFF
+            else float(telemetry.pressure_right_filtered)
+        )
         message.left_present = bool(
             telemetry.pressure_flags & PRESSURE_LEFT_PRESENT
         )
@@ -1238,6 +1271,7 @@ class SerialBridgeNode(Node):
         message.calibrated = bool(
             telemetry.pressure_flags & PRESSURE_CALIBRATED
         )
+        message.alert = telemetry.pressure_alert
         self._pressure_pub.publish(message)
 
     @staticmethod
@@ -1389,7 +1423,7 @@ class SerialBridgeNode(Node):
             status.message = 'emergency stop is active'
         elif (
             self._require_hall_feedback
-            and not (self._capabilities & CAP_TWO_HALL_SENSORS)
+            and not self._hall_feedback_available(self._capabilities)
         ):
             status.level = DiagnosticStatus.ERROR
             status.message = 'drive firmware lacks Hall feedback'
@@ -1420,9 +1454,14 @@ class SerialBridgeNode(Node):
         ):
             status.level = DiagnosticStatus.WARN
             status.message = 'Hall pulses per revolution are not calibrated'
-        elif not self._require_hall_feedback:
+        elif not self._hall_feedback_available(self._capabilities):
             status.level = DiagnosticStatus.WARN
             status.message = 'open-loop drive active; speed feedback disabled'
+        elif self._single_hall_active(self._capabilities):
+            status.level = DiagnosticStatus.WARN
+            status.message = (
+                'single left Hall feedback active; right wheel is unmonitored'
+            )
         elif not (self._capabilities & CAP_PRESSURE_TELEMETRY):
             status.level = DiagnosticStatus.WARN
             status.message = 'drive firmware lacks pressure telemetry'
@@ -1486,6 +1525,16 @@ class SerialBridgeNode(Node):
                 value=str(self._require_hall_feedback).lower(),
             ),
             KeyValue(
+                key='hall_sensor_layout',
+                value=(
+                    'single_left'
+                    if self._single_hall_active(self._capabilities)
+                    else 'dual'
+                    if self._capabilities & CAP_TWO_HALL_SENSORS
+                    else 'none'
+                ),
+            ),
+            KeyValue(
                 key='hall_left_pulses',
                 value=(
                     str(telemetry.hall_left_pulses)
@@ -1535,6 +1584,30 @@ class SerialBridgeNode(Node):
                 key='pressure_right_raw',
                 value=(
                     str(telemetry.pressure_right_raw)
+                    if telemetry is not None
+                    else 'unknown'
+                ),
+            ),
+            KeyValue(
+                key='pressure_left_filtered',
+                value=(
+                    str(telemetry.pressure_left_filtered)
+                    if telemetry is not None
+                    else 'unknown'
+                ),
+            ),
+            KeyValue(
+                key='pressure_right_filtered',
+                value=(
+                    str(telemetry.pressure_right_filtered)
+                    if telemetry is not None
+                    else 'unknown'
+                ),
+            ),
+            KeyValue(
+                key='pressure_alert',
+                value=(
+                    str(telemetry.pressure_alert)
                     if telemetry is not None
                     else 'unknown'
                 ),

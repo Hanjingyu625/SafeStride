@@ -19,7 +19,7 @@ constexpr size_t MAX_ENCODED_FRAME_SIZE = 160U;
 constexpr size_t HELLO_PAYLOAD_SIZE = 8U;
 constexpr size_t SESSION_START_PAYLOAD_SIZE = 4U;
 constexpr size_t COMMAND_PAYLOAD_SIZE = 8U;
-constexpr size_t TELEMETRY_PAYLOAD_SIZE = 38U;
+constexpr size_t TELEMETRY_PAYLOAD_SIZE = 42U;
 constexpr size_t TERRAIN_TELEMETRY_PAYLOAD_SIZE = 14U;
 
 enum class ReceiveResult : uint8_t {
@@ -78,4 +78,3 @@ bool sendFrame(
     uint16_t payload_length);
 
 }  // namespace safestride_protocol
-
