@@ -24,7 +24,7 @@ CRC_STRUCT = struct.Struct('<H')
 HELLO_STRUCT = struct.Struct('<II')
 SESSION_START_STRUCT = struct.Struct('<I')
 COMMAND_STRUCT = struct.Struct('<iHBB')
-TELEMETRY_STRUCT = struct.Struct('<iiiiHHHhhHHHHHBB')
+TELEMETRY_STRUCT = struct.Struct('<iiiiHHHhhHHHHHHHBB')
 TERRAIN_TELEMETRY_STRUCT = struct.Struct('<HBBHHhhH')
 GPS_TELEMETRY_STRUCT = struct.Struct('<iiIBB')
 
@@ -437,6 +437,8 @@ class TelemetryPayload:
     last_command_sequence: int
     pressure_left_raw: int = 0xFFFF
     pressure_right_raw: int = 0xFFFF
+    pressure_left_filtered: int = 0xFFFF
+    pressure_right_filtered: int = 0xFFFF
     pressure_flags: int = 0
     pressure_alert: int = 0
     TYPE: ClassVar[PacketType] = PacketType.TELEMETRY
@@ -461,6 +463,14 @@ class TelemetryPayload:
             _u16('last_command_sequence', self.last_command_sequence),
             _u16('pressure_left_raw', self.pressure_left_raw),
             _u16('pressure_right_raw', self.pressure_right_raw),
+            _u16(
+                'pressure_left_filtered',
+                self.pressure_left_filtered,
+            ),
+            _u16(
+                'pressure_right_filtered',
+                self.pressure_right_filtered,
+            ),
             _u8('pressure_flags', self.pressure_flags),
             _u8('pressure_alert', self.pressure_alert),
         )

@@ -31,31 +31,29 @@ constexpr int32_t MAX_DECEL_MRAD_S2 = 2500L;
 constexpr int32_t ARM_MAX_MEASURED_SPEED_MRAD_S = 100L;
 constexpr uint16_t ARM_STATIONARY_DWELL_MS = 250U;
 
-// Hall feedback is temporarily disabled. The current motor is driven open-loop
-// from ROS velocity commands until the Hall hardware is replaced by an encoder.
-// Keep the pin definitions for the future encoder integration, but do not
-// configure or sample them while this flag is false.
-constexpr bool ENABLE_HALL_FEEDBACK = false;
+// One single-output Hall sensor is installed on the left wheel only. Its speed
+// is used as the common feedback estimate because both motors share one driver.
+// Six evenly spaced magnets are the bench default. If five magnets are fitted,
+// change HALL_PULSES_PER_WHEEL_REV and both ROS YAML files before flashing.
+constexpr bool ENABLE_HALL_FEEDBACK = true;
 constexpr bool USE_SINGLE_HALL_SENSOR = true;
 constexpr uint8_t LEFT_HALL_PIN = 2U;
-constexpr uint8_t RIGHT_HALL_PIN = 3U;
+constexpr uint8_t RIGHT_HALL_PIN = 3U;  // unused in single-Hall configuration
 constexpr uint8_t HALL_ACTIVE_LEVEL = LOW;
 // Reject sub-millisecond electrical chatter without discarding valid pulses
 // if the measured pulse-per-revolution value is increased later.
 constexpr uint32_t HALL_MIN_PULSE_INTERVAL_US = 500UL;
-// With one magnet per revolution the interval can be several seconds. Keep the
-// last period estimate long enough for a 0.5 rad/s wheel to produce a new pulse.
-constexpr uint32_t HALL_ZERO_TIMEOUT_US = 15000000UL;
-// The current wheel setup has one magnet and therefore one pulse per complete
-// wheel revolution. Change this value in both MCU and ROS configuration if the
-// number of magnets or the sensing geometry changes.
-constexpr uint32_t HALL_PULSES_PER_WHEEL_REV = 1UL;
-constexpr bool HALL_CALIBRATED = false;
+// At the minimum monitored speed (0.5 rad/s), six magnets produce an edge about
+// every 2.1 seconds. Force the estimate to zero after 3 seconds so a stopped
+// wheel does not retain a stale velocity for the former 15-second interval.
+constexpr uint32_t HALL_ZERO_TIMEOUT_US = 3000000UL;
+constexpr uint32_t HALL_PULSES_PER_WHEEL_REV = 6UL;
+constexpr bool HALL_CALIBRATED = true;
 
 // Runtime Hall plausibility monitor. Tune from lifted-wheel logs. A fault
 // latches until MCU reset so an intermittent sensor cannot silently re-arm.
 constexpr int32_t HALL_STALL_TARGET_MIN_MRAD_S = 500L;
-constexpr uint16_t HALL_STALL_TIMEOUT_MS = 15000U;
+constexpr uint16_t HALL_STALL_TIMEOUT_MS = 4000U;
 constexpr int32_t HALL_MAX_PLAUSIBLE_MRAD_S = 5000L;
 constexpr uint16_t HALL_OVERSPEED_TIMEOUT_MS = 100U;
 
@@ -66,9 +64,8 @@ constexpr uint8_t MOTOR_IN1_PIN = 6U;
 constexpr uint8_t MOTOR_IN2_PIN = 8U;
 constexpr int8_t MOTOR_SIGN = 1;
 constexpr uint16_t MAX_PWM = 100U;  // deliberately low for first lifted test
-// The tested motor/driver pair does not start reliably below this PWM. In the
-// temporary open-loop mode, non-zero ROS targets map linearly from this value
-// to MAX_PWM. This controls electrical output, not measured wheel speed.
+// The tested motor/driver pair does not start reliably below this PWM. Closed-
+// loop output is raised to this floor only while the PID requests torque.
 constexpr uint8_t MOTOR_MIN_ACTIVE_PWM = 90U;
 
 // E-stop hardware is not implemented in the current build. Keep this false so
@@ -80,20 +77,23 @@ constexpr uint8_t ESTOP_PIN = 12U;
 constexpr uint8_t ESTOP_ACTIVE_LEVEL = HIGH;
 
 // The two FSR channels replace the single digital dead-man switch. Each FSR
-// must be wired as a voltage divider that reads near zero when released.
-// Temporary hardware-test setting requested for the current build. Pressure is
-// still published, but deadmanActive() remains true while this is false.
-constexpr bool REQUIRE_DEADMAN = false;
+// must be wired as a voltage divider that reads near zero when released. The
+// low bench threshold permits a light finger press; both channels are still
+// required so a floating/disconnected test circuit does not intentionally
+// bypass the motor interlock.
+constexpr bool REQUIRE_DEADMAN = true;
 constexpr uint8_t PRESSURE_LEFT_PIN = A1;
 constexpr uint8_t PRESSURE_RIGHT_PIN = A2;
-constexpr uint16_t PRESSURE_SAMPLE_PERIOD_MS = 100U;
-constexpr float PRESSURE_FILTER_ALPHA = 0.2F;
+constexpr uint16_t PRESSURE_SAMPLE_PERIOD_MS = 20U;
+constexpr uint8_t PRESSURE_ADC_SAMPLES = 4U;
+constexpr float PRESSURE_FILTER_ALPHA = 0.35F;
 // Watch /handle/pressure with the motors isolated, then set each channel's
 // polarity and threshold halfway between its released and held readings.
 constexpr bool PRESSURE_LEFT_ACTIVE_HIGH = true;
 constexpr bool PRESSURE_RIGHT_ACTIVE_HIGH = true;
-constexpr float PRESSURE_LEFT_PRESENT_THRESHOLD = 100.0F;
-constexpr float PRESSURE_RIGHT_PRESENT_THRESHOLD = 100.0F;
+constexpr float PRESSURE_LEFT_PRESENT_THRESHOLD = 40.0F;
+constexpr float PRESSURE_RIGHT_PRESENT_THRESHOLD = 40.0F;
+constexpr float PRESSURE_PRESENT_HYSTERESIS = 10.0F;
 constexpr bool PRESSURE_THRESHOLDS_CALIBRATED = false;
 constexpr float PRESSURE_IMBALANCE_THRESHOLD = 300.0F;
 constexpr float PRESSURE_SUDDEN_CHANGE_THRESHOLD = 150.0F;
@@ -122,8 +122,8 @@ constexpr float CURRENT_MA_PER_V = 1000.0F;
 constexpr bool ENABLE_FRONT_RANGE_SENSORS = false;
 
 // PID output is PWM counts. Keep both wheels lifted, tune the shared output,
-// and keep integrator gain at zero until direction and both Hall channels are
-// proven. These example gains are intentionally mild.
+// and keep integrator gain at zero until direction and the left Hall channel
+// are proven. These example gains are intentionally mild.
 constexpr float MOTOR_PID_KP = 12.0F;
 constexpr float MOTOR_PID_KI = 0.0F;
 constexpr float MOTOR_PID_KD = 0.0F;
@@ -150,8 +150,12 @@ static_assert(
     HALL_PULSES_PER_WHEEL_REV > 0UL,
     "Hall pulses per wheel revolution must be positive");
 static_assert(
-    !USE_SINGLE_HALL_SENSOR || LEFT_HALL_PIN == 2U || LEFT_HALL_PIN == 3U,
-    "single Hall sensor must use an Arduino Uno interrupt pin");
+    !ENABLE_HALL_FEEDBACK || LEFT_HALL_PIN == 2U || LEFT_HALL_PIN == 3U,
+    "left Hall sensor must use an Arduino Uno interrupt pin");
+static_assert(
+    !ENABLE_HALL_FEEDBACK || USE_SINGLE_HALL_SENSOR ||
+        RIGHT_HALL_PIN == 2U || RIGHT_HALL_PIN == 3U,
+    "right Hall sensor must use an Arduino Uno interrupt pin");
 static_assert(
     HALL_MIN_PULSE_INTERVAL_US > 0UL &&
         HALL_ZERO_TIMEOUT_US > HALL_MIN_PULSE_INTERVAL_US,
@@ -206,5 +210,18 @@ static_assert(
         PRESSURE_RIGHT_PRESENT_THRESHOLD >= 0.0F &&
         PRESSURE_RIGHT_PRESENT_THRESHOLD <= 1023.0F,
     "pressure thresholds must fit the ADC range");
+static_assert(
+    PRESSURE_ADC_SAMPLES > 0U && PRESSURE_ADC_SAMPLES <= 16U,
+    "pressure ADC sample count must be between 1 and 16");
+static_assert(
+    PRESSURE_FILTER_ALPHA > 0.0F && PRESSURE_FILTER_ALPHA <= 1.0F,
+    "pressure filter alpha must be in (0, 1]");
+static_assert(
+    PRESSURE_PRESENT_HYSTERESIS >= 0.0F &&
+        PRESSURE_PRESENT_HYSTERESIS <
+            PRESSURE_LEFT_PRESENT_THRESHOLD &&
+        PRESSURE_PRESENT_HYSTERESIS <
+            PRESSURE_RIGHT_PRESENT_THRESHOLD,
+    "pressure hysteresis must be non-negative and below both thresholds");
 
 }  // namespace safestride_config

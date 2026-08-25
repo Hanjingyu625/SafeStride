@@ -8,7 +8,7 @@ motion, but it must never be the only layer capable of stopping an actuator.
 | Controller | Connected hardware | Responsibility |
 |---|---|---|
 | Raspberry Pi | Camera, two USB serial links | ROS 2, road-surface classification, crosswalk logic, logging and high-level requests |
-| Drive Uno | Two Hall speed sensors, two handle pressure sensors, one shared motor driver | Final common wheel enable, velocity control and Hall watchdog; E-stop input is reserved but not implemented |
+| Drive Uno | One left-wheel Hall speed sensor, two handle pressure sensors, one shared motor driver | Final common wheel enable, velocity control and Hall watchdog; E-stop input is reserved but not implemented |
 | Terrain Uno | TOF-10120, BE-220 GPS, future IMUs/leg hardware | TOF/GPS acquisition; future step and leg state machine |
 
 The pressure sensors form a two-channel handle-presence/dead-man input, not a
@@ -53,3 +53,14 @@ and an MCU-local timeout. Any failed condition stops wheel and leg motion.
 4. Both Unos invalidate their sessions after a watchdog timeout.
 5. Deployment is forbidden above the configured wheel-speed threshold.
 6. Initial builds keep all motor output disabled in configuration.
+
+## Downhill control boundary
+
+Slope detection must not directly request reverse motor rotation in the current
+hardware. The single-output Hall sensor cannot measure true wheel direction,
+the deployed firmware has no valid pitch source, and battery/current sensing is
+disabled. A future downhill controller should first remove forward assist and
+request a safe speed reduction. Active electric braking requires a validated
+direction-capable encoder, pitch estimate, current and DC-bus voltage limits,
+a driver and battery explicitly rated for the selected braking method, and an
+independent mechanical stopping path.

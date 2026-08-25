@@ -14,8 +14,8 @@ serial_bridge:
       ttl_ms: 200
       arm_max_wheel_speed_rad_s: 0.10
       max_abs_angular_z_rad_s: 0.0
-      # Temporary open-loop drive until wheel encoders are installed.
-      require_hall_feedback: false
+      # The Drive Uno advertises its installed left-wheel Hall channel.
+      require_hall_feedback: true
       # Legacy pulse-gated bench firmware must never arm in normal operation.
       allow_magnet_bench_mode: false
       arm_confirmation_timeout_s: 1.0
@@ -26,7 +26,9 @@ serial_bridge:
     # Wheel radius/separation come from the launch arguments so URDF and
     # bridge kinematics cannot diverge.
     base:
-      hall_pulses_per_revolution: 1
+      # Must exactly match firmware HALL_PULSES_PER_WHEEL_REV (use 5 if five
+      # magnets are installed on the sensed left wheel).
+      hall_pulses_per_revolution: 6
       max_wheel_speed_rad_s: 3.0
     range:
       min_m: 0.02

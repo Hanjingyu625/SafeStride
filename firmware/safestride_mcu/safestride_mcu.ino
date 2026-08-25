@@ -42,6 +42,7 @@ constexpr uint32_t CAP_TWO_CURRENTS = 1UL << 3U;
 constexpr uint32_t CAP_DEADMAN = 1UL << 4U;
 constexpr uint32_t CAP_ESTOP = 1UL << 5U;
 constexpr uint32_t CAP_PRESSURE_TELEMETRY = 1UL << 6U;
+constexpr uint32_t CAP_SINGLE_HALL_SENSOR = 1UL << 10U;
 
 constexpr uint8_t PRESSURE_FLAG_LEFT_PRESENT = 1U << 0U;
 constexpr uint8_t PRESSURE_FLAG_RIGHT_PRESENT = 1U << 1U;
@@ -276,10 +277,8 @@ uint16_t currentStatusBits() {
     if (digitalRead(cfg::LEFT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL) {
       status |= STATUS_LEFT_HALL_ACTIVE;
     }
-    const bool right_hall_active = cfg::USE_SINGLE_HALL_SENSOR
-        ? (digitalRead(cfg::LEFT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL)
-        : (digitalRead(cfg::RIGHT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL);
-    if (right_hall_active) {
+    if (!cfg::USE_SINGLE_HALL_SENSOR &&
+        digitalRead(cfg::RIGHT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL) {
       status |= STATUS_RIGHT_HALL_ACTIVE;
     }
   }
@@ -334,7 +333,9 @@ void sendHello() {
   uint8_t payload[proto::HELLO_PAYLOAD_SIZE];
   uint32_t capabilities = CAP_DEADMAN | CAP_PRESSURE_TELEMETRY;
   if (cfg::ENABLE_HALL_FEEDBACK) {
-    capabilities |= CAP_TWO_HALL_SENSORS;
+    capabilities |= cfg::USE_SINGLE_HALL_SENSOR
+        ? CAP_SINGLE_HALL_SENSOR
+        : CAP_TWO_HALL_SENSORS;
   }
   if (cfg::ENABLE_ESTOP) {
     capabilities |= CAP_ESTOP;
@@ -383,9 +384,15 @@ void sendTelemetry() {
   proto::writeU16(payload + 30U, g_last_command_sequence);
   proto::writeU16(
       payload + 32U,
-      static_cast<uint16_t>(g_pressure.leftFiltered() + 0.5F));
+      g_pressure.leftRaw());
   proto::writeU16(
       payload + 34U,
+      g_pressure.rightRaw());
+  proto::writeU16(
+      payload + 36U,
+      static_cast<uint16_t>(g_pressure.leftFiltered() + 0.5F));
+  proto::writeU16(
+      payload + 38U,
       static_cast<uint16_t>(g_pressure.rightFiltered() + 0.5F));
   uint8_t pressure_flags = 0U;
   if (g_pressure.leftPresent()) {
@@ -397,8 +404,8 @@ void sendTelemetry() {
   if (g_pressure.calibrated()) {
     pressure_flags |= PRESSURE_FLAG_CALIBRATED;
   }
-  payload[36U] = pressure_flags;
-  payload[37U] = static_cast<uint8_t>(g_pressure.alert());
+  payload[40U] = pressure_flags;
+  payload[41U] = static_cast<uint8_t>(g_pressure.alert());
 
   proto::sendFrame(
       Serial,

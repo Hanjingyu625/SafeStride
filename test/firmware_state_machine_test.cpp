@@ -118,8 +118,8 @@ int main() {
   assert(!g_watchdog_timed_out);
   assert(g_state == ControllerState::DISARMED);
 
-  // Open-loop mode still requires a short disabled dwell and an explicit
-  // motion command before the controller can arm.
+  // Hall feedback mode still requires a short stationary dwell and an
+  // explicit motion command before the controller can arm.
   g_stationary_tracking = true;
   g_stationary_since_ms =
       g_test_millis - cfg::ARM_STATIONARY_DWELL_MS;

@@ -21,7 +21,11 @@ $TypeCommand = 0x10
 $TypeTelemetry = 0x20
 $TypeTerrainTelemetry = 0x21
 $CapTwoHallSensors = 1
+$CapSingleHallSensor = 1 -shl 10
 $CapTof10120 = 0x100
+$DriveTelemetryPayloadSize = 42
+$StatusMotorEnabled = 1 -shl 1
+$StatusDeadmanActive = 1 -shl 2
 $StatusLeftHallActive = 1 -shl 11
 $StatusRightHallActive = 1 -shl 12
 
@@ -337,7 +341,9 @@ function Test-DriveStatus {
     $port = Open-UnoPort $PortName
     try {
         $hello = Wait-Hello $port
-        if (($hello.Capabilities -band $CapTwoHallSensors) -eq 0) {
+        if (($hello.Capabilities -band (
+            $CapTwoHallSensors -bor $CapSingleHallSensor
+        )) -eq 0) {
             throw "$PortName is not Drive firmware"
         }
         $sessionId = New-SessionId
@@ -346,18 +352,32 @@ function Test-DriveStatus {
             New-CommandPayload 0 $false
         )
         $frame = Wait-Telemetry $port $TypeTelemetry $sessionId
+        if ($frame.Payload.Count -ne $DriveTelemetryPayloadSize) {
+            throw 'Drive telemetry layout does not match this test tool'
+        }
         $status = [BitConverter]::ToUInt16($frame.Payload, 26)
         $fault = [BitConverter]::ToUInt16($frame.Payload, 28)
+        $hallLayout = if (($hello.Capabilities -band
+            $CapSingleHallSensor) -ne 0) { 'single_left' } else { 'dual' }
         [pscustomobject]@{
             Port = $PortName
             Role = 'Drive'
+            HallLayout = $hallLayout
             Link = (($status -band 1) -ne 0)
             Armed = (($status -band 2) -ne 0)
             Deadman = (($status -band 4) -ne 0)
             MagnetBench = (($status -band 0x80) -ne 0)
             FaultBits = ('0x{0:x4}' -f $fault)
-            PressureLeft = [BitConverter]::ToUInt16($frame.Payload, 32)
-            PressureRight = [BitConverter]::ToUInt16($frame.Payload, 34)
+            PressureLeftRaw = [BitConverter]::ToUInt16($frame.Payload, 32)
+            PressureRightRaw = [BitConverter]::ToUInt16($frame.Payload, 34)
+            PressureLeftFiltered = [BitConverter]::ToUInt16(
+                $frame.Payload, 36
+            )
+            PressureRightFiltered = [BitConverter]::ToUInt16(
+                $frame.Payload, 38
+            )
+            PressureFlags = ('0x{0:x2}' -f $frame.Payload[40])
+            PressureAlert = [int]$frame.Payload[41]
         }
     } finally {
         if ($port.IsOpen) {
@@ -401,7 +421,9 @@ function Watch-HallSensors {
     [uint16]$sequence = 0
     try {
         $hello = Wait-Hello $port
-        if (($hello.Capabilities -band $CapTwoHallSensors) -eq 0) {
+        if (($hello.Capabilities -band (
+            $CapTwoHallSensors -bor $CapSingleHallSensor
+        )) -eq 0) {
             throw "$PortName is not Drive firmware"
         }
         $sessionId = New-SessionId
@@ -411,9 +433,12 @@ function Watch-HallSensors {
             New-CommandPayload 0 $false
         )
         $sequence++
-        [void](Wait-Telemetry $port $TypeTelemetry $sessionId)
+        $firstFrame = Wait-Telemetry $port $TypeTelemetry $sessionId
+        if ($firstFrame.Payload.Count -ne $DriveTelemetryPayloadSize) {
+            throw 'Drive telemetry layout does not match this test tool'
+        }
 
-        Write-Host 'Motor disabled. Pass a magnet over D2 or D3.'
+        Write-Host 'Motor disabled. Pass a magnet over the left D2 sensor.'
         Write-Host (
             ' time  left_active right_active left_pulses right_pulses ' +
             'left_mrad_s right_mrad_s'
@@ -475,7 +500,9 @@ function Start-DriveMotorTest {
     [uint16]$sequence = 0
     try {
         $hello = Wait-Hello $port
-        if (($hello.Capabilities -band $CapTwoHallSensors) -eq 0) {
+        if (($hello.Capabilities -band (
+            $CapTwoHallSensors -bor $CapSingleHallSensor
+        )) -eq 0) {
             throw "$PortName is not Drive firmware"
         }
         $sessionId = New-SessionId
@@ -485,20 +512,55 @@ function Start-DriveMotorTest {
             New-CommandPayload 0 $false
         )
         $sequence++
-        [void](Wait-Telemetry $port $TypeTelemetry $sessionId)
+        $firstFrame = Wait-Telemetry $port $TypeTelemetry $sessionId
+        if ($firstFrame.Payload.Count -ne $DriveTelemetryPayloadSize) {
+            throw 'Drive telemetry layout does not match this test tool'
+        }
+        $firstStatus = [BitConverter]::ToUInt16($firstFrame.Payload, 26)
+        if (($firstStatus -band $StatusDeadmanActive) -eq 0) {
+            throw (
+                'both pressure sensors must be lightly pressed before motor ' +
+                'enable and held throughout the test'
+            )
+        }
         Write-Host ((
                 "Drive enabled for {0}s at target {1} mrad/s. " +
                 'Both wheels must rotate and keep producing Hall pulses. ' +
-                'A missing Hall channel causes a latched fault-stop.'
+                'Keep both pressure sensors pressed. A missing Hall channel ' +
+                'causes a latched fault-stop.'
             ) -f $Seconds, $Target)
         $timer = [Diagnostics.Stopwatch]::StartNew()
+        $armedSeen = $false
         while ($timer.Elapsed.TotalSeconds -lt $Seconds) {
             Write-Frame $port $TypeCommand $sequence $sessionId (
                 New-CommandPayload $Target $true
             )
             $sequence++
-            [void](Read-ProtocolFrame $port 20)
+            $frame = Read-ProtocolFrame $port 20
+            if ($null -ne $frame -and
+                $frame.Type -eq $TypeTelemetry -and
+                $frame.SessionId -eq $sessionId) {
+                if ($frame.Payload.Count -ne $DriveTelemetryPayloadSize) {
+                    throw 'Drive telemetry layout changed during the test'
+                }
+                $status = [BitConverter]::ToUInt16($frame.Payload, 26)
+                $fault = [BitConverter]::ToUInt16($frame.Payload, 28)
+                if ($fault -ne 0) {
+                    throw ('Drive fault latched: 0x{0:x4}' -f $fault)
+                }
+                if (($status -band $StatusMotorEnabled) -ne 0) {
+                    $armedSeen = $true
+                } elseif ($armedSeen) {
+                    throw 'Drive disarmed during the motor test'
+                }
+            }
+            if (-not $armedSeen -and $timer.ElapsedMilliseconds -gt 1500) {
+                throw 'Drive did not confirm ARMED within 1.5 seconds'
+            }
             Start-Sleep -Milliseconds 30
+        }
+        if (-not $armedSeen) {
+            throw 'Drive never confirmed ARMED'
         }
     } finally {
         if ($port.IsOpen -and $sessionId -ne 0) {

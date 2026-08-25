@@ -2,7 +2,7 @@
 
 Raspberry Pi의 `safestride_bridge`와 Drive/Terrain Uno가 공통으로 사용하는
 USB 직렬 프로토콜이다. v2부터 Drive Uno는 단일 모터드라이버의 공통 속도
-목표와 좌우 홀센서 펄스를 사용한다. v1 펌웨어와 v2 브리지는 호환되지
+목표와 왼쪽 바퀴 홀센서 펄스를 사용한다. v1 펌웨어와 v2 브리지는 호환되지
 않으므로 두 Uno와 Raspberry Pi 소프트웨어를 함께 갱신해야 한다.
 
 ## 프레임
@@ -47,6 +47,7 @@ Payload `<II>`: `boot_id`, `capabilities`.
 | 7 | legacy 자석 펄스 벤치 모드(현재 Drive 펌웨어는 광고하지 않음) |
 | 8 | Terrain TOF 텔레메트리 |
 | 9 | Terrain Uno의 NMEA GPS 위치·지면속도 텔레메트리 |
+| 10 | 왼쪽 바퀴의 단일출력 홀센서 1개(오른쪽 값은 공통 추정치) |
 
 ### `SESSION_START` (`0x02`, Pi → MCU)
 
@@ -76,7 +77,7 @@ Drive Uno는 홀센서 보정, dead-man, fault, session, 정지 대기 조건을
 
 ### `TELEMETRY` (`0x20`, Drive Uno → Pi)
 
-Payload `<iiiiHHHhhHHHHHBB>`, 38 bytes이다.
+Payload `<iiiiHHHhhHHHHHHHBB>`, 42 bytes이다.
 
 | 자료형 | 내용 |
 |---|---|
@@ -90,13 +91,18 @@ Payload `<iiiiHHHhhHHHHHBB>`, 38 bytes이다.
 | `uint16` | status bitmap |
 | `uint16` | fault bitmap |
 | `uint16` | 마지막 수락 command sequence |
-| `uint16` ×2 | 좌우 압력 ADC 값 |
+| `uint16` ×2 | 좌우 압력 원시 ADC 값(4회 평균) |
+| `uint16` ×2 | 좌우 압력 저역통과 필터 ADC 값 |
 | `uint8` | pressure flags |
 | `uint8` | pressure alert (`0` 정상, `1` 경고, `2` 손 이탈) |
 
 단일출력 홀센서는 자체적으로 회전 방향을 알 수 없다. 펄스 위치와 속도의
 부호는 공통 드라이버 명령 방향에서 얻는다. 외력으로 역방향 이동하는 경우의
 부호는 보장되지 않는다.
+
+현재 단일-Hall 구성에서는 실제 센서가 있는 왼쪽 측정치를 공통 구동계 속도로
+사용하며 텔레메트리의 오른쪽 펄스·속도 필드에도 같은 추정치를 넣는다. ROS의
+`WheelHall.left_sensor_present/right_sensor_present`로 실제 장착 여부를 구분한다.
 
 Status bitmap:
 
