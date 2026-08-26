@@ -1,0 +1,33 @@
+{
+  "timestamp": 1784022828.9597585,
+  "elapsed_s": 12.721,
+  "settings": {
+    "left_threshold": 50,
+    "right_threshold": 50,
+    "overload_threshold": 900,
+    "asymmetry_ratio_threshold": 0.35,
+    "release_debounce_ms": 250,
+    "asymmetry_hold_ms": 2000,
+    "serial_timeout_ms": 1000,
+    "both_hands_required": true,
+    "profile_alpha": 0.02
+  },
+  "left_pressure": 286,
+  "right_pressure": 281,
+  "left_contact": true,
+  "right_contact": true,
+  "both_contact": true,
+  "asymmetry_ratio": 0.0088,
+  "pressure_total": 567,
+  "pi_command_allowed": true,
+  "requested_action": "DRIVE_ALLOWED",
+  "reason": "HANDLES_HELD",
+  "serial_timeout": false,
+  "rehab_summary": {
+    "left_load_share": 0.504,
+    "right_load_share": 0.496,
+    "load_imbalance": 0.008,
+    "interpretation": "BALANCED",
+    "note": "This is a support-use pattern, not a medical diagnosis. One FSR per handle can compare left versus right only; it cannot identify palm position within a handle."
+  }
+}

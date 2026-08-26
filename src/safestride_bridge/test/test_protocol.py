@@ -6,6 +6,7 @@ import unittest
 from safestride_bridge.protocol import (
     BOARD_ROLE_DRIVE,
     COMMAND_STRUCT,
+    GPS_TELEMETRY_STRUCT,
     HEADER_STRUCT,
     TELEMETRY_STRUCT,
     TERRAIN_TELEMETRY_STRUCT,
@@ -15,6 +16,7 @@ from safestride_bridge.protocol import (
     Frame,
     FrameDecodeError,
     FrameParser,
+    GpsTelemetryPayload,
     HelloPayload,
     PacketType,
     PayloadDecodeError,
@@ -225,6 +227,8 @@ class TestPayloads(unittest.TestCase):
             last_command_sequence=65535,
             pressure_left_raw=321,
             pressure_right_raw=654,
+            pressure_left_filtered=300,
+            pressure_right_filtered=600,
             pressure_flags=0x07,
             pressure_alert=1,
         )
@@ -233,7 +237,7 @@ class TestPayloads(unittest.TestCase):
         self.assertEqual(
             packed,
             struct.pack(
-                '<iiiiHHHhhHHHHHBB',
+                '<iiiiHHHhhHHHHHHHBB',
                 -123456,
                 789012,
                 -2000,
@@ -248,6 +252,8 @@ class TestPayloads(unittest.TestCase):
                 65535,
                 321,
                 654,
+                300,
+                600,
                 0x07,
                 1,
             ),
@@ -285,6 +291,21 @@ class TestPayloads(unittest.TestCase):
             TerrainTelemetryPayload.unpack(payload.pack()), payload
         )
 
+    def test_gps_telemetry_exact_layout(self):
+        payload = GpsTelemetryPayload(
+            latitude_e7=375665000,
+            longitude_e7=1269780000,
+            speed_mm_s=1234,
+            flags=0x03,
+            satellites=9,
+        )
+        self.assertEqual(
+            payload.pack(),
+            struct.pack('<iiIBB', 375665000, 1269780000, 1234, 3, 9),
+        )
+        self.assertEqual(len(payload.pack()), GPS_TELEMETRY_STRUCT.size)
+        self.assertEqual(GpsTelemetryPayload.unpack(payload.pack()), payload)
+
     def test_wrong_payload_size_is_rejected(self):
         with self.assertRaises(PayloadDecodeError):
             HelloPayload.unpack(b'\x00')
@@ -292,6 +313,8 @@ class TestPayloads(unittest.TestCase):
             CommandPayload.unpack(b'\x00' * (COMMAND_STRUCT.size - 1))
         with self.assertRaises(PayloadDecodeError):
             TelemetryPayload.unpack(b'')
+        with self.assertRaises(PayloadDecodeError):
+            GpsTelemetryPayload.unpack(b'\x00' * 13)
 
     def test_command_rejects_invalid_enable_and_reserved(self):
         with self.assertRaises(ValueError):
@@ -303,6 +326,48 @@ class TestPayloads(unittest.TestCase):
         with self.assertRaises(PayloadDecodeError):
             CommandPayload.unpack(
                 struct.pack('<iHBB', 0, 100, 1, 1)
+            )
+
+    def test_telemetry_rejects_invalid_pressure_fields(self):
+        values = [0] * 18
+        values[16] = 0x08
+        with self.assertRaises(PayloadDecodeError):
+            TelemetryPayload.unpack(TELEMETRY_STRUCT.pack(*values))
+
+        values[16] = 0
+        values[17] = 3
+        with self.assertRaises(PayloadDecodeError):
+            TelemetryPayload.unpack(TELEMETRY_STRUCT.pack(*values))
+
+        with self.assertRaises(ValueError):
+            TelemetryPayload(*values).pack()
+
+    def test_terrain_telemetry_rejects_invalid_alert_fields(self):
+        values = [0] * 8
+        values[2] = 4
+        with self.assertRaises(PayloadDecodeError):
+            TerrainTelemetryPayload.unpack(
+                TERRAIN_TELEMETRY_STRUCT.pack(*values)
+            )
+        with self.assertRaises(ValueError):
+            TerrainTelemetryPayload(*values).pack()
+
+    def test_gps_telemetry_rejects_invalid_fields(self):
+        with self.assertRaises(ValueError):
+            GpsTelemetryPayload(0, 0, 0, 0x04, 0).pack()
+        with self.assertRaises(ValueError):
+            GpsTelemetryPayload(900000001, 0, 0, 1, 0).pack()
+        with self.assertRaises(PayloadDecodeError):
+            GpsTelemetryPayload.unpack(
+                GPS_TELEMETRY_STRUCT.pack(1, 1, 0, 0, 0)
+            )
+        with self.assertRaises(PayloadDecodeError):
+            GpsTelemetryPayload.unpack(
+                GPS_TELEMETRY_STRUCT.pack(0, 0, 1, 0, 0)
+            )
+        with self.assertRaises(PayloadDecodeError):
+            GpsTelemetryPayload.unpack(
+                GPS_TELEMETRY_STRUCT.pack(0, 0, 500001, 2, 0)
             )
 
 

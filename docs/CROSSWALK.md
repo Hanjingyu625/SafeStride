@@ -1,8 +1,9 @@
 # GPS crosswalk assistance
 
 The standalone `smart_crosswalk_controller_v6.py` logic has been split into
-testable ROS 2 components. `gps_node` publishes BE-220 fixes and speed, while
-`crosswalk_controller` publishes a high-level `/cmd_vel`. Every command still
+testable ROS 2 components. By default Terrain Uno publishes BE-220 fixes and
+speed through `terrain_bridge`, while `crosswalk_controller` publishes a
+high-level `/cmd_vel`. Every command still
 passes through `safety_supervisor`, the Drive serial bridge and the Drive Uno's
 dead-man, E-stop, watchdog and fault checks.
 
@@ -39,7 +40,6 @@ valid ID, API key or fresh signal value, the policy fails closed at the curb.
 Keep `motion_output_enabled: false` for GPS walks and inspect:
 
 ```bash
-export SAFESTRIDE_ENABLE_GPS=true
 export SAFESTRIDE_ENABLE_CROSSWALK=true
 bash scripts/run.sh
 ros2 topic echo /crosswalk/status

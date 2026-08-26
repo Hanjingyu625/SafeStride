@@ -13,10 +13,13 @@ constexpr uint8_t MOTOR_IN1 = 6U;
 constexpr uint8_t MOTOR_IN2 = 8U;
 constexpr bool MOTOR_REVERSED = false;
 constexpr int MAX_PWM = 100;
+constexpr uint16_t COMMAND_TIMEOUT_MS = 500U;
 
 constexpr uint16_t COMMAND_BUFFER_SIZE = 16U;
 char command_buffer[COMMAND_BUFFER_SIZE];
 uint8_t command_length = 0U;
+uint32_t last_command_ms = 0UL;
+bool command_active = false;
 
 void driveMotors(int signed_pwm) {
   if (MOTOR_REVERSED) {
@@ -70,8 +73,12 @@ void processSerial() {
       int signed_pwm = 0;
       if (parseSignedPwm(command_buffer, signed_pwm)) {
         driveMotors(signed_pwm);
+        command_active = signed_pwm != 0;
+        last_command_ms = millis();
         Serial.println("OK");
       } else {
+        stopMotors();
+        command_active = false;
         Serial.println("ERR");
       }
       command_length = 0U;
@@ -80,6 +87,7 @@ void processSerial() {
     if (command_length + 1U >= COMMAND_BUFFER_SIZE) {
       command_length = 0U;
       stopMotors();
+      command_active = false;
       Serial.println("ERR");
       continue;
     }
@@ -102,4 +110,11 @@ void setup() {
 
 void loop() {
   processSerial();
+  if (command_active &&
+      static_cast<uint32_t>(millis() - last_command_ms) >=
+          COMMAND_TIMEOUT_MS) {
+    stopMotors();
+    command_active = false;
+    Serial.println("TIMEOUT");
+  }
 }

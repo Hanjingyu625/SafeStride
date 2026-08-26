@@ -1,0 +1,15 @@
+{
+  "latitude": 37.53996826,
+  "longitude": 127.07047289,
+  "distance_m": 12.54,
+  "length_m": 29.34,
+  "width_m": 8.24,
+  "source_record": {
+    "latitude": 37.53996826,
+    "longitude": 127.07047289,
+    "et": 29.34,
+    "bt": 8.24,
+    "axis_bearing_deg": 18.8,
+    "source_index": 21917
+  }
+}

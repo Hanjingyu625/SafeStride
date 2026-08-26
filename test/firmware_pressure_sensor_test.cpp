@@ -49,6 +49,10 @@ int main() {
   assert(pressure.bothHandsPresent());
   assert(pressure.leftPresent());
   assert(pressure.rightPresent());
+  assert(pressure.leftRaw() == 500U);
+  assert(pressure.rightRaw() == 500U);
+  assert(pressure.leftFiltered() == 500.0F);
+  assert(pressure.rightFiltered() == 500.0F);
   assert(
       pressure.calibrated() == cfg::PRESSURE_THRESHOLDS_CALIBRATED);
   assert(pressure.alert() == PressureAlert::NORMAL);
@@ -63,12 +67,21 @@ int main() {
   assert(pressure.alert() == PressureAlert::WARNING);
 
   g_left_raw = 0;
-  for (int i = 0; i < 20; ++i) {
+  for (int i = 0; i < 10; ++i) {
     g_now_ms += cfg::PRESSURE_SAMPLE_PERIOD_MS;
     pressure.update(g_now_ms);
   }
+  // A released channel must stop motion within 200 ms in this bench preset.
   assert(!pressure.bothHandsPresent());
   assert(pressure.alert() == PressureAlert::HANDS_OFF);
+
+  // The published raw channel follows the ADC immediately while the filtered
+  // channel is intentionally smoothed for presence/dead-man decisions.
+  g_left_raw = 512;
+  g_now_ms += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  pressure.update(g_now_ms);
+  assert(pressure.leftRaw() == 512U);
+  assert(pressure.leftFiltered() < 512.0F);
 
   printf("firmware pressure-sensor tests: OK\n");
   return 0;

@@ -8,8 +8,22 @@ namespace cfg = safestride_config;
 
 namespace {
 
-bool channelPresent(float value, bool active_high, float threshold) {
-  return active_high ? value >= threshold : value <= threshold;
+bool channelPresent(
+    float value,
+    bool was_present,
+    bool active_high,
+    float threshold) {
+  const float hysteresis = cfg::PRESSURE_PRESENT_HYSTERESIS;
+  if (active_high) {
+    const float decision_level = was_present
+        ? threshold - hysteresis
+        : threshold;
+    return value >= decision_level;
+  }
+  const float decision_level = was_present
+      ? threshold + hysteresis
+      : threshold;
+  return value <= decision_level;
 }
 
 }  // namespace
@@ -17,26 +31,52 @@ bool channelPresent(float value, bool active_high, float threshold) {
 PressureSensorPair::PressureSensorPair()
     : initialized_(false),
       last_sample_ms_(0UL),
+      left_raw_(0U),
+      right_raw_(0U),
       left_(0.0F),
       right_(0.0F),
       previous_left_(0.0F),
       previous_right_(0.0F),
       difference_(0.0F),
       maximum_delta_(0.0F),
+      left_present_(false),
+      right_present_(false),
       alert_(PressureAlert::HANDS_OFF) {}
 
 void PressureSensorPair::begin(uint32_t now_ms) {
-  left_ = static_cast<float>(analogRead(cfg::PRESSURE_LEFT_PIN));
-  right_ = static_cast<float>(analogRead(cfg::PRESSURE_RIGHT_PIN));
+  left_raw_ = readAveraged(cfg::PRESSURE_LEFT_PIN);
+  right_raw_ = readAveraged(cfg::PRESSURE_RIGHT_PIN);
+  left_ = static_cast<float>(left_raw_);
+  right_ = static_cast<float>(right_raw_);
   previous_left_ = left_;
   previous_right_ = right_;
   difference_ = fabsf(left_ - right_);
   maximum_delta_ = 0.0F;
   initialized_ = true;
+  updatePresence();
   alert_ = bothHandsPresent()
       ? PressureAlert::NORMAL
       : PressureAlert::HANDS_OFF;
   last_sample_ms_ = now_ms;
+}
+
+uint16_t PressureSensorPair::readAveraged(uint8_t pin) const {
+  // Discard the first conversion after an AVR ADC mux change so charge left
+  // by the other pressure channel does not leak into this reading.
+  (void)analogRead(pin);
+  uint32_t total = 0UL;
+  for (uint8_t index = 0U; index < cfg::PRESSURE_ADC_SAMPLES; ++index) {
+    int reading = analogRead(pin);
+    if (reading < 0) {
+      reading = 0;
+    } else if (reading > 1023) {
+      reading = 1023;
+    }
+    total += static_cast<uint16_t>(reading);
+  }
+  return static_cast<uint16_t>(
+      (total + cfg::PRESSURE_ADC_SAMPLES / 2U) /
+      cfg::PRESSURE_ADC_SAMPLES);
 }
 
 void PressureSensorPair::update(uint32_t now_ms) {
@@ -52,10 +92,10 @@ void PressureSensorPair::update(uint32_t now_ms) {
 }
 
 void PressureSensorPair::sample() {
-  const float raw_left =
-      static_cast<float>(analogRead(cfg::PRESSURE_LEFT_PIN));
-  const float raw_right =
-      static_cast<float>(analogRead(cfg::PRESSURE_RIGHT_PIN));
+  left_raw_ = readAveraged(cfg::PRESSURE_LEFT_PIN);
+  right_raw_ = readAveraged(cfg::PRESSURE_RIGHT_PIN);
+  const float raw_left = static_cast<float>(left_raw_);
+  const float raw_right = static_cast<float>(right_raw_);
   const float alpha = cfg::PRESSURE_FILTER_ALPHA;
 
   left_ = alpha * raw_left + (1.0F - alpha) * left_;
@@ -65,6 +105,7 @@ void PressureSensorPair::sample() {
   const float right_delta = fabsf(right_ - previous_right_);
   maximum_delta_ = left_delta > right_delta ? left_delta : right_delta;
   difference_ = fabsf(left_ - right_);
+  updatePresence();
 
   if (!bothHandsPresent()) {
     alert_ = PressureAlert::HANDS_OFF;
@@ -80,22 +121,29 @@ void PressureSensorPair::sample() {
   previous_right_ = right_;
 }
 
+void PressureSensorPair::updatePresence() {
+  left_present_ = channelPresent(
+      left_,
+      left_present_,
+      cfg::PRESSURE_LEFT_ACTIVE_HIGH,
+      cfg::PRESSURE_LEFT_PRESENT_THRESHOLD);
+  right_present_ = channelPresent(
+      right_,
+      right_present_,
+      cfg::PRESSURE_RIGHT_ACTIVE_HIGH,
+      cfg::PRESSURE_RIGHT_PRESENT_THRESHOLD);
+}
+
 bool PressureSensorPair::bothHandsPresent() const {
   return leftPresent() && rightPresent();
 }
 
 bool PressureSensorPair::leftPresent() const {
-  return initialized_ && channelPresent(
-      left_,
-      cfg::PRESSURE_LEFT_ACTIVE_HIGH,
-      cfg::PRESSURE_LEFT_PRESENT_THRESHOLD);
+  return initialized_ && left_present_;
 }
 
 bool PressureSensorPair::rightPresent() const {
-  return initialized_ && channelPresent(
-      right_,
-      cfg::PRESSURE_RIGHT_ACTIVE_HIGH,
-      cfg::PRESSURE_RIGHT_PRESENT_THRESHOLD);
+  return initialized_ && right_present_;
 }
 
 bool PressureSensorPair::initialized() const {
@@ -108,6 +156,14 @@ bool PressureSensorPair::calibrated() const {
 
 PressureAlert PressureSensorPair::alert() const {
   return alert_;
+}
+
+uint16_t PressureSensorPair::leftRaw() const {
+  return left_raw_;
+}
+
+uint16_t PressureSensorPair::rightRaw() const {
+  return right_raw_;
 }
 
 float PressureSensorPair::leftFiltered() const {

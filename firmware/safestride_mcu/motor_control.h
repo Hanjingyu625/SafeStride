@@ -22,12 +22,6 @@ class DriveController {
       const HallSample& right_hall,
       int32_t requested_mrad_s,
       bool output_allowed);
-  void updateMagnetBench(
-      uint32_t elapsed_us,
-      const HallSample& left_hall,
-      const HallSample& right_hall,
-      int32_t requested_mrad_s,
-      bool output_allowed);
   void disableImmediately();
 
   int32_t leftVelocityMradS() const;
@@ -75,11 +69,12 @@ class DriveController {
       float measured_mrad_s,
       float dt_seconds,
       PidState& state);
+  static float compensateMotorDeadzone(
+      float controller_pwm,
+      float target_mrad_s);
+  static float openLoopPwm(float target_mrad_s);
   static void writeMotor(float pwm);
-  static float hallSpeedMagnitude(
-      const HallSample& sample,
-      uint32_t pulse_delta,
-      uint32_t elapsed_us);
+  static float hallSpeedMagnitude(const HallSample& sample);
   static bool updateHallMonitor(
       HallMonitorState& state,
       uint32_t pulse_count,
@@ -88,7 +83,6 @@ class DriveController {
       uint32_t elapsed_us,
       bool output_allowed);
   void updateHallFeedback(
-      uint32_t elapsed_us,
       const HallSample& left_hall,
       const HallSample& right_hall);
   void updateHallPlausibility(

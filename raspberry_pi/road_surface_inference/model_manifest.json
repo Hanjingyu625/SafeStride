@@ -1,0 +1,472 @@
+{
+  "schema_version": 1,
+  "trained_at_utc": "2026-08-24T09:31:31.338927+00:00",
+  "model_name": "mobilenet_v3_small",
+  "quantization": "float32",
+  "quantization_report": {
+    "requested": true,
+    "accepted": false,
+    "mode": "post_training_static_fx",
+    "backend": "qnnpack",
+    "weight_dtype": "qint8",
+    "activation_dtype": "quint8",
+    "calibration": {
+      "split": "train",
+      "transform": "resize_normalize_without_augmentation",
+      "selected_samples": 4096,
+      "class_counts": {
+        "smooth_paved": 456,
+        "rough_paved": 455,
+        "block_paved": 455,
+        "gravel": 455,
+        "mud_dirt": 455,
+        "unpaved_mixed": 455,
+        "wet_paved": 455,
+        "wet_unpaved": 455,
+        "snow_ice": 455
+      },
+      "requested_batches": 32,
+      "observer_batches": 32,
+      "observer_samples": 4096
+    },
+    "validation_macro_f1_drop": 0.7081347729395047,
+    "validation_max_class_recall_drop": 0.9302325581395349,
+    "error": null,
+    "observer_batches": 32,
+    "observer_samples": 4096
+  },
+  "pruning": "none",
+  "deployment_approved": true,
+  "deployment_gate_reasons": [],
+  "input": {
+    "layout": "NCHW",
+    "dtype": "float32",
+    "width": 224,
+    "height": 224,
+    "color": "RGB",
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "classes": [
+    "smooth_paved",
+    "rough_paved",
+    "block_paved",
+    "gravel",
+    "mud_dirt",
+    "unpaved_mixed",
+    "wet_paved",
+    "wet_unpaved",
+    "snow_ice"
+  ],
+  "output": "logits",
+  "dataset": {
+    "total": 17887,
+    "class_counts": {
+      "smooth_paved": 3987,
+      "rough_paved": 2775,
+      "block_paved": 2529,
+      "gravel": 1393,
+      "mud_dirt": 1375,
+      "unpaved_mixed": 1629,
+      "wet_paved": 1400,
+      "wet_unpaved": 1400,
+      "snow_ice": 1399
+    },
+    "source_counts": {
+      "cycling_small": 1905,
+      "rscd_test_50k": 700,
+      "rscd_train": 8399,
+      "rscd_vali_20k": 668,
+      "streetsurfacevis": 6215
+    },
+    "split": {
+      "train": 14897,
+      "validation": 1037,
+      "test": 1953
+    },
+    "sources": {
+      "rscd": {
+        "id": "rezzzq/RSCD-1million",
+        "revision": "957b9dbb25172d2b32bb7b853a671be8f2d5c69b",
+        "license": "MIT"
+      },
+      "streetsurfacevis": {
+        "record": "11449977",
+        "license": "CC-BY-SA"
+      },
+      "rtk": {
+        "dataset": "ffwgjdfn86",
+        "version": 1,
+        "license": "CC-BY-4.0"
+      },
+      "cycling": {
+        "record": "17838875",
+        "license": "CC-BY-SA-4.0"
+      }
+    }
+  },
+  "training_config": {
+    "work_dir": "/content/drive/MyDrive/SafeStride/road_surface_training_v2",
+    "export_dir": "/content/drive/MyDrive/SafeStride/road_surface_mobilenet_v3_small_v1/export",
+    "checkpoint_dir": "/content/drive/MyDrive/SafeStride/road_surface_mobilenet_v3_small_v1/checkpoints",
+    "resume": true,
+    "dataset_manifest": null,
+    "rebuild_dataset_cache": false,
+    "seed": 42,
+    "image_size": 224,
+    "batch_size": 128,
+    "num_workers": 2,
+    "head_epochs": 3,
+    "finetune_epochs": 15,
+    "early_stop_patience": 4,
+    "lr_plateau_patience": 2,
+    "lr_decay_factor": 0.5,
+    "min_lr": 1e-06,
+    "head_lr": 0.001,
+    "finetune_lr": 0.0001,
+    "weight_decay": 0.0001,
+    "label_smoothing": 0.05,
+    "min_per_class": 60,
+    "recommended_per_class": 250,
+    "max_per_source_class": 1600,
+    "max_per_class": 4000,
+    "rscd_per_class": 1200,
+    "rscd_validation_per_class": 100,
+    "rscd_test_per_class": 100,
+    "rscd_download_workers": 4,
+    "min_validation_per_class": 10,
+    "min_macro_f1": 0.75,
+    "min_class_recall": 0.55,
+    "model_selection_tolerance": 0.005,
+    "models": [
+      "mobilenet_v3_small"
+    ],
+    "skip_rscd": false,
+    "skip_streetsurfacevis": false,
+    "skip_rtk": false,
+    "skip_cycling": false,
+    "local_data_dir": null,
+    "quantize_int8": true,
+    "calibration_batches": 32
+  },
+  "metrics": {
+    "validation": {
+      "loss": 0.9066749011079279,
+      "accuracy": 0.76374156219865,
+      "macro_f1": 0.7497083657183411,
+      "per_class_precision": {
+        "smooth_paved": 0.6699029126213593,
+        "rough_paved": 0.6944444444444444,
+        "block_paved": 0.9777777777777777,
+        "gravel": 0.6421052631578947,
+        "mud_dirt": 0.8461538461538461,
+        "unpaved_mixed": 0.801980198019802,
+        "wet_paved": 0.6701030927835051,
+        "wet_unpaved": 0.6744186046511628,
+        "snow_ice": 0.9420289855072463
+      },
+      "per_class_recall": {
+        "smooth_paved": 0.8214285714285714,
+        "rough_paved": 0.75,
+        "block_paved": 0.8186046511627907,
+        "gravel": 0.6559139784946236,
+        "mud_dirt": 0.5866666666666667,
+        "unpaved_mixed": 0.9418604651162791,
+        "wet_paved": 0.65,
+        "wet_unpaved": 0.87,
+        "snow_ice": 0.65
+      },
+      "per_class_f1": {
+        "smooth_paved": 0.7379679144385026,
+        "rough_paved": 0.7211538461538461,
+        "block_paved": 0.8911392405063291,
+        "gravel": 0.648936170212766,
+        "mud_dirt": 0.6929133858267716,
+        "unpaved_mixed": 0.8663101604278075,
+        "wet_paved": 0.6598984771573604,
+        "wet_unpaved": 0.759825327510917,
+        "snow_ice": 0.7692307692307693
+      },
+      "support": {
+        "smooth_paved": 168,
+        "rough_paved": 100,
+        "block_paved": 215,
+        "gravel": 93,
+        "mud_dirt": 75,
+        "unpaved_mixed": 86,
+        "wet_paved": 100,
+        "wet_unpaved": 100,
+        "snow_ice": 100
+      },
+      "confusion_matrix": [
+        [
+          138,
+          5,
+          0,
+          7,
+          3,
+          5,
+          5,
+          2,
+          3
+        ],
+        [
+          4,
+          75,
+          0,
+          11,
+          0,
+          0,
+          9,
+          1,
+          0
+        ],
+        [
+          24,
+          0,
+          176,
+          0,
+          0,
+          15,
+          0,
+          0,
+          0
+        ],
+        [
+          3,
+          3,
+          0,
+          61,
+          2,
+          0,
+          4,
+          20,
+          0
+        ],
+        [
+          3,
+          6,
+          0,
+          13,
+          44,
+          0,
+          1,
+          8,
+          0
+        ],
+        [
+          3,
+          0,
+          2,
+          0,
+          0,
+          81,
+          0,
+          0,
+          0
+        ],
+        [
+          16,
+          8,
+          2,
+          1,
+          0,
+          0,
+          65,
+          7,
+          1
+        ],
+        [
+          1,
+          2,
+          0,
+          1,
+          3,
+          0,
+          6,
+          87,
+          0
+        ],
+        [
+          14,
+          9,
+          0,
+          1,
+          0,
+          0,
+          7,
+          4,
+          65
+        ]
+      ]
+    },
+    "test": {
+      "loss": 0.6443168444323405,
+      "accuracy": 0.844342037890425,
+      "macro_f1": 0.8675548764969769,
+      "per_class_precision": {
+        "smooth_paved": 0.8388704318936877,
+        "rough_paved": 0.47601476014760147,
+        "block_paved": 0.9333333333333333,
+        "gravel": 0.9411764705882353,
+        "mud_dirt": 0.979381443298969,
+        "unpaved_mixed": 0.9478260869565217,
+        "wet_paved": 0.87,
+        "wet_unpaved": 0.9247311827956989,
+        "snow_ice": 0.9772727272727273
+      },
+      "per_class_recall": {
+        "smooth_paved": 0.7769230769230769,
+        "rough_paved": 0.7914110429447853,
+        "block_paved": 0.8350877192982457,
+        "gravel": 0.96,
+        "mud_dirt": 0.95,
+        "unpaved_mixed": 0.9211267605633803,
+        "wet_paved": 0.87,
+        "wet_unpaved": 0.86,
+        "snow_ice": 0.86
+      },
+      "per_class_f1": {
+        "smooth_paved": 0.8067092651757188,
+        "rough_paved": 0.5944700460829493,
+        "block_paved": 0.8814814814814815,
+        "gravel": 0.9504950495049505,
+        "mud_dirt": 0.9644670050761421,
+        "unpaved_mixed": 0.9342857142857143,
+        "wet_paved": 0.87,
+        "wet_unpaved": 0.8911917098445595,
+        "snow_ice": 0.9148936170212766
+      },
+      "support": {
+        "smooth_paved": 650,
+        "rough_paved": 163,
+        "block_paved": 285,
+        "gravel": 100,
+        "mud_dirt": 100,
+        "unpaved_mixed": 355,
+        "wet_paved": 100,
+        "wet_unpaved": 100,
+        "snow_ice": 100
+      },
+      "confusion_matrix": [
+        [
+          505,
+          123,
+          11,
+          0,
+          0,
+          7,
+          2,
+          1,
+          1
+        ],
+        [
+          22,
+          129,
+          2,
+          4,
+          1,
+          3,
+          1,
+          1,
+          0
+        ],
+        [
+          31,
+          10,
+          238,
+          0,
+          0,
+          6,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          3,
+          0,
+          96,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          2,
+          0,
+          2,
+          95,
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          21,
+          3,
+          4,
+          0,
+          0,
+          327,
+          0,
+          0,
+          0
+        ],
+        [
+          6,
+          0,
+          0,
+          0,
+          0,
+          2,
+          87,
+          4,
+          1
+        ],
+        [
+          2,
+          1,
+          0,
+          0,
+          1,
+          0,
+          10,
+          86,
+          0
+        ],
+        [
+          14,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          86
+        ]
+      ]
+    }
+  },
+  "artifact": {
+    "filename": "road_surface_public_mix_torchscript.pt",
+    "size_bytes": 6122098,
+    "sha256": "fe5d041737b8839e198c2d76dac34cde483edd6c138e8b437585ad4cc38597ba",
+    "median_cpu_latency_ms_colab": 6.126828000105888
+  },
+  "runtime": {
+    "torch": "2.11.0+cu128",
+    "torchvision": "0.26.0+cu128"
+  }
+}

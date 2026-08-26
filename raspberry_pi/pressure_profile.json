@@ -1,0 +1,20 @@
+{
+  "sample_count": 97,
+  "left_held_ema": 296.033031532834,
+  "right_held_ema": 291.45720154321884,
+  "left_load_total": 3700.4307249238873,
+  "right_load_total": 3641.4822874088877,
+  "release_events": 0,
+  "left_release_events": 0,
+  "right_release_events": 0,
+  "asymmetry_events": 0,
+  "overload_events": 0,
+  "total_session_seconds": 12.721205359999658,
+  "summary": {
+    "left_load_share": 0.504,
+    "right_load_share": 0.496,
+    "load_imbalance": 0.008,
+    "interpretation": "BALANCED",
+    "note": "This is a support-use pattern, not a medical diagnosis. One FSR per handle can compare left versus right only; it cannot identify palm position within a handle."
+  }
+}
