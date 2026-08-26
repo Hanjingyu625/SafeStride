@@ -138,12 +138,25 @@ int main() {
     assert(g_motor_in1_level == HIGH);
     assert(g_motor_in2_level == LOW);
     assert(drive.leftHallPulsePosition() == 0L);
+    assert(drive.leftVelocityMradS() >= 999L);
+    assert(drive.leftVelocityMradS() <= 1001L);
 
     drive.updateMagnetBench(
         5000UL, magnet_pulse, stopped, 500L, false);
     assert(g_motor_pwm == 0);
     assert(g_motor_in1_level == LOW);
     assert(g_motor_in2_level == LOW);
+
+    const HallSample visible_for_echo = {
+        1UL, 6283185UL, 4000000UL};
+    drive.updateMagnetBench(
+        5000UL, visible_for_echo, stopped, 500L, false);
+    assert(drive.leftVelocityMradS() >= 999L);
+    const HallSample expired = {
+        1UL, 6283185UL, cfg::MAGNET_BENCH_VELOCITY_HOLD_US};
+    drive.updateMagnetBench(
+        5000UL, expired, stopped, 500L, false);
+    assert(drive.leftVelocityMradS() == 0L);
 
     drive.updateMagnetBench(
         5000UL, magnet_pulse, stopped, -500L, true);

@@ -4,6 +4,7 @@ import struct
 import unittest
 
 from safestride_bridge.protocol import (
+    BOARD_ROLE_DRIVE,
     COMMAND_STRUCT,
     HEADER_STRUCT,
     TELEMETRY_STRUCT,
@@ -112,7 +113,7 @@ class TestFrame(unittest.TestCase):
             sequence=1,
             session_id=0,
             timestamp_ms=10,
-            payload=HelloPayload(3, 7).pack(),
+            payload=HelloPayload(3, 7, BOARD_ROLE_DRIVE).pack(),
         )
         raw = bytearray(frame.raw_bytes())
         raw[2] = 1
@@ -127,7 +128,7 @@ class TestFrame(unittest.TestCase):
             sequence=1,
             session_id=0,
             timestamp_ms=10,
-            payload=HelloPayload(3, 7).pack(),
+            payload=HelloPayload(3, 7, BOARD_ROLE_DRIVE).pack(),
         )
         raw = bytearray(frame.raw_bytes())
         raw[HEADER_STRUCT.size] ^= 0x80
@@ -188,14 +189,16 @@ class TestFrame(unittest.TestCase):
 class TestPayloads(unittest.TestCase):
 
     def test_hello(self):
-        payload = HelloPayload(0xDEADBEEF, 0x01020304)
+        payload = HelloPayload(
+            0xDEADBEEF, 0x01020304, BOARD_ROLE_DRIVE
+        )
         self.assertEqual(HelloPayload.unpack(payload.pack()), payload)
-        self.assertEqual(len(payload.pack()), 8)
+        self.assertEqual(len(payload.pack()), 16)
 
     def test_session_start(self):
-        payload = SessionStartPayload(0xDEADBEEF)
+        payload = SessionStartPayload(0xDEADBEEF, BOARD_ROLE_DRIVE)
         self.assertEqual(SessionStartPayload.unpack(payload.pack()), payload)
-        self.assertEqual(len(payload.pack()), 4)
+        self.assertEqual(len(payload.pack()), 12)
 
     def test_command_exact_layout(self):
         payload = CommandPayload(-12345, 150, 1)
@@ -260,11 +263,20 @@ class TestPayloads(unittest.TestCase):
             tof_reference_mm=500,
             tof_error_mm=210,
             tof_change_mm=-15,
+            bno_heading_mrad=1571,
+            bno_roll_mrad=-120,
+            bno_pitch_mrad=340,
+            bno_valid=1,
+            bno_calibration=0xFF,
             fault_bits=0,
         )
         self.assertEqual(
             payload.pack(),
-            struct.pack('<HBBHHhhH', 725, 1, 2, 710, 500, 210, -15, 0),
+            struct.pack(
+                '<HBBHHhhhhhBBH',
+                725, 1, 2, 710, 500, 210, -15,
+                1571, -120, 340, 1, 0xFF, 0,
+            ),
         )
         self.assertEqual(
             len(payload.pack()), TERRAIN_TELEMETRY_STRUCT.size
@@ -345,6 +357,22 @@ class TestFrameParser(unittest.TestCase):
     def test_empty_delimiters_are_ignored(self):
         parser = FrameParser()
         self.assertEqual(parser.feed(b'\x00\x00\x00'), [])
+        self.assertEqual(parser.frame_error_count, 0)
+
+    def test_version_mismatch_is_reported_separately(self):
+        parser = FrameParser()
+        old_frame = Frame(
+            version=PROTOCOL_VERSION - 1,
+            packet_type=PacketType.HELLO,
+            sequence=1,
+            session_id=0,
+            timestamp_ms=0,
+        )
+        self.assertEqual(parser.feed(old_frame.encode()), [])
+        self.assertEqual(parser.version_error_count, 1)
+        self.assertEqual(
+            parser.last_unsupported_version, PROTOCOL_VERSION - 1
+        )
         self.assertEqual(parser.frame_error_count, 0)
 
 

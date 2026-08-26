@@ -53,6 +53,18 @@ void updateTimer(
   }
 }
 
+uint32_t hallZeroTimeoutUs() {
+  return cfg::MAGNET_BENCH_MODE
+      ? cfg::MAGNET_BENCH_VELOCITY_HOLD_US
+      : cfg::HALL_ZERO_TIMEOUT_US;
+}
+
+float velocityFilterAlpha() {
+  return cfg::MAGNET_BENCH_MODE
+      ? cfg::MAGNET_BENCH_VELOCITY_FILTER_ALPHA
+      : cfg::VELOCITY_FILTER_ALPHA;
+}
+
 }  // namespace
 
 DriveController::DriveController()
@@ -160,7 +172,7 @@ float DriveController::hallSpeedMagnitude(
     const HallSample& sample,
     uint32_t pulse_delta,
     uint32_t elapsed_us) {
-  if (sample.age_us >= cfg::HALL_ZERO_TIMEOUT_US) {
+  if (sample.age_us >= hallZeroTimeoutUs()) {
     return 0.0F;
   }
   const float mrad_per_pulse =
@@ -213,15 +225,15 @@ void DriveController::updateHallFeedback(
   const float raw_right = direction * hallSpeedMagnitude(
       right_hall, right_delta, elapsed_us);
   const float alpha = clampFloat(
-      cfg::VELOCITY_FILTER_ALPHA, 0.0F, 1.0F);
+      velocityFilterAlpha(), 0.0F, 1.0F);
 
-  if (left_hall.age_us >= cfg::HALL_ZERO_TIMEOUT_US) {
+  if (left_hall.age_us >= hallZeroTimeoutUs()) {
     filtered_left_mrad_s_ = 0.0F;
   } else {
     filtered_left_mrad_s_ +=
         alpha * (raw_left - filtered_left_mrad_s_);
   }
-  if (right_hall.age_us >= cfg::HALL_ZERO_TIMEOUT_US) {
+  if (right_hall.age_us >= hallZeroTimeoutUs()) {
     filtered_right_mrad_s_ = 0.0F;
   } else {
     filtered_right_mrad_s_ +=

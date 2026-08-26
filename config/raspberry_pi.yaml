@@ -15,6 +15,7 @@ serial_bridge:
       max_abs_angular_z_rad_s: 0.0
       # Temporary no-wheel test. Must match firmware MAGNET_BENCH_MODE.
       allow_magnet_bench_mode: true
+      auto_arm_magnet_bench_mode: true
       arm_confirmation_timeout_s: 1.0
     telemetry: {timeout_s: 0.30}
     diagnostics: {publish_rate_hz: 1.0}
@@ -55,9 +56,10 @@ terrain_bridge:
     telemetry: {timeout_s: 0.30}
     diagnostics: {publish_rate_hz: 1.0}
     range: {min_m: 0.10, max_m: 2.0, field_of_view_rad: 0.052}
-    frames: {tof: terrain_tof_link}
+    frames: {tof: terrain_tof_link, bno: imu_link}
     topics:
       tof: /terrain/tof
+      imu: /terrain/imu
       status: /terrain/status
       diagnostics: /diagnostics
 
@@ -71,7 +73,8 @@ safety_supervisor:
     range_timeout: 0.35
     # The terrain TOF faces downward and cannot replace front obstacle ranges.
     require_range_sensors: false
-    require_deadman: true
+    # Temporary bench mode: pressure is still published but does not inhibit.
+    require_deadman: false
     max_forward_velocity: 0.15
     max_reverse_velocity: 0.08
     max_angular_velocity: 0.0

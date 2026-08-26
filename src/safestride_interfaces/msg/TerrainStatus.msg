@@ -7,6 +7,7 @@ uint8 LEG_SAFE_STOP=4
 uint8 LEG_FAULT=5
 float32 tof_distance_m
 bool tof_valid
+float32 yaw_rad
 float32 pitch_rad
 float32 roll_rad
 bool mpu_valid

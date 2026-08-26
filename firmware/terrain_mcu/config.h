@@ -24,6 +24,15 @@ constexpr float TOF_CHANGE_THRESHOLD_MM = 10.0F;
 constexpr uint8_t TOF_REQUIRED_FRAMES = 4U;
 constexpr uint16_t TOF_RED_HOLD_MS = 1000U;
 
+// BNO055 shares the Uno A4/A5 I2C bus with the TOF-10120. The driver probes
+// both legal addresses so the ADR pin may be tied either low or high.
+constexpr bool ENABLE_BNO055 = true;
+constexpr uint8_t BNO055_ADDRESS_LOW = 0x28U;
+constexpr uint8_t BNO055_ADDRESS_HIGH = 0x29U;
+constexpr uint16_t BNO055_SAMPLE_PERIOD_MS = 50U;
+constexpr uint16_t BNO055_RECONNECT_PERIOD_MS = 1000U;
+constexpr uint8_t BNO055_MAX_CONSECUTIVE_ERRORS = 3U;
+
 static_assert(
     TOF_MIN_VALID_DISTANCE_MM < TOF_MAX_VALID_DISTANCE_MM,
     "TOF valid range is invalid");

@@ -25,6 +25,10 @@ except ImportError:  # pragma: no cover - depends on target OS packaging
     serial = None
 
 from .protocol import (
+    BOARD_ROLE_DRIVE,
+    FIRMWARE_RELEASE_ID,
+    PROTOCOL_SCHEMA_ID,
+    PROTOCOL_VERSION,
     CommandPayload,
     Frame,
     FrameParser,
@@ -96,6 +100,7 @@ class SerialBridgeNode(Node):
         self._payload_error_count = 0
         self._session_error_count = 0
         self._sequence_error_count = 0
+        self._compatibility_error: Optional[str] = None
 
         self._session_id = 0
         self._boot_id = 0
@@ -193,6 +198,7 @@ class SerialBridgeNode(Node):
             ('command.arm_max_wheel_speed_rad_s', 0.10),
             ('command.max_abs_angular_z_rad_s', 0.0),
             ('command.allow_magnet_bench_mode', False),
+            ('command.auto_arm_magnet_bench_mode', False),
             ('command.arm_confirmation_timeout_s', 1.0),
             ('telemetry.timeout_s', 0.30),
             ('diagnostics.publish_rate_hz', 1.0),
@@ -301,6 +307,17 @@ class SerialBridgeNode(Node):
         self._allow_magnet_bench_mode = bool(
             self._value('command.allow_magnet_bench_mode')
         )
+        self._auto_arm_magnet_bench_mode = bool(
+            self._value('command.auto_arm_magnet_bench_mode')
+        )
+        if (
+            self._auto_arm_magnet_bench_mode
+            and not self._allow_magnet_bench_mode
+        ):
+            raise ValueError(
+                'auto-arm magnet bench mode requires '
+                'allow_magnet_bench_mode=true'
+            )
         self._arm_confirmation_timeout = finite_float(
             'command.arm_confirmation_timeout_s',
             self._value('command.arm_confirmation_timeout_s'),
@@ -531,6 +548,7 @@ class SerialBridgeNode(Node):
         self._session_id = 0
         self._boot_id = 0
         self._capabilities = 0
+        self._compatibility_error = None
         self._session_started = False
         self._clear_enable_request()
         self._last_command_time = None
@@ -669,6 +687,32 @@ class SerialBridgeNode(Node):
     def _handle_hello(
         self, hello: HelloPayload, hello_sequence: int
     ) -> None:
+        compatibility_errors = []
+        if hello.board_role != BOARD_ROLE_DRIVE:
+            compatibility_errors.append(
+                f'board role {hello.board_role} is not DRIVE'
+            )
+        if hello.protocol_version != PROTOCOL_VERSION:
+            compatibility_errors.append(
+                f'HELLO protocol {hello.protocol_version} != '
+                f'{PROTOCOL_VERSION}'
+            )
+        if hello.schema_id != PROTOCOL_SCHEMA_ID:
+            compatibility_errors.append(
+                f'schema 0x{hello.schema_id:04x} != '
+                f'0x{PROTOCOL_SCHEMA_ID:04x}'
+            )
+        if hello.firmware_release_id != FIRMWARE_RELEASE_ID:
+            compatibility_errors.append(
+                f'firmware release {hello.firmware_release_id} != '
+                f'{FIRMWARE_RELEASE_ID}'
+            )
+        if compatibility_errors:
+            self._compatibility_error = '; '.join(compatibility_errors)
+            self._session_started = False
+            return
+        self._compatibility_error = None
+        self._parser.last_unsupported_version = None
         if (
             hello.boot_id == self._boot_id
             and self._session_started
@@ -704,7 +748,10 @@ class SerialBridgeNode(Node):
             self._last_hall_left = None
             self._last_hall_right = None
 
-        payload = SessionStartPayload(hello.boot_id).pack()
+        payload = SessionStartPayload(
+            hello.boot_id,
+            BOARD_ROLE_DRIVE,
+        ).pack()
         frame = self._make_frame(
             PacketType.SESSION_START,
             payload,
@@ -954,6 +1001,22 @@ class SerialBridgeNode(Node):
             self._clear_enable_request()
             self._send_command(0, False)
             return
+
+        if (
+            self._auto_arm_magnet_bench_mode
+            and not self._enabled_requested
+            and telemetry is not None
+            and self._magnet_bench_mode_active(telemetry)
+        ):
+            self._enabled_requested = True
+            self._arm_confirmed = False
+            self._arm_confirmation_deadline = (
+                now + self._arm_confirmation_timeout
+            )
+            self.get_logger().warning(
+                'auto-arming temporary magnet bench mode for a fresh '
+                'velocity command'
+            )
 
         if (
             self._enabled_requested
@@ -1311,6 +1374,18 @@ class SerialBridgeNode(Node):
         elif not self._serial_connected():
             status.level = DiagnosticStatus.ERROR
             status.message = 'serial port disconnected'
+        elif self._parser.last_unsupported_version is not None:
+            status.level = DiagnosticStatus.ERROR
+            status.message = (
+                'protocol version mismatch: controller '
+                f'v{self._parser.last_unsupported_version}, '
+                f'bridge v{PROTOCOL_VERSION}; flash both MCUs'
+            )
+        elif self._compatibility_error is not None:
+            status.level = DiagnosticStatus.ERROR
+            status.message = (
+                f'incompatible controller: {self._compatibility_error}'
+            )
         elif not self._session_started:
             status.level = DiagnosticStatus.WARN
             status.message = 'waiting for controller HELLO'
@@ -1389,12 +1464,37 @@ class SerialBridgeNode(Node):
         status.values = [
             KeyValue(key='port', value=self._port),
             KeyValue(key='baudrate', value=str(self._baudrate)),
+            KeyValue(key='expected_board_role', value='DRIVE'),
+            KeyValue(key='protocol_version', value=str(PROTOCOL_VERSION)),
+            KeyValue(
+                key='protocol_schema_id',
+                value=f'0x{PROTOCOL_SCHEMA_ID:04x}',
+            ),
+            KeyValue(
+                key='firmware_release_id',
+                value=str(FIRMWARE_RELEASE_ID),
+            ),
+            KeyValue(
+                key='observed_protocol_version',
+                value=(
+                    str(self._parser.last_unsupported_version)
+                    if self._parser.last_unsupported_version is not None
+                    else (
+                        str(PROTOCOL_VERSION)
+                        if self._boot_id else 'unknown'
+                    )
+                ),
+            ),
             KeyValue(key='session_id', value=f'0x{self._session_id:08x}'),
             KeyValue(key='boot_id', value=f'0x{self._boot_id:08x}'),
             KeyValue(key='telemetry_age_s', value=f'{age:.3f}'),
             KeyValue(
                 key='crc_errors',
                 value=str(self._parser.crc_error_count),
+            ),
+            KeyValue(
+                key='version_errors',
+                value=str(self._parser.version_error_count),
             ),
             KeyValue(
                 key='frame_errors',
@@ -1416,6 +1516,10 @@ class SerialBridgeNode(Node):
             KeyValue(
                 key='enabled_requested',
                 value=str(self._enabled_requested).lower(),
+            ),
+            KeyValue(
+                key='magnet_bench_auto_arm',
+                value=str(self._auto_arm_magnet_bench_mode).lower(),
             ),
             KeyValue(
                 key='hall_left_pulses',

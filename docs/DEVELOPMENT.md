@@ -39,12 +39,14 @@ expects `/dev/safestride-drive` and `/dev/safestride-terrain`; GPS uses its own
 alias when enabled.
 
 Both Arduino sketches must be flashed after a wire-protocol change. Protocol
-v2 is intentionally incompatible with the old dual-wheel command payload, so
+v3 is intentionally incompatible with older firmware, so
 the Drive MCU, Terrain MCU and ROS bridge must be updated together.
 
 For unattended startup, first review `config/raspberry_pi.yaml`, install the
 udev rules, build successfully, and then run `bash scripts/install_service.sh`.
-The service starts disarmed and never calls the enable service automatically.
+The service starts disarmed. The temporary magnet-bench configuration may
+auto-arm only while a fresh straight-line command is being received; disable
+that option before normal wheel-on-ground operation.
 
 Put the supplied shapefile in `data/external/crosswalk_shp/` and converted JSON
 in `data/generated/`. Store YOLO weights in GitHub Releases or an artifact store

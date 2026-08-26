@@ -55,6 +55,10 @@ constexpr bool HALL_CALIBRATED = false;
 constexpr bool MAGNET_BENCH_MODE = true;
 constexpr uint8_t MAGNET_BENCH_PWM = 60U;
 constexpr uint16_t MAGNET_BENCH_PULSE_HOLD_MS = 750U;
+// Hand-moved magnets can take several seconds between approaches. Retain the
+// pulse-pair speed long enough to see it in `ros2 topic echo /wheel/hall`.
+constexpr uint32_t MAGNET_BENCH_VELOCITY_HOLD_US = 5000000UL;
+constexpr float MAGNET_BENCH_VELOCITY_FILTER_ALPHA = 1.0F;
 
 // Runtime Hall plausibility monitor. Tune from lifted-wheel logs. A fault
 // latches until MCU reset so an intermittent sensor cannot silently re-arm.
@@ -114,7 +118,7 @@ constexpr uint8_t RIGHT_CURRENT_SENSE_PIN = A4;
 constexpr float CURRENT_ZERO_V = 2.5F;
 constexpr float CURRENT_MA_PER_V = 1000.0F;
 
-// The v2 telemetry layout reserves two front-range fields, but no such sensors
+// The telemetry layout reserves two front-range fields, but no such sensors
 // are installed in the current pin map. Do not advertise the capability or
 // require the ROS topics until real non-blocking drivers replace the sentinels.
 constexpr bool ENABLE_FRONT_RANGE_SENSORS = false;
@@ -148,6 +152,15 @@ static_assert(
     MAGNET_BENCH_PULSE_HOLD_MS > 0U &&
         MAGNET_BENCH_PULSE_HOLD_MS <= 1000U,
     "magnet bench pulse hold must be between 1 and 1000 ms");
+static_assert(
+    MAGNET_BENCH_VELOCITY_HOLD_US >= HALL_ZERO_TIMEOUT_US,
+    "magnet bench velocity hold must cover the normal Hall timeout");
+static_assert(
+    MAGNET_BENCH_VELOCITY_FILTER_ALPHA > 0.0F &&
+        MAGNET_BENCH_VELOCITY_FILTER_ALPHA <= 1.0F &&
+        VELOCITY_FILTER_ALPHA > 0.0F &&
+        VELOCITY_FILTER_ALPHA <= 1.0F,
+    "velocity filter alpha values must be in (0, 1]");
 static_assert(
     HALL_PULSES_PER_WHEEL_REV > 0UL,
     "Hall pulses per wheel revolution must be positive");

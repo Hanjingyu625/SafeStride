@@ -75,6 +75,7 @@ bringup 후 센서 링크는 다음처럼 각각 한 메시지를 받아 확인�
 ros2 topic echo /handle/pressure --once
 ros2 topic echo /wheel/hall --once
 ros2 topic echo /terrain/tof --once
+ros2 topic echo /terrain/imu --once
 ros2 topic echo /terrain/status --once
 ros2 topic echo /walker/status --once
 ```
@@ -83,16 +84,15 @@ ros2 topic echo /walker/status --once
 `firmware/safestride_mcu/config.h`의 좌우 polarity/threshold를 조정하고, 검증을
 마친 경우에만 `PRESSURE_THRESHOLDS_CALIBRATED`를 `true`로 바꿔 다시 flash한다.
 
-모터는 시작 시 항상 disarmed다. 현재 E-stop은 미구현이므로 별도의 물리 전원
-차단 수단을 즉시 사용할 수 있고 바퀴를 지면에서 든 상태에서만 한 터미널로
-아주 작은 속도 명령을 계속 발행하고, 다른 터미널에서
-명시적으로 enable한다.
+모터는 시작 시 disarmed다. 현재 임시 자석 벤치 설정은 신선한 직진 명령을
+받으면 자동 arm하지만, 홀센서 펄스 전에는 출력하지 않는다. E-stop은
+미구현이므로 별도의 물리 전원 차단 수단을 즉시 사용할 수 있고 모터 축을
+고정한 상태에서만 아주 작은 속도 명령을 계속 발행한다.
 
 ```bash
 ros2 topic pub --rate 20 /cmd_vel geometry_msgs/msg/TwistStamped \
   "{header: {frame_id: base_link}, twist: {linear: {x: 0.03}}}"
-ros2 service call /walker/set_enabled std_srvs/srv/SetBool "{data: true}"
-# 시험 직후
+# 시험 직후에는 먼저 위 topic publisher를 Ctrl+C로 끝낸 다음
 ros2 service call /walker/set_enabled std_srvs/srv/SetBool "{data: false}"
 ```
 
@@ -101,7 +101,7 @@ ros2 service call /walker/set_enabled std_srvs/srv/SetBool "{data: false}"
 ```text
 src/                         ROS 2 Jazzy 패키지
 firmware/safestride_mcu/     Drive Uno 펌웨어
-firmware/terrain_mcu/        Terrain Uno TOF 센서 펌웨어
+firmware/terrain_mcu/        Terrain Uno TOF/BNO055 센서 펌웨어
 config/                      하드웨어 및 실행 설정
 deploy/udev/                 고정 serial 장치 별칭
 deploy/systemd/              화면 없는 자동 시작 서비스

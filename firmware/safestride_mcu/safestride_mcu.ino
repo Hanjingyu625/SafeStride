@@ -93,10 +93,12 @@ bool estopActive() {
 }
 
 bool deadmanActive() {
-  if (cfg::MAGNET_BENCH_MODE || !cfg::REQUIRE_DEADMAN) {
-    return true;
-  }
   return g_pressure.bothHandsPresent();
+}
+
+bool motionDeadmanSatisfied() {
+  return cfg::MAGNET_BENCH_MODE || !cfg::REQUIRE_DEADMAN ||
+         deadmanActive();
 }
 
 bool driverFaultActive() {
@@ -237,7 +239,7 @@ void refreshPhysicalSafety() {
     return;
   }
 
-  if (g_state == ControllerState::ARMED && !deadmanActive()) {
+  if (g_state == ControllerState::ARMED && !motionDeadmanSatisfied()) {
     immediateStop(ControllerState::SAFE_STOP, false);
   }
 }
@@ -337,6 +339,10 @@ void sendHello() {
   }
   proto::writeU32(payload, g_boot_id);
   proto::writeU32(payload + 4U, capabilities);
+  payload[8U] = proto::BOARD_ROLE_DRIVE;
+  payload[9U] = proto::VERSION;
+  proto::writeU16(payload + 10U, proto::SCHEMA_ID);
+  proto::writeU32(payload + 12U, proto::FIRMWARE_RELEASE_ID);
   if (proto::sendFrame(
       Serial,
       proto::TYPE_HELLO,
@@ -423,7 +429,12 @@ bool handleSessionStart(
     return false;
   }
   const uint32_t expected_boot_id = proto::readU32(frame.payload);
-  if (expected_boot_id != g_boot_id) {
+  if (expected_boot_id != g_boot_id ||
+      frame.payload[4U] != proto::BOARD_ROLE_DRIVE ||
+      frame.payload[5U] != proto::VERSION ||
+      proto::readU16(frame.payload + 6U) != proto::SCHEMA_ID ||
+      proto::readU32(frame.payload + 8U) !=
+          proto::FIRMWARE_RELEASE_ID) {
     return false;
   }
 
@@ -492,7 +503,7 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   // stop state is active. Releasing the input alone never restarts motion; the
   // host must first send a disabled command and explicitly arm again.
   if ((!cfg::MAGNET_BENCH_MODE && !cfg::HALL_CALIBRATED) ||
-      estopActive() || !deadmanActive() || g_watchdog_timed_out ||
+      estopActive() || !motionDeadmanSatisfied() || g_watchdog_timed_out ||
       g_fault_bits != 0U ||
       g_state == ControllerState::ESTOP ||
       g_state == ControllerState::SAFE_STOP ||
@@ -569,7 +580,7 @@ void runControlLoop(uint32_t now_us) {
       g_session_active &&
       g_state == ControllerState::ARMED &&
       !estopActive() &&
-      deadmanActive() &&
+      motionDeadmanSatisfied() &&
       g_fault_bits == 0U;
   if (cfg::MAGNET_BENCH_MODE) {
     const uint32_t pulse_hold_us =

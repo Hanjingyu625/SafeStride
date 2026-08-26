@@ -4,17 +4,20 @@
 
 - Raspberry Pi 4 / Ubuntu 24.04 / ROS 2 Jazzy
 - SafeStride Drive Uno: 좌우 홀센서, 좌우 압력센서, 단일 SZH-GNP521
-- Terrain Uno: TOF-10120
+- Terrain Uno: TOF-10120, BNO055
 - 두 모터: 하나의 SZH-GNP521 출력에 연결되어 같은 명령으로 동작
 
 현재 운영 ROS에서 확인 가능한 센서는 `/wheel/hall`, `/handle/pressure`,
-`/terrain/tof`이다. MPU-9250/AK8963과 BNO055는 아직 운영 펌웨어와 프로토콜에
-구현되지 않아 이 절차의 검사 대상이 아니다.
+`/terrain/tof`, `/terrain/imu`이다. MPU-9250/AK8963은 아직 운영 펌웨어와
+프로토콜에 구현되지 않아 이 절차의 검사 대상이 아니다.
 
 현재 브랜치는 바퀴 없이 홀센서와 자석만으로 구동 신호를 확인하는 임시
 `MAGNET_BENCH_MODE`가 켜져 있다. 이 모드에서는 압력 dead-man, 홀 보정, 정지
-대기와 Hall fault 판정을 우회한다. 대신 ROS/MCU 명령 watchdog, USB session,
-0이 아닌 최신 직진 명령, 명시적 enable, 펄스 후 750 ms 자동 정지는 유지한다.
+대기와 Hall fault 판정을 우회한다. ROS의 pressure dead-man 차단도 임시로
+꺼져 있지만 압력 값과 실제 dead-man 판정은 계속 토픽에 표시된다. 대신
+ROS/MCU 명령 watchdog, USB session, 0이 아닌 최신 직진 명령, 펄스 후 750 ms
+자동 정지는 유지한다. 현재 설정은 신선한 직진 명령을 받으면 벤치 세션을
+자동 arm한다.
 
 ## 1. 전원 인가 전 확인
 
@@ -84,7 +87,7 @@ enable을 거부한다. 현재 자석 벤치 모드에서는 보정값을 거짓
 
 ## 3. 두 Uno 운영 펌웨어 업로드
 
-프로토콜 v2 변경이 포함되어 있으므로 **두 Uno를 모두 다시 플래시**해야 한다.
+프로토콜 v3 변경이 포함되어 있으므로 **두 Uno를 모두 다시 플래시**해야 한다.
 한 번에 보드 하나만 연결하면 포트가 뒤바뀌는 실수를 줄일 수 있다.
 
 ```bash
@@ -101,6 +104,20 @@ arduino-cli upload --fqbn arduino:avr:uno -p /dev/ttyACM1 \
 운영 펌웨어는 같은 포트에 binary 프레임을 보내므로 Arduino 시리얼 모니터를
 열어 두지 않는다. ROS bridge와 시리얼 모니터는 동시에 같은 포트를 사용할 수
 없다.
+
+ROS를 띄우기 전에 각 포트의 양방향 통신을 독립 검사할 수 있다. 이미 서비스가
+실행 중이면 먼저 중지하고, 두 명령 모두 `PASS`와 텔레메트리 바이트 수를
+출력하는지 확인한다.
+
+```bash
+sudo systemctl stop safestride.service 2>/dev/null || true
+python3 tools/serial_probe.py --port /dev/safestride-drive --role drive
+python3 tools/serial_probe.py --port /dev/safestride-terrain --role terrain
+```
+
+이 도구는 HELLO만 읽는 것이 아니라 호환성 값을 확인하고 SESSION_START를 보낸
+후 같은 session ID의 telemetry까지 받아야 성공한다. 따라서 Uno→Pi와 Pi→Uno를
+한 번에 검사한다.
 
 ## 4. Raspberry Pi 장치명 고정
 
@@ -168,6 +185,20 @@ ros2 node list
 ros2 topic list | sort
 ```
 
+먼저 직렬 핸드셰이크를 확인한다.
+
+```bash
+ros2 topic echo /diagnostics --once
+```
+
+Drive 진단에는 `expected_board_role=DRIVE`, Terrain 진단에는
+`expected_board_role=TERRAIN`이 표시되고, 둘 다 `protocol_version=3`,
+`protocol_schema_id=0x0301`, `firmware_release_id=20260816`이어야 한다.
+`protocol version mismatch`는 Pi 코드와 Uno 펌웨어 버전 불일치,
+`board role ... is not DRIVE/TERRAIN`은 두 USB 장치 경로가 뒤바뀐 경우다.
+`waiting for ... HELLO`만 계속되면 포트 경로·dialout 권한·115200 baud와 다른
+프로그램이 해당 포트를 열고 있지 않은지 확인한다.
+
 다음 토픽을 하나씩 확인한다.
 
 ```bash
@@ -175,6 +206,7 @@ ros2 topic echo /walker/status
 ros2 topic echo /wheel/hall
 ros2 topic echo /handle/pressure
 ros2 topic echo /terrain/tof
+ros2 topic echo /terrain/imu
 ros2 topic echo /terrain/status
 ros2 topic echo /diagnostics
 ```
@@ -187,10 +219,19 @@ ros2 topic echo /diagnostics
 | 한쪽 손을 놓음 | `deadman=false` |
 | E-stop 상태 | 현재 미구현이므로 `/walker/status.estop=false` 유지 |
 | TOF 앞 물체 이동 | `/terrain/tof.range` 변화 |
+| BNO055를 천천히 기울임/회전 | `/terrain/status`의 roll/pitch/yaw와 `/terrain/imu.orientation` 변화 |
 
-자석을 D2 또는 D3 홀센서에 통과시킬 때 `/wheel/hall`의 해당 `pulses`가
-증가해야 한다. 증가하지 않으면 모터 시험으로 넘어가지 않는다. 자석 벤치
-모드에서는 `calibrated=false`와 실제 압력센서 상태를 시험 목적으로 우회한다.
+자석을 D2 또는 D3 홀센서에 가까이 댔다 떼면 `/wheel/hall`의 해당 `pulses`가
+증가해야 한다. 속도는 펄스 사이 시간으로 계산하므로 같은 센서에 자석을
+최소 두 번 가까이 대야 `velocity_rad_s`가 의미 있는 값으로 바뀐다. 현재
+`PPR=1` 값은 실제 바퀴 속도가 아니라 펄스 간격을 환산한 시험값이며 마지막
+펄스 후 최대 5초 동안 확인할 수 있다. 펄스가 증가하지 않으면 모터 시험으로
+넘어가지 않는다. 자석 벤치 모드에서는 `calibrated=false`와 실제 압력센서
+상태를 시험 목적으로 우회한다.
+
+BNO055의 `bno_calibration`은 Bosch의 원시 calibration byte이며 모든 하위
+센서가 완전 보정되면 `255`(`0xff`)가 된다. 연결 직후 보정값이 낮아도
+`bno_valid=true`이고 자세 값이 움직임에 반응하면 통신 자체는 정상이다.
 
 ## 7. 바퀴 없이 자석으로 ROS 모터 시험
 
@@ -206,18 +247,15 @@ ros2 topic pub -r 20 /cmd_vel geometry_msgs/msg/TwistStamped \
   "{header: {frame_id: base_link}, twist: {linear: {x: 0.05}, angular: {z: 0.0}}}"
 ```
 
-5. 명령 발행이 유지되는 동안 다른 터미널에서 한 번만 enable한다. 성공 메시지는
-   `magnet bench armed`를 포함한다. 이 시점에는 아직 모터가 돌지 않아야 한다.
-
-```bash
-ros2 service call /walker/set_enabled std_srvs/srv/SetBool "{data: true}"
-```
-
+5. 현재 테스트 설정은 위 명령을 받으면 자동 arm한다. `/walker/status`에서
+   `armed=true`를 확인하되, 이 시점에는 아직 모터가 돌지 않아야 한다. 자동
+   arm을 끈 경우에만 `/walker/set_enabled` 서비스로 수동 enable한다.
 6. D2 또는 D3 홀센서 앞에서 자석을 한 번 통과시킨다. 어느 한쪽 펄스든 감지되면
    연결된 두 모터가 함께 약 0.75초 구동된 뒤 자동 정지해야 한다. 자석을 계속
    왕복하면 마지막 감지 시점부터 0.75초씩 연장된다. 반대 방향 시험은 `linear.x`를
    `-0.05`로 바꾼 뒤 다시 enable한다.
-7. 즉시 정지할 때는 다음 명령을 보내고 속도 발행 터미널도 `Ctrl+C`로 끝낸다.
+7. 즉시 정지할 때는 **먼저 속도 발행 터미널을 `Ctrl+C`로 끝낸 뒤** 다음
+   명령을 보낸다. 속도 발행이 계속되면 자동 arm 설정이 다시 활성화한다.
 
 ```bash
 ros2 service call /walker/set_enabled std_srvs/srv/SetBool "{data: false}"
@@ -231,15 +269,16 @@ ros2 service call /walker/set_enabled std_srvs/srv/SetBool "{data: false}"
 단일 드라이버 하드웨어에서는 지원하지 않는다.
 
 바퀴를 장착하거나 정상 주행 시험으로 넘어가기 전에는 반드시
-`MAGNET_BENCH_MODE=false`, `allow_magnet_bench_mode: false`로 되돌리고 홀센서와
+`MAGNET_BENCH_MODE=false`, `allow_magnet_bench_mode: false`,
+`auto_arm_magnet_bench_mode: false`, `require_deadman: true`로 되돌리고 홀센서와
 압력센서를 보정한다. 현재 설정은 정상 주행용이 아니다.
 
 ## 8. 정상 판정 체크리스트
 
 - [ ] `/dev/safestride-drive`, `/dev/safestride-terrain`이 올바른 보드를 가리킨다.
-- [ ] 두 bridge가 protocol v2 session을 시작한다.
+- [ ] 두 bridge가 protocol v3/schema `0x0301`/release `20260816` session을 시작한다.
 - [ ] 자석을 대면 `/wheel/hall`의 해당 펄스가 증가한다.
-- [ ] 압력센서와 TOF 토픽이 실제 조작에 반응하고 E-stop은 false로 유지된다.
+- [ ] 압력센서, TOF, BNO 토픽이 실제 조작에 반응하고 E-stop은 false로 유지된다.
 - [ ] `/diagnostics`에는 의도된 magnet bench 경고 외 serial/CRC/frame fault가 없다.
 - [ ] enable 전에는 배터리가 연결되어도 두 모터가 움직이지 않는다.
 - [ ] enable 후 자석 펄스가 있을 때만 두 모터가 같은 방향으로 움직인다.

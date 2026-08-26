@@ -5,7 +5,8 @@ workspace="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source /opt/ros/jazzy/setup.bash
 cd "${workspace}"
 bash -n "${workspace}"/scripts/*.sh
-python3 -m unittest "${workspace}/test/test_hardware_integrity.py"
+python3 "${workspace}/test/test_hardware_integrity.py"
+python3 "${workspace}/tools/serial_probe.py" --help >/dev/null
 if [[ ! -f install/setup.bash ]]; then
   echo "Run ./scripts/build.sh first." >&2
   exit 1

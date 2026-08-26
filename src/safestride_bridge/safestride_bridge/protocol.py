@@ -14,18 +14,23 @@ import struct
 from typing import ClassVar, Iterable, List
 
 
-PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = 3
+PROTOCOL_SCHEMA_ID = 0x0301
+FIRMWARE_RELEASE_ID = 20260816
+
+BOARD_ROLE_DRIVE = 1
+BOARD_ROLE_TERRAIN = 2
 FRAME_DELIMITER = 0x00
 MAX_RAW_FRAME_SIZE = 128
 
 HEADER_STRUCT = struct.Struct('<BBBBHHII')
 CRC_STRUCT = struct.Struct('<H')
 
-HELLO_STRUCT = struct.Struct('<II')
-SESSION_START_STRUCT = struct.Struct('<I')
+HELLO_STRUCT = struct.Struct('<IIBBHI')
+SESSION_START_STRUCT = struct.Struct('<IBBHI')
 COMMAND_STRUCT = struct.Struct('<iHBB')
 TELEMETRY_STRUCT = struct.Struct('<iiiiHHHhhHHHHHBB')
-TERRAIN_TELEMETRY_STRUCT = struct.Struct('<HBBHHhhH')
+TERRAIN_TELEMETRY_STRUCT = struct.Struct('<HBBHHhhhhhBBH')
 
 
 class ProtocolError(ValueError):
@@ -42,6 +47,17 @@ class FrameDecodeError(ProtocolError):
 
 class CrcMismatchError(FrameDecodeError):
     """Raised when a packet CRC does not match its contents."""
+
+
+class UnsupportedVersionError(FrameDecodeError):
+    """Raised when a frame belongs to a different wire protocol."""
+
+    def __init__(self, observed: int, expected: int) -> None:
+        self.observed = int(observed)
+        self.expected = int(expected)
+        super().__init__(
+            f'unsupported protocol version {observed}; expected {expected}'
+        )
 
 
 class PayloadDecodeError(ProtocolError):
@@ -248,10 +264,7 @@ def decode_frame(encoded: bytes) -> Frame:
     ) = HEADER_STRUCT.unpack(raw[:HEADER_STRUCT.size])
 
     if version != PROTOCOL_VERSION:
-        raise FrameDecodeError(
-            f'unsupported protocol version {version}; '
-            f'expected {PROTOCOL_VERSION}'
-        )
+        raise UnsupportedVersionError(version, PROTOCOL_VERSION)
     if flags != 0:
         raise FrameDecodeError('unsupported nonzero header flags')
     if reserved != 0:
@@ -287,6 +300,8 @@ class FrameParser:
         self.frames_received = 0
         self.crc_error_count = 0
         self.frame_error_count = 0
+        self.version_error_count = 0
+        self.last_unsupported_version: int | None = None
 
     def reset(self, clear_counters: bool = False) -> None:
         """Discard a partial packet, optionally resetting statistics."""
@@ -297,6 +312,8 @@ class FrameParser:
             self.frames_received = 0
             self.crc_error_count = 0
             self.frame_error_count = 0
+            self.version_error_count = 0
+            self.last_unsupported_version = None
 
     def feed(self, data: Iterable[int]) -> List[Frame]:
         """Consume bytes and return every complete, valid frame."""
@@ -318,6 +335,9 @@ class FrameParser:
                     frame = decode_frame(bytes(self._buffer))
                 except CrcMismatchError:
                     self.crc_error_count += 1
+                except UnsupportedVersionError as error:
+                    self.version_error_count += 1
+                    self.last_unsupported_version = error.observed
                 except ProtocolError:
                     self.frame_error_count += 1
                 else:
@@ -352,12 +372,20 @@ class HelloPayload:
 
     boot_id: int
     capabilities: int
+    board_role: int
+    protocol_version: int = PROTOCOL_VERSION
+    schema_id: int = PROTOCOL_SCHEMA_ID
+    firmware_release_id: int = FIRMWARE_RELEASE_ID
     TYPE: ClassVar[PacketType] = PacketType.HELLO
 
     def pack(self) -> bytes:
         return HELLO_STRUCT.pack(
             _u32('boot_id', self.boot_id),
             _u32('capabilities', self.capabilities),
+            _u8('board_role', self.board_role),
+            _u8('protocol_version', self.protocol_version),
+            _u16('schema_id', self.schema_id),
+            _u32('firmware_release_id', self.firmware_release_id),
         )
 
     @classmethod
@@ -371,11 +399,19 @@ class SessionStartPayload:
     """SESSION_START payload sent by the host after a HELLO."""
 
     expected_boot_id: int
+    expected_board_role: int
+    protocol_version: int = PROTOCOL_VERSION
+    schema_id: int = PROTOCOL_SCHEMA_ID
+    firmware_release_id: int = FIRMWARE_RELEASE_ID
     TYPE: ClassVar[PacketType] = PacketType.SESSION_START
 
     def pack(self) -> bytes:
         return SESSION_START_STRUCT.pack(
-            _u32('expected_boot_id', self.expected_boot_id)
+            _u32('expected_boot_id', self.expected_boot_id),
+            _u8('expected_board_role', self.expected_board_role),
+            _u8('protocol_version', self.protocol_version),
+            _u16('schema_id', self.schema_id),
+            _u32('firmware_release_id', self.firmware_release_id),
         )
 
     @classmethod
@@ -476,12 +512,19 @@ class TerrainTelemetryPayload:
     tof_reference_mm: int
     tof_error_mm: int
     tof_change_mm: int
+    bno_heading_mrad: int
+    bno_roll_mrad: int
+    bno_pitch_mrad: int
+    bno_valid: int
+    bno_calibration: int
     fault_bits: int
     TYPE: ClassVar[PacketType] = PacketType.TERRAIN_TELEMETRY
 
     def pack(self) -> bytes:
         if self.tof_valid not in (0, 1):
             raise ValueError('tof_valid must be 0 or 1')
+        if self.bno_valid not in (0, 1):
+            raise ValueError('bno_valid must be 0 or 1')
         return TERRAIN_TELEMETRY_STRUCT.pack(
             _u16('tof_distance_mm', self.tof_distance_mm),
             _u8('tof_valid', self.tof_valid),
@@ -490,6 +533,11 @@ class TerrainTelemetryPayload:
             _u16('tof_reference_mm', self.tof_reference_mm),
             int(self.tof_error_mm),
             int(self.tof_change_mm),
+            int(self.bno_heading_mrad),
+            int(self.bno_roll_mrad),
+            int(self.bno_pitch_mrad),
+            _u8('bno_valid', self.bno_valid),
+            _u8('bno_calibration', self.bno_calibration),
             _u16('fault_bits', self.fault_bits),
         )
 
@@ -501,4 +549,6 @@ class TerrainTelemetryPayload:
         payload = cls(*TERRAIN_TELEMETRY_STRUCT.unpack(data))
         if payload.tof_valid not in (0, 1):
             raise PayloadDecodeError('tof_valid must be 0 or 1')
+        if payload.bno_valid not in (0, 1):
+            raise PayloadDecodeError('bno_valid must be 0 or 1')
         return payload

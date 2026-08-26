@@ -1,9 +1,13 @@
-# SafeStride 직렬 통신 프로토콜 v2
+# SafeStride 직렬 통신 프로토콜 v3
 
 Raspberry Pi의 `safestride_bridge`와 Drive/Terrain Uno가 공통으로 사용하는
-USB 직렬 프로토콜이다. v2부터 Drive Uno는 단일 모터드라이버의 공통 속도
-목표와 좌우 홀센서 펄스를 사용한다. v1 펌웨어와 v2 브리지는 호환되지
-않으므로 두 Uno와 Raspberry Pi 소프트웨어를 함께 갱신해야 한다.
+USB 직렬 프로토콜이다. v3는 `board_role`, 스키마 ID와 펌웨어 릴리스 ID를
+핸드셰이크에 포함해 오래된 펌웨어나 서로 바뀐 Drive/Terrain 포트를 명시적으로
+거부한다. v1/v2 펌웨어와 v3 브리지는 호환되지 않으므로 두 Uno와 Raspberry Pi
+소프트웨어를 반드시 함께 갱신해야 한다.
+
+현재 호환성 값은 protocol `3`, schema `0x0301`, firmware release
+`20260816`이다.
 
 ## 프레임
 
@@ -17,7 +21,7 @@ USB 직렬 프로토콜이다. v2부터 Drive Uno는 단일 모터드라이버�
 
 | 오프셋 | 자료형 | 내용 |
 |---:|---|---|
-| 0 | `uint8` | 프로토콜 버전, `2` |
+| 0 | `uint8` | 프로토콜 버전, `3` |
 | 1 | `uint8` | 메시지 타입 |
 | 2 | `uint8` | flags, 반드시 `0` |
 | 3 | `uint8` | reserved, 반드시 `0` |
@@ -33,7 +37,16 @@ CRC 오류, 크기 오류, 잘못된 세션이나 중복·과거 sequence는 명
 
 ### `HELLO` (`0x01`, MCU → Pi)
 
-Payload `<II>`: `boot_id`, `capabilities`.
+Payload `<IIBBHI>`, 16 bytes이다.
+
+| 자료형 | 내용 |
+|---|---|
+| `uint32` | `boot_id` |
+| `uint32` | capabilities |
+| `uint8` | board role (`1` Drive, `2` Terrain) |
+| `uint8` | payload가 기대하는 protocol version (`3`) |
+| `uint16` | schema ID (`0x0301`) |
+| `uint32` | firmware release ID (`20260816`) |
 
 | capability bit | 의미 |
 |---:|---|
@@ -46,11 +59,14 @@ Payload `<II>`: `boot_id`, `capabilities`.
 | 6 | 좌우 압력센서 텔레메트리 |
 | 7 | 자석 펄스 모터 벤치 모드(임시 시험 빌드) |
 | 8 | Terrain TOF 텔레메트리 |
+| 9 | Terrain BNO055 orientation 텔레메트리 |
 
 ### `SESSION_START` (`0x02`, Pi → MCU)
 
-Payload `<I>`: MCU가 보낸 `boot_id`. Pi가 0이 아닌 새 session ID를 헤더에
-넣는다. 재부팅 또는 watchdog 만료 후에는 이전 세션 명령을 재사용할 수 없다.
+Payload `<IBBHI>`, 12 bytes이다. MCU가 보낸 `boot_id`, 기대 board role,
+protocol version, schema ID, firmware release ID를 Pi가 되돌려 보낸다. MCU는
+하나라도 다르면 세션을 시작하지 않는다. Pi가 0이 아닌 새 session ID를 헤더에
+넣으며, 재부팅 또는 watchdog 만료 후에는 이전 세션 명령을 재사용할 수 없다.
 
 ### `COMMAND` (`0x10`, Pi → Drive Uno)
 
@@ -71,9 +87,11 @@ Drive Uno는 홀센서 보정, dead-man, fault, session, 정지 대기 조건을
 
 Capability/status bit 7이 모두 설정된 임시 자석 벤치 빌드에서는 ROS 측의
 `allow_magnet_bench_mode`도 명시적으로 true일 때만 홀 보정, dead-man, 정지
-대기를 우회한다. enable 상태와 최신 속도 명령이 있어도 모터 출력은 D2 또는
+대기를 우회한다. `auto_arm_magnet_bench_mode=true`이면 새 속도 명령이 들어올
+때 테스트 세션만 자동 arm된다. 최신 속도 명령이 있어도 모터 출력은 D2 또는
 D3의 최근 펄스가 있을 때만 고정 저출력으로 켜진다. 세션 및 command watchdog은
-이 모드에서도 유지된다.
+이 모드에서도 유지된다. status의 dead-man bit는 우회 여부와 무관하게 실제
+압력센서 판정값을 계속 보고한다.
 
 ### `TELEMETRY` (`0x20`, Drive Uno → Pi)
 
@@ -118,7 +136,7 @@ Fault bitmap의 공통 값은 `WalkerStatus.msg`와 같다. `0x0002`는 단일
 
 ### `TERRAIN_TELEMETRY` (`0x21`, Terrain Uno → Pi)
 
-Payload `<HBBHHhhH>`, 14 bytes이다.
+Payload `<HBBHHhhhhhBBH>`, 22 bytes이다.
 
 | 자료형 | 내용 |
 |---|---|
@@ -129,7 +147,12 @@ Payload `<HBBHHhhH>`, 14 bytes이다.
 | `uint16` | 기준 거리, mm |
 | `int16` | 기준 대비 오차, mm |
 | `int16` | 직전 필터값 대비 변화, mm |
+| `int16` | BNO055 heading, mrad |
+| `int16` | BNO055 roll, mrad |
+| `int16` | BNO055 pitch, mrad |
+| `uint8` | BNO055 valid |
+| `uint8` | BNO055 calibration status 원시 byte |
 | `uint16` | Terrain fault bitmap |
 
-Terrain MCU는 현재 TOF 텔레메트리만 ROS로 보낸다. MPU-9250/AK8963과
-BNO055는 아직 운영 펌웨어와 프로토콜에 구현되지 않았다.
+Terrain fault bit 0은 TOF 무효, bit 1은 BNO055 무효이다. MPU-9250/AK8963은
+아직 운영 펌웨어와 프로토콜에 구현되지 않았다.

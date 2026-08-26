@@ -12,6 +12,10 @@ namespace {
 uint32_t g_now_ms = 0UL;
 uint16_t g_distance_mm = 500U;
 uint8_t g_wire_index = 0U;
+uint8_t g_wire_address = 0U;
+uint8_t g_wire_register = 0U;
+uint8_t g_wire_quantity = 0U;
+uint8_t g_wire_write_index = 0U;
 uint8_t g_serial_rx[256];
 size_t g_serial_rx_length = 0U;
 size_t g_serial_rx_index = 0U;
@@ -97,19 +101,42 @@ size_t HardwareSerial::print(const char*) { return 1U; }
 size_t HardwareSerial::println(const char*) { return 1U; }
 
 void TwoWire::begin() {}
-void TwoWire::beginTransmission(uint8_t) {}
-size_t TwoWire::write(uint8_t) { return 1U; }
+void TwoWire::beginTransmission(uint8_t address) {
+  g_wire_address = address;
+  g_wire_write_index = 0U;
+}
+size_t TwoWire::write(uint8_t value) {
+  if (g_wire_write_index++ == 0U) {
+    g_wire_register = value;
+  }
+  return 1U;
+}
 uint8_t TwoWire::endTransmission() { return 0U; }
-uint8_t TwoWire::requestFrom(uint8_t, uint8_t quantity) {
+uint8_t TwoWire::requestFrom(uint8_t address, uint8_t quantity) {
+  g_wire_address = address;
   g_wire_index = 0U;
+  g_wire_quantity = quantity;
   return quantity;
 }
-int TwoWire::available() { return 2 - g_wire_index; }
+int TwoWire::available() { return g_wire_quantity - g_wire_index; }
 int TwoWire::read() {
-  if (g_wire_index++ == 0U) {
-    return static_cast<int>((g_distance_mm >> 8U) & 0xFFU);
+  const uint8_t index = g_wire_index++;
+  if (g_wire_address == cfg::TOF_I2C_ADDRESS) {
+    return index == 0U
+        ? static_cast<int>((g_distance_mm >> 8U) & 0xFFU)
+        : static_cast<int>(g_distance_mm & 0xFFU);
   }
-  return static_cast<int>(g_distance_mm & 0xFFU);
+  if (g_wire_register == 0x00U) {
+    return 0xA0;
+  }
+  if (g_wire_register == 0x1AU) {
+    const uint8_t euler[6U] = {0xA0U, 0x05U, 0xA0U, 0x00U, 0xB0U, 0xFFU};
+    return euler[index];
+  }
+  if (g_wire_register == 0x35U) {
+    return 0xFF;
+  }
+  return 0;
 }
 
 int main() {
@@ -119,6 +146,10 @@ int main() {
 
   uint8_t payload[proto::SESSION_START_PAYLOAD_SIZE];
   proto::writeU32(payload, g_boot_id);
+  payload[4U] = proto::BOARD_ROLE_TERRAIN;
+  payload[5U] = proto::VERSION;
+  proto::writeU16(payload + 6U, proto::SCHEMA_ID);
+  proto::writeU32(payload + 8U, proto::FIRMWARE_RELEASE_ID);
   BufferStream command;
   assert(proto::sendFrame(
       command,
@@ -150,6 +181,8 @@ int main() {
   assert(frame.payload_length == proto::TERRAIN_TELEMETRY_PAYLOAD_SIZE);
   assert(proto::readU16(frame.payload) == g_distance_mm);
   assert(frame.payload[2U] == 1U);
+  assert(frame.payload[18U] == 1U);
+  assert(frame.payload[19U] == 0xFFU);
 
   printf("firmware terrain session/telemetry tests: OK\n");
   return 0;

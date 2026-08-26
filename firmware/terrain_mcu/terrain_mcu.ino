@@ -7,6 +7,7 @@
 #endif
 
 #include "config.h"
+#include "bno055_sensor.h"
 #include "protocol.h"
 #include "tof10120_sensor.h"
 
@@ -18,7 +19,9 @@ namespace cfg = safestride_terrain_config;
 namespace proto = safestride_protocol;
 
 constexpr uint32_t CAP_TOF10120 = 1UL << 8U;
+constexpr uint32_t CAP_BNO055 = 1UL << 9U;
 constexpr uint16_t FAULT_TOF_INVALID = 1U << 0U;
+constexpr uint16_t FAULT_BNO_INVALID = 1U << 1U;
 
 enum class LegState : uint8_t {
   STOWED,
@@ -31,6 +34,7 @@ enum class LegState : uint8_t {
 
 proto::FrameReceiver g_receiver;
 Tof10120Sensor g_tof;
+Bno055Sensor g_bno;
 LegState g_leg_state = LegState::SAFE_STOP;
 uint32_t g_boot_id = 0UL;
 uint32_t g_session_id = 0UL;
@@ -94,7 +98,15 @@ int16_t roundedSigned16(float value) {
 void sendHello() {
   uint8_t payload[proto::HELLO_PAYLOAD_SIZE];
   proto::writeU32(payload + 0U, g_boot_id);
-  proto::writeU32(payload + 4U, CAP_TOF10120);
+  uint32_t capabilities = CAP_TOF10120;
+  if (cfg::ENABLE_BNO055) {
+    capabilities |= CAP_BNO055;
+  }
+  proto::writeU32(payload + 4U, capabilities);
+  payload[8U] = proto::BOARD_ROLE_TERRAIN;
+  payload[9U] = proto::VERSION;
+  proto::writeU16(payload + 10U, proto::SCHEMA_ID);
+  proto::writeU32(payload + 12U, proto::FIRMWARE_RELEASE_ID);
   proto::sendFrame(
       Serial,
       proto::TYPE_HELLO,
@@ -119,8 +131,16 @@ void sendTelemetry() {
       payload + 6U, roundedUnsigned16(g_tof.referenceDistanceMm()));
   proto::writeI16(payload + 8U, roundedSigned16(g_tof.errorMm()));
   proto::writeI16(payload + 10U, roundedSigned16(g_tof.changeMm()));
-  proto::writeU16(
-      payload + 12U, g_tof.valid() ? 0U : FAULT_TOF_INVALID);
+  proto::writeI16(payload + 12U, g_bno.headingMrad());
+  proto::writeI16(payload + 14U, g_bno.rollMrad());
+  proto::writeI16(payload + 16U, g_bno.pitchMrad());
+  payload[18U] = g_bno.valid() ? 1U : 0U;
+  payload[19U] = g_bno.calibration();
+  uint16_t faults = g_tof.valid() ? 0U : FAULT_TOF_INVALID;
+  if (cfg::ENABLE_BNO055 && !g_bno.valid()) {
+    faults |= FAULT_BNO_INVALID;
+  }
+  proto::writeU16(payload + 20U, faults);
   proto::sendFrame(
       Serial,
       proto::TYPE_TERRAIN_TELEMETRY,
@@ -145,7 +165,12 @@ void processHostProtocol() {
     if (frame.type != proto::TYPE_SESSION_START ||
         frame.payload_length != proto::SESSION_START_PAYLOAD_SIZE ||
         frame.session_id == 0UL ||
-        proto::readU32(frame.payload) != g_boot_id) {
+        proto::readU32(frame.payload) != g_boot_id ||
+        frame.payload[4U] != proto::BOARD_ROLE_TERRAIN ||
+        frame.payload[5U] != proto::VERSION ||
+        proto::readU16(frame.payload + 6U) != proto::SCHEMA_ID ||
+        proto::readU32(frame.payload + 8U) !=
+            proto::FIRMWARE_RELEASE_ID) {
       continue;
     }
     g_session_id = frame.session_id;
@@ -164,6 +189,7 @@ void setup() {
   Serial.begin(cfg::SERIAL_BAUD);
   const uint32_t now_ms = millis();
   g_tof.begin(now_ms);
+  g_bno.begin(now_ms);
   g_boot_id = makeBootId();
   g_last_hello_ms = now_ms - cfg::HELLO_PERIOD_MS;
   g_last_telemetry_ms = now_ms;
@@ -180,6 +206,7 @@ void loop() {
   processHostProtocol();
   const uint32_t now_ms = millis();
   g_tof.update(now_ms);
+  g_bno.update(now_ms);
   if (now_ms - g_last_hello_ms >= cfg::HELLO_PERIOD_MS) {
     g_last_hello_ms = now_ms;
     sendHello();

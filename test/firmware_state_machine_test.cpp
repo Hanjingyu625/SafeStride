@@ -73,6 +73,11 @@ int main() {
 
   uint8_t session_payload[proto::SESSION_START_PAYLOAD_SIZE] = {};
   proto::writeU32(session_payload, g_boot_id);
+  session_payload[4U] = proto::BOARD_ROLE_DRIVE;
+  session_payload[5U] = proto::VERSION;
+  proto::writeU16(session_payload + 6U, proto::SCHEMA_ID);
+  proto::writeU32(
+      session_payload + 8U, proto::FIRMWARE_RELEASE_ID);
   proto::FrameView session_start = {
       proto::TYPE_SESSION_START,
       0U,

@@ -12,7 +12,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from safestride_interfaces.msg import TerrainStatus
-from sensor_msgs.msg import Range
+from sensor_msgs.msg import Imu, Range
 
 try:
     import serial
@@ -20,6 +20,10 @@ except ImportError:  # pragma: no cover - target package dependency
     serial = None
 
 from .protocol import (
+    BOARD_ROLE_TERRAIN,
+    FIRMWARE_RELEASE_ID,
+    PROTOCOL_SCHEMA_ID,
+    PROTOCOL_VERSION,
     Frame,
     FrameParser,
     HelloPayload,
@@ -30,6 +34,10 @@ from .protocol import (
     sequence_is_newer,
 )
 from .validation import bounded_int, finite_float
+
+
+CAP_TOF10120 = 1 << 8
+CAP_BNO055 = 1 << 9
 
 
 class TerrainBridgeNode(Node):
@@ -46,6 +54,7 @@ class TerrainBridgeNode(Node):
         self._payload_errors = 0
         self._session_errors = 0
         self._sequence_errors = 0
+        self._compatibility_error: Optional[str] = None
         self._session_id = 0
         self._boot_id = 0
         self._capabilities = 0
@@ -57,6 +66,9 @@ class TerrainBridgeNode(Node):
 
         self._tof_pub = self.create_publisher(
             Range, self._topic_tof, qos_profile_sensor_data
+        )
+        self._imu_pub = self.create_publisher(
+            Imu, self._topic_imu, qos_profile_sensor_data
         )
         self._status_pub = self.create_publisher(
             TerrainStatus, self._topic_status, 10
@@ -89,7 +101,9 @@ class TerrainBridgeNode(Node):
             ('range.max_m', 2.00),
             ('range.field_of_view_rad', 0.052),
             ('frames.tof', 'terrain_tof_link'),
+            ('frames.bno', 'imu_link'),
             ('topics.tof', '/terrain/tof'),
+            ('topics.imu', '/terrain/imu'),
             ('topics.status', '/terrain/status'),
             ('topics.diagnostics', '/diagnostics'),
         )
@@ -153,7 +167,9 @@ class TerrainBridgeNode(Node):
                 'serial poll period must be shorter than telemetry timeout'
             )
         self._frame_tof = str(self._value('frames.tof'))
+        self._frame_bno = str(self._value('frames.bno'))
         self._topic_tof = str(self._value('topics.tof'))
+        self._topic_imu = str(self._value('topics.imu'))
         self._topic_status = str(self._value('topics.status'))
         self._topic_diagnostics = str(self._value('topics.diagnostics'))
 
@@ -180,6 +196,7 @@ class TerrainBridgeNode(Node):
         self._session_id = 0
         self._boot_id = 0
         self._capabilities = 0
+        self._compatibility_error = None
         self._session_started = False
         self._last_sequence = None
         self._last_telemetry_time = None
@@ -275,9 +292,44 @@ class TerrainBridgeNode(Node):
         self._publish_telemetry(telemetry)
 
     def _handle_hello(self, hello: HelloPayload) -> None:
-        new_session = (
-            not self._session_started or hello.boot_id != self._boot_id
-        )
+        compatibility_errors = []
+        if hello.board_role != BOARD_ROLE_TERRAIN:
+            compatibility_errors.append(
+                f'board role {hello.board_role} is not TERRAIN'
+            )
+        if hello.protocol_version != PROTOCOL_VERSION:
+            compatibility_errors.append(
+                f'HELLO protocol {hello.protocol_version} != '
+                f'{PROTOCOL_VERSION}'
+            )
+        if hello.schema_id != PROTOCOL_SCHEMA_ID:
+            compatibility_errors.append(
+                f'schema 0x{hello.schema_id:04x} != '
+                f'0x{PROTOCOL_SCHEMA_ID:04x}'
+            )
+        if hello.firmware_release_id != FIRMWARE_RELEASE_ID:
+            compatibility_errors.append(
+                f'firmware release {hello.firmware_release_id} != '
+                f'{FIRMWARE_RELEASE_ID}'
+            )
+        if compatibility_errors:
+            self._compatibility_error = '; '.join(compatibility_errors)
+            self._session_started = False
+            return
+        self._compatibility_error = None
+        self._parser.last_unsupported_version = None
+
+        if (
+            hello.boot_id == self._boot_id
+            and self._session_started
+            and self._link_ok()
+        ):
+            # Terrain firmware advertises periodically for reconnects. A
+            # healthy session must not be restarted for each advertisement.
+            return
+        # Reaching this point means there is no healthy session. Always issue
+        # a fresh session ID, even if the MCU boot ID did not change.
+        new_session = True
         if new_session:
             session_id = secrets.randbits(32)
             if session_id == 0 or session_id == self._session_id:
@@ -293,7 +345,10 @@ class TerrainBridgeNode(Node):
             sequence=self._next_sequence(),
             session_id=self._session_id,
             timestamp_ms=int(self._now() * 1000.0) & 0xFFFFFFFF,
-            payload=SessionStartPayload(hello.boot_id).pack(),
+            payload=SessionStartPayload(
+                hello.boot_id,
+                BOARD_ROLE_TERRAIN,
+            ).pack(),
         )
         if self._write_frame(frame):
             self._session_started = True
@@ -343,7 +398,49 @@ class TerrainBridgeNode(Node):
             else float('nan')
         )
         self._tof_pub.publish(message)
+        self._publish_imu(telemetry)
         self._publish_status()
+
+    @staticmethod
+    def _quaternion_from_rpy(
+        roll: float, pitch: float, yaw: float
+    ) -> tuple[float, float, float, float]:
+        cr = math.cos(roll * 0.5)
+        sr = math.sin(roll * 0.5)
+        cp = math.cos(pitch * 0.5)
+        sp = math.sin(pitch * 0.5)
+        cy = math.cos(yaw * 0.5)
+        sy = math.sin(yaw * 0.5)
+        return (
+            sr * cp * cy - cr * sp * sy,
+            cr * sp * cy + sr * cp * sy,
+            cr * cp * sy - sr * sp * cy,
+            cr * cp * cy + sr * sp * sy,
+        )
+
+    def _publish_imu(self, telemetry: TerrainTelemetryPayload) -> None:
+        message = Imu()
+        message.header.stamp = self.get_clock().now().to_msg()
+        message.header.frame_id = self._frame_bno
+        message.angular_velocity_covariance[0] = -1.0
+        message.linear_acceleration_covariance[0] = -1.0
+        if telemetry.bno_valid:
+            yaw = telemetry.bno_heading_mrad / 1000.0
+            roll = telemetry.bno_roll_mrad / 1000.0
+            pitch = telemetry.bno_pitch_mrad / 1000.0
+            (
+                message.orientation.x,
+                message.orientation.y,
+                message.orientation.z,
+                message.orientation.w,
+            ) = self._quaternion_from_rpy(roll, pitch, yaw)
+            message.orientation_covariance[0] = 0.05
+            message.orientation_covariance[4] = 0.05
+            message.orientation_covariance[8] = 0.05
+        else:
+            message.orientation.w = 1.0
+            message.orientation_covariance[0] = -1.0
+        self._imu_pub.publish(message)
 
     def _publish_status(self) -> None:
         now = self._now()
@@ -356,6 +453,11 @@ class TerrainBridgeNode(Node):
             message.tof_valid = False
             message.fault_bits = 0
             message.telemetry_age = float('inf')
+            message.yaw_rad = float('nan')
+            message.pitch_rad = float('nan')
+            message.roll_rad = float('nan')
+            message.bno_valid = False
+            message.bno_calibration = 0
         else:
             message.tof_distance_m = (
                 telemetry.tof_distance_mm / 1000.0
@@ -367,11 +469,21 @@ class TerrainBridgeNode(Node):
             message.telemetry_age = float(
                 max(0.0, now - self._last_telemetry_time)
             )
-        message.pitch_rad = float('nan')
-        message.roll_rad = float('nan')
+            message.bno_valid = bool(telemetry.bno_valid)
+            message.bno_calibration = telemetry.bno_calibration
+            message.yaw_rad = (
+                telemetry.bno_heading_mrad / 1000.0
+                if telemetry.bno_valid else float('nan')
+            )
+            message.pitch_rad = (
+                telemetry.bno_pitch_mrad / 1000.0
+                if telemetry.bno_valid else float('nan')
+            )
+            message.roll_rad = (
+                telemetry.bno_roll_mrad / 1000.0
+                if telemetry.bno_valid else float('nan')
+            )
         message.mpu_valid = False
-        message.bno_valid = False
-        message.bno_calibration = 0
         message.leg_state = int(
             getattr(TerrainStatus, 'LEG_SAFE_STOP', 4)
         )
@@ -395,15 +507,36 @@ class TerrainBridgeNode(Node):
         elif not self._connected():
             status.level = DiagnosticStatus.ERROR
             status.message = 'terrain serial port disconnected'
+        elif self._parser.last_unsupported_version is not None:
+            status.level = DiagnosticStatus.ERROR
+            status.message = (
+                'protocol version mismatch: Terrain Uno '
+                f'v{self._parser.last_unsupported_version}, '
+                f'bridge v{PROTOCOL_VERSION}; flash both MCUs'
+            )
+        elif self._compatibility_error is not None:
+            status.level = DiagnosticStatus.ERROR
+            status.message = (
+                f'incompatible Terrain Uno: {self._compatibility_error}'
+            )
         elif not self._session_started:
             status.level = DiagnosticStatus.WARN
             status.message = 'waiting for Terrain Uno HELLO'
         elif not self._link_ok(now):
             status.level = DiagnosticStatus.ERROR
             status.message = 'terrain telemetry timed out'
+        elif not (self._capabilities & CAP_TOF10120):
+            status.level = DiagnosticStatus.ERROR
+            status.message = 'Terrain firmware lacks TOF-10120 capability'
+        elif not (self._capabilities & CAP_BNO055):
+            status.level = DiagnosticStatus.ERROR
+            status.message = 'Terrain firmware lacks BNO055 capability'
         elif telemetry is None or not telemetry.tof_valid:
             status.level = DiagnosticStatus.ERROR
             status.message = 'TOF-10120 reading invalid'
+        elif not telemetry.bno_valid:
+            status.level = DiagnosticStatus.ERROR
+            status.message = 'BNO055 reading invalid'
         elif (
             self._parser.crc_error_count
             or self._parser.frame_error_count
@@ -415,13 +548,34 @@ class TerrainBridgeNode(Node):
             status.message = 'terrain link active with malformed frames'
         else:
             status.level = DiagnosticStatus.OK
-            status.message = 'terrain link and TOF-10120 active'
+            status.message = 'terrain link, TOF-10120 and BNO055 active'
         age = (
             float('inf') if self._last_telemetry_time is None
             else max(0.0, now - self._last_telemetry_time)
         )
         status.values = [
             KeyValue(key='port', value=self._port),
+            KeyValue(key='expected_board_role', value='TERRAIN'),
+            KeyValue(key='protocol_version', value=str(PROTOCOL_VERSION)),
+            KeyValue(
+                key='protocol_schema_id',
+                value=f'0x{PROTOCOL_SCHEMA_ID:04x}',
+            ),
+            KeyValue(
+                key='firmware_release_id',
+                value=str(FIRMWARE_RELEASE_ID),
+            ),
+            KeyValue(
+                key='observed_protocol_version',
+                value=(
+                    str(self._parser.last_unsupported_version)
+                    if self._parser.last_unsupported_version is not None
+                    else (
+                        str(PROTOCOL_VERSION)
+                        if self._boot_id else 'unknown'
+                    )
+                ),
+            ),
             KeyValue(key='boot_id', value=f'0x{self._boot_id:08x}'),
             KeyValue(key='session_id', value=f'0x{self._session_id:08x}'),
             KeyValue(key='telemetry_age_s', value=f'{age:.3f}'),
@@ -437,7 +591,22 @@ class TerrainBridgeNode(Node):
                 ),
             ),
             KeyValue(
+                key='bno_valid',
+                value=str(bool(telemetry and telemetry.bno_valid)).lower(),
+            ),
+            KeyValue(
+                key='bno_calibration',
+                value=(
+                    f'0x{telemetry.bno_calibration:02x}'
+                    if telemetry is not None else 'unknown'
+                ),
+            ),
+            KeyValue(
                 key='crc_errors', value=str(self._parser.crc_error_count)
+            ),
+            KeyValue(
+                key='version_errors',
+                value=str(self._parser.version_error_count),
             ),
             KeyValue(
                 key='frame_errors',

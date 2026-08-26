@@ -9,6 +9,12 @@ ROOT = Path(__file__).resolve().parents[1]
 DRIVE_CONFIG = ROOT / "firmware/safestride_mcu/config.h"
 DRIVE_FIRMWARE = ROOT / "firmware/safestride_mcu/safestride_mcu.ino"
 TERRAIN_FIRMWARE = ROOT / "firmware/terrain_mcu/terrain_mcu.ino"
+DRIVE_PROTOCOL = ROOT / "firmware/safestride_mcu/protocol.h"
+TERRAIN_PROTOCOL = ROOT / "firmware/terrain_mcu/protocol.h"
+PYTHON_PROTOCOL = (
+    ROOT / "src/safestride_bridge/safestride_bridge/protocol.py"
+)
+BNO_DRIVER = ROOT / "firmware/terrain_mcu/bno055_sensor.cpp"
 BRIDGE = (
     ROOT
     / "src/safestride_bridge/safestride_bridge/serial_bridge_node.py"
@@ -37,6 +43,10 @@ class TestHardwareIntegrity(unittest.TestCase):
         cls.drive = DRIVE_FIRMWARE.read_text(encoding="utf-8")
         cls.terrain = TERRAIN_FIRMWARE.read_text(encoding="utf-8")
         cls.bridge = BRIDGE.read_text(encoding="utf-8")
+        cls.drive_protocol = DRIVE_PROTOCOL.read_text(encoding="utf-8")
+        cls.terrain_protocol = TERRAIN_PROTOCOL.read_text(encoding="utf-8")
+        cls.python_protocol = PYTHON_PROTOCOL.read_text(encoding="utf-8")
+        cls.bno = BNO_DRIVER.read_text(encoding="utf-8")
 
     def test_drive_active_pins_are_unique(self):
         names = (
@@ -56,8 +66,12 @@ class TestHardwareIntegrity(unittest.TestCase):
             len(owners),
             f"Drive Uno pin collision: {owners}",
         )
-        self.assertNotIn("0U", owners.values(), "D0 is reserved for USB serial")
-        self.assertNotIn("1U", owners.values(), "D1 is reserved for USB serial")
+        self.assertNotIn(
+            "0U", owners.values(), "D0 is reserved for USB serial"
+        )
+        self.assertNotIn(
+            "1U", owners.values(), "D1 is reserved for USB serial"
+        )
 
     def test_optional_inputs_do_not_overlap_each_other(self):
         names = (
@@ -113,14 +127,46 @@ class TestHardwareIntegrity(unittest.TestCase):
         )
         self.assertIn("CAP_MAGNET_BENCH_MODE", self.bridge)
         self.assertIn("STATUS_MAGNET_BENCH_MODE", self.bridge)
+        self.assertIn(
+            "('command.auto_arm_magnet_bench_mode', False)", self.bridge
+        )
         for path in ROS_CONFIGS:
             text = path.read_text(encoding="utf-8")
             self.assertIn("allow_magnet_bench_mode: true", text)
+            self.assertIn("auto_arm_magnet_bench_mode: true", text)
+            self.assertIn("require_deadman: false", text)
 
     def test_terrain_uses_i2c_without_gpio_actuator_outputs(self):
         self.assertIn("Wire.begin()", self.terrain)
         self.assertNotIn("analogWrite(", self.terrain)
         self.assertNotRegex(self.terrain, r"\battachInterrupt\s*\(")
+        self.assertIn("g_bno.update(now_ms)", self.terrain)
+        self.assertIn("REG_OPR_MODE", self.bno)
+        self.assertNotIn("digitalWrite(", self.bno)
+
+    def test_protocol_compatibility_constants_are_synchronized(self):
+        for protocol in (self.drive_protocol, self.terrain_protocol):
+            self.assertEqual(constant_expression(protocol, "VERSION"), "3U")
+            self.assertEqual(
+                constant_expression(protocol, "SCHEMA_ID"), "0x0301U"
+            )
+            self.assertEqual(
+                constant_expression(protocol, "FIRMWARE_RELEASE_ID"),
+                "20260816UL",
+            )
+            self.assertEqual(
+                constant_expression(protocol, "HELLO_PAYLOAD_SIZE"),
+                "16U",
+            )
+            self.assertEqual(
+                constant_expression(protocol, "SESSION_START_PAYLOAD_SIZE"),
+                "12U",
+            )
+        self.assertIn("PROTOCOL_VERSION = 3", self.python_protocol)
+        self.assertIn("PROTOCOL_SCHEMA_ID = 0x0301", self.python_protocol)
+        self.assertIn(
+            "FIRMWARE_RELEASE_ID = 20260816", self.python_protocol
+        )
 
 
 if __name__ == "__main__":

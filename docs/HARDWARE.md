@@ -9,7 +9,8 @@
 | 좌우 압력센서 | Drive Uno | A0, A1 전압분배기 |
 | E-stop | 미구현 | A2 예약, 현재 입력으로 설정하지 않음 |
 | TOF-10120 | Terrain Uno | I2C A4/A5, `0x52` |
-| MPU-9250/AK8963, BNO055 | Terrain Uno 예정 | 현재 운영 펌웨어 미구현 |
+| BNO055 | Terrain Uno | I2C A4/A5, `0x28` 또는 `0x29` |
+| MPU-9250/AK8963 | Terrain Uno 예정 | 현재 운영 펌웨어 미구현 |
 | BE-220 GPS, 카메라 | Raspberry Pi | USB/UART, CSI/USB |
 
 ## Drive Uno 핀맵
