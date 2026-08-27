@@ -31,6 +31,11 @@ constexpr int32_t MAX_DECEL_MRAD_S2 = 2500L;
 constexpr int32_t ARM_MAX_MEASURED_SPEED_MRAD_S = 100L;
 constexpr uint16_t ARM_STATIONARY_DWELL_MS = 250U;
 
+// Current deployment mode: both pressure channels are the motion level.
+// Hall telemetry remains available, but Hall dwell/stall checks do not gate
+// motor output. Set this false when closed-loop Hall safety is commissioned.
+constexpr bool DEADMAN_DIRECT_DRIVE = true;
+
 // One single-output Hall sensor is installed on the LEFT wheel only. D2 uses
 // interrupt 0 on the Uno and counts falling edges. Six magnets are fitted to
 // that wheel. The shared motor driver means the measured speed is mirrored to
@@ -57,8 +62,7 @@ constexpr uint16_t MAGNET_BENCH_PULSE_HOLD_MS = 750U;
 constexpr uint32_t MAGNET_BENCH_VELOCITY_HOLD_US = 5000000UL;
 constexpr float MAGNET_BENCH_VELOCITY_FILTER_ALPHA = 1.0F;
 
-// Runtime Hall plausibility monitor. Tune from lifted-wheel logs. A fault
-// latches until MCU reset so an intermittent sensor cannot silently re-arm.
+// Runtime Hall plausibility monitor used when DEADMAN_DIRECT_DRIVE is false.
 constexpr int32_t HALL_STALL_TARGET_MIN_MRAD_S = 300L;
 constexpr uint16_t HALL_STALL_TIMEOUT_MS = 3000U;
 constexpr int32_t HALL_MAX_PLAUSIBLE_MRAD_S = 5000L;

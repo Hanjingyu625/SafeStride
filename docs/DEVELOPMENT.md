@@ -51,6 +51,8 @@ are active and the Drive link has no MCU fault, the bridge streams a fixed
 0.10 m/s forward target without waiting for `/cmd_vel_safe`. Releasing either
 pressure input immediately sends a disabled stop. Set
 `command.deadman_direct_drive` to `false` to restore supervised velocity input.
+Drive firmware also keeps Hall feedback telemetry-only while
+`DEADMAN_DIRECT_DRIVE=true`; it does not delay re-arming or latch a Hall fault.
 Keep the wheels lifted during initial tests.
 
 Put the supplied shapefile in `data/external/crosswalk_shp/` and converted JSON

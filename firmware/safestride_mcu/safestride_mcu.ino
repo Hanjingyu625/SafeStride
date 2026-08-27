@@ -502,7 +502,8 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   }
 
   if (g_state == ControllerState::DISARMED) {
-    if (!cfg::MAGNET_BENCH_MODE && !stationaryDwellMet()) {
+    if (!cfg::MAGNET_BENCH_MODE && !cfg::DEADMAN_DIRECT_DRIVE &&
+        !stationaryDwellMet()) {
       return false;
     }
     markAcceptedCommand(frame, ttl_ms);
@@ -588,7 +589,8 @@ void runControlLoop(uint32_t now_us) {
         left_hall,
         right_hall,
         g_requested_mrad_s,
-        output_allowed);
+        output_allowed,
+        !cfg::DEADMAN_DIRECT_DRIVE);
   }
   const uint8_t hall_faults = g_drive.hallFaultMask();
   if (hall_faults != 0U) {

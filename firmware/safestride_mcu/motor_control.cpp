@@ -291,7 +291,8 @@ void DriveController::update(
     const HallSample& left_hall,
     const HallSample& right_hall,
     int32_t requested_mrad_s,
-    bool output_allowed) {
+    bool output_allowed,
+    bool enforce_hall_faults) {
   if (elapsed_us == 0UL) {
     return;
   }
@@ -312,11 +313,17 @@ void DriveController::update(
   applied_target_mrad_s_ = rampTarget(
       applied_target_mrad_s_, limited_target, dt_seconds);
 
-  updateHallPlausibility(
-      left_hall, right_hall, elapsed_us, true);
-  if (hall_fault_mask_ != 0U) {
-    disableImmediately();
-    return;
+  if (enforce_hall_faults) {
+    updateHallPlausibility(
+        left_hall, right_hall, elapsed_us, true);
+    if (hall_fault_mask_ != 0U) {
+      disableImmediately();
+      return;
+    }
+  } else {
+    hall_fault_mask_ = 0U;
+    left_hall_monitor_ = {false, 0UL, 0UL, 0UL};
+    right_hall_monitor_ = {false, 0UL, 0UL, 0UL};
   }
 
   const float measured_average =

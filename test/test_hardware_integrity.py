@@ -156,6 +156,11 @@ class TestHardwareIntegrity(unittest.TestCase):
         self.assertNotIn("_enabled_requested", self.bridge)
         self.assertNotIn("_arm_confirmed", self.bridge)
         self.assertNotIn("_clear_enable_request", self.bridge)
+        self.assertEqual(
+            constant_expression(self.config, "DEADMAN_DIRECT_DRIVE"),
+            "true",
+        )
+        self.assertIn("!cfg::DEADMAN_DIRECT_DRIVE", self.drive)
 
     def test_terrain_uses_i2c_without_gpio_actuator_outputs(self):
         self.assertIn("Wire.begin()", self.terrain)

@@ -99,6 +99,20 @@ int main() {
     DriveController drive;
     drive.begin();
     primeFeedback(drive);
+    const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
+    for (int i = 0; i < 720; ++i) {
+      drive.update(5000UL, stopped, stopped, 667L, true, false);
+    }
+    assert(drive.hallFaultMask() == 0U);
+    assert(g_motor_pwm >= cfg::MOTOR_MIN_ACTIVE_PWM);
+    assert(g_motor_in1_level == HIGH);
+    assert(g_motor_in2_level == LOW);
+  }
+
+  {
+    DriveController drive;
+    drive.begin();
+    primeFeedback(drive);
     uint32_t right_count = 0UL;
     const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
     for (int i = 0; i < 720; ++i) {
