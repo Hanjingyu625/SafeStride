@@ -40,7 +40,7 @@ constexpr uint8_t HALL_ACTIVE_LEVEL = LOW;
 // Reject sub-millisecond electrical chatter without discarding valid pulses
 // if the measured pulse-per-revolution value is increased later.
 constexpr uint32_t HALL_MIN_PULSE_INTERVAL_US = 500UL;
-constexpr uint32_t HALL_ZERO_TIMEOUT_US = 1500000UL;
+constexpr uint32_t HALL_ZERO_TIMEOUT_US = 3000000UL;
 constexpr uint32_t HALL_PULSES_PER_WHEEL_REV = 6UL;
 constexpr bool HALL_CALIBRATED = true;
 
@@ -60,7 +60,7 @@ constexpr float MAGNET_BENCH_VELOCITY_FILTER_ALPHA = 1.0F;
 // Runtime Hall plausibility monitor. Tune from lifted-wheel logs. A fault
 // latches until MCU reset so an intermittent sensor cannot silently re-arm.
 constexpr int32_t HALL_STALL_TARGET_MIN_MRAD_S = 300L;
-constexpr uint16_t HALL_STALL_TIMEOUT_MS = 1500U;
+constexpr uint16_t HALL_STALL_TIMEOUT_MS = 3000U;
 constexpr int32_t HALL_MAX_PLAUSIBLE_MRAD_S = 5000L;
 constexpr uint16_t HALL_OVERSPEED_TIMEOUT_MS = 100U;
 
@@ -71,6 +71,10 @@ constexpr uint8_t MOTOR_IN1_PIN = 6U;
 constexpr uint8_t MOTOR_IN2_PIN = 8U;
 constexpr int8_t MOTOR_SIGN = 1;
 constexpr uint16_t MAX_PWM = 100U;  // deliberately low for first lifted test
+// Bench testing showed that this motor/driver only starts reliably at PWM 80.
+// Apply this floor to non-zero PID output so low-speed commands do not hum,
+// fail to produce Hall pulses, and then trip the stall monitor.
+constexpr uint8_t MOTOR_MIN_ACTIVE_PWM = 80U;
 
 // E-stop hardware is not implemented in the current build. Keep this false so
 // the input is not configured, the reported state stays normal, and the
@@ -144,6 +148,9 @@ static_assert(
 static_assert(
     MAX_PWM > 0U && MAX_PWM <= 255U,
     "MAX_PWM must fit the Arduino analogue output range");
+static_assert(
+    MOTOR_MIN_ACTIVE_PWM > 0U && MOTOR_MIN_ACTIVE_PWM <= MAX_PWM,
+    "minimum active motor PWM must be positive and no higher than MAX_PWM");
 static_assert(
     MAGNET_BENCH_PWM > 0U && MAGNET_BENCH_PWM <= MAX_PWM,
     "magnet bench PWM must be positive and no higher than MAX_PWM");

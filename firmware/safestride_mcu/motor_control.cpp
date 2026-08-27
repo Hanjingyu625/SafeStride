@@ -147,6 +147,48 @@ float DriveController::calculatePid(
          cfg::MOTOR_PID_KD * derivative;
 }
 
+float DriveController::compensateMotorDeadzone(
+    float controller_pwm,
+    float target_mrad_s) {
+  if (fabsf(target_mrad_s) < 20.0F) {
+    return 0.0F;
+  }
+
+  // Never reverse merely to correct a small overspeed. The current shared
+  // driver should coast until the requested direction needs positive torque.
+  if (target_mrad_s > 0.0F) {
+    if (controller_pwm <= 0.0F) {
+      return 0.0F;
+    }
+    return clampFloat(
+        controller_pwm,
+        static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM),
+        static_cast<float>(cfg::MAX_PWM));
+  }
+  if (controller_pwm >= 0.0F) {
+    return 0.0F;
+  }
+  return clampFloat(
+      controller_pwm,
+      -static_cast<float>(cfg::MAX_PWM),
+      -static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM));
+}
+
+float DriveController::openLoopPwm(float target_mrad_s) {
+  if (fabsf(target_mrad_s) < 20.0F) {
+    return 0.0F;
+  }
+  const float normalized = clampFloat(
+      fabsf(target_mrad_s) /
+          static_cast<float>(cfg::MAX_WHEEL_TARGET_MRAD_S),
+      0.0F,
+      1.0F);
+  const float pwm = static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM) +
+      normalized * static_cast<float>(
+          cfg::MAX_PWM - cfg::MOTOR_MIN_ACTIVE_PWM);
+  return target_mrad_s > 0.0F ? pwm : -pwm;
+}
+
 void DriveController::writeMotor(float pwm) {
   float signed_pwm = pwm * static_cast<float>(cfg::MOTOR_SIGN);
   signed_pwm = clampFloat(
@@ -279,8 +321,10 @@ void DriveController::update(
 
   const float measured_average =
       0.5F * (filtered_left_mrad_s_ + filtered_right_mrad_s_);
-  writeMotor(calculatePid(
-      applied_target_mrad_s_, measured_average, dt_seconds, motor_pid_));
+  const float controller_pwm = calculatePid(
+      applied_target_mrad_s_, measured_average, dt_seconds, motor_pid_);
+  writeMotor(compensateMotorDeadzone(
+      controller_pwm, applied_target_mrad_s_));
 }
 
 void DriveController::updateMagnetBench(

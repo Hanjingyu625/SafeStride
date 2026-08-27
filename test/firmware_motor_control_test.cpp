@@ -74,7 +74,7 @@ int main() {
       drive.update(5000UL, moving, moving, 1000L, true);
     }
     assert(drive.hallFaultMask() == 0U);
-    assert(g_motor_pwm > 0);
+    assert(g_motor_pwm >= cfg::MOTOR_MIN_ACTIVE_PWM);
     assert(g_motor_in1_level == HIGH);
     assert(g_motor_in2_level == LOW);
     assert(drive.leftHallPulsePosition() == 220L);
@@ -86,7 +86,7 @@ int main() {
     drive.begin();
     primeFeedback(drive);
     const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
-    for (int i = 0; i < 420; ++i) {
+    for (int i = 0; i < 720; ++i) {
       drive.update(5000UL, stopped, stopped, 3000L, true);
     }
     assert(drive.hallFaultMask() == DriveController::HALL_FAULT_LEFT);
@@ -101,7 +101,7 @@ int main() {
     primeFeedback(drive);
     uint32_t right_count = 0UL;
     const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
-    for (int i = 0; i < 420; ++i) {
+    for (int i = 0; i < 720; ++i) {
       const HallSample right = sample(++right_count);
       drive.update(5000UL, stopped, right, 3000L, true);
     }
