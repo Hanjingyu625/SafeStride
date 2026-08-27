@@ -104,7 +104,13 @@ int main() {
       drive.update(5000UL, stopped, stopped, 667L, true, false);
     }
     assert(drive.hallFaultMask() == 0U);
-    assert(g_motor_pwm >= cfg::MOTOR_MIN_ACTIVE_PWM);
+    const int expected_open_loop_pwm =
+        static_cast<int>(cfg::MOTOR_MIN_ACTIVE_PWM) +
+        (667 * static_cast<int>(
+                   cfg::MAX_PWM - cfg::MOTOR_MIN_ACTIVE_PWM) +
+         cfg::MAX_WHEEL_TARGET_MRAD_S / 2) /
+            cfg::MAX_WHEEL_TARGET_MRAD_S;
+    assert(g_motor_pwm == expected_open_loop_pwm);
     assert(g_motor_in1_level == HIGH);
     assert(g_motor_in2_level == LOW);
   }

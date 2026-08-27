@@ -324,6 +324,9 @@ void DriveController::update(
     hall_fault_mask_ = 0U;
     left_hall_monitor_ = {false, 0UL, 0UL, 0UL};
     right_hall_monitor_ = {false, 0UL, 0UL, 0UL};
+    motor_pid_ = {0.0F, 0.0F};
+    writeMotor(openLoopPwm(applied_target_mrad_s_));
+    return;
   }
 
   const float measured_average =
