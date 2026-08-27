@@ -12,7 +12,8 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from safestride_interfaces.msg import TerrainStatus
-from sensor_msgs.msg import Imu, Range
+from sensor_msgs.msg import Imu, NavSatFix, NavSatStatus, Range
+from std_msgs.msg import Float32
 
 try:
     import serial
@@ -37,7 +38,10 @@ from .validation import bounded_int, finite_float
 
 
 CAP_TOF10120 = 1 << 8
-CAP_BNO055 = 1 << 9
+CAP_MPU6050 = 1 << 9
+CAP_GPS = 1 << 10
+GPS_FIX_VALID = 1 << 0
+GPS_SPEED_VALID = 1 << 1
 
 
 class TerrainBridgeNode(Node):
@@ -73,6 +77,12 @@ class TerrainBridgeNode(Node):
         self._status_pub = self.create_publisher(
             TerrainStatus, self._topic_status, 10
         )
+        self._gps_fix_pub = self.create_publisher(
+            NavSatFix, self._topic_gps_fix, qos_profile_sensor_data
+        )
+        self._gps_speed_pub = self.create_publisher(
+            Float32, self._topic_gps_speed, qos_profile_sensor_data
+        )
         self._diagnostics_pub = self.create_publisher(
             DiagnosticArray, self._topic_diagnostics, 10
         )
@@ -100,10 +110,14 @@ class TerrainBridgeNode(Node):
             ('range.min_m', 0.10),
             ('range.max_m', 2.00),
             ('range.field_of_view_rad', 0.052),
+            ('gps.enabled', True),
             ('frames.tof', 'terrain_tof_link'),
-            ('frames.bno', 'imu_link'),
+            ('frames.imu', 'imu_link'),
+            ('frames.gps', 'gps_link'),
             ('topics.tof', '/terrain/tof'),
             ('topics.imu', '/terrain/imu'),
+            ('topics.gps_fix', '/gps/fix'),
+            ('topics.gps_speed', '/gps/speed'),
             ('topics.status', '/terrain/status'),
             ('topics.diagnostics', '/diagnostics'),
         )
@@ -167,9 +181,13 @@ class TerrainBridgeNode(Node):
                 'serial poll period must be shorter than telemetry timeout'
             )
         self._frame_tof = str(self._value('frames.tof'))
-        self._frame_bno = str(self._value('frames.bno'))
+        self._frame_imu = str(self._value('frames.imu'))
+        self._frame_gps = str(self._value('frames.gps'))
+        self._gps_enabled = bool(self._value('gps.enabled'))
         self._topic_tof = str(self._value('topics.tof'))
         self._topic_imu = str(self._value('topics.imu'))
+        self._topic_gps_fix = str(self._value('topics.gps_fix'))
+        self._topic_gps_speed = str(self._value('topics.gps_speed'))
         self._topic_status = str(self._value('topics.status'))
         self._topic_diagnostics = str(self._value('topics.diagnostics'))
 
@@ -399,6 +417,7 @@ class TerrainBridgeNode(Node):
         )
         self._tof_pub.publish(message)
         self._publish_imu(telemetry)
+        self._publish_gps(telemetry)
         self._publish_status()
 
     @staticmethod
@@ -421,26 +440,75 @@ class TerrainBridgeNode(Node):
     def _publish_imu(self, telemetry: TerrainTelemetryPayload) -> None:
         message = Imu()
         message.header.stamp = self.get_clock().now().to_msg()
-        message.header.frame_id = self._frame_bno
-        message.angular_velocity_covariance[0] = -1.0
-        message.linear_acceleration_covariance[0] = -1.0
-        if telemetry.bno_valid:
-            yaw = telemetry.bno_heading_mrad / 1000.0
-            roll = telemetry.bno_roll_mrad / 1000.0
-            pitch = telemetry.bno_pitch_mrad / 1000.0
+        message.header.frame_id = self._frame_imu
+        if telemetry.mpu_valid:
+            roll = telemetry.mpu_roll_mrad / 1000.0
+            pitch = telemetry.mpu_pitch_mrad / 1000.0
             (
                 message.orientation.x,
                 message.orientation.y,
                 message.orientation.z,
                 message.orientation.w,
-            ) = self._quaternion_from_rpy(roll, pitch, yaw)
-            message.orientation_covariance[0] = 0.05
-            message.orientation_covariance[4] = 0.05
-            message.orientation_covariance[8] = 0.05
+            ) = self._quaternion_from_rpy(roll, pitch, 0.0)
+            # Roll/pitch come from gravity; MPU6050 has no magnetometer, so
+            # yaw is unobservable and deliberately assigned high covariance.
+            message.orientation_covariance[0] = 0.08
+            message.orientation_covariance[4] = 0.08
+            message.orientation_covariance[8] = 9999.0
+            message.angular_velocity.x = (
+                telemetry.mpu_gyro_x_mrad_s / 1000.0
+            )
+            message.angular_velocity.y = (
+                telemetry.mpu_gyro_y_mrad_s / 1000.0
+            )
+            message.angular_velocity.z = (
+                telemetry.mpu_gyro_z_mrad_s / 1000.0
+            )
+            gravity_per_mg = 9.80665 / 1000.0
+            message.linear_acceleration.x = (
+                telemetry.mpu_accel_x_mg * gravity_per_mg
+            )
+            message.linear_acceleration.y = (
+                telemetry.mpu_accel_y_mg * gravity_per_mg
+            )
+            message.linear_acceleration.z = (
+                telemetry.mpu_accel_z_mg * gravity_per_mg
+            )
+            message.angular_velocity_covariance[0] = 0.02
+            message.angular_velocity_covariance[4] = 0.02
+            message.angular_velocity_covariance[8] = 0.02
+            message.linear_acceleration_covariance[0] = 0.10
+            message.linear_acceleration_covariance[4] = 0.10
+            message.linear_acceleration_covariance[8] = 0.10
         else:
             message.orientation.w = 1.0
             message.orientation_covariance[0] = -1.0
+            message.angular_velocity_covariance[0] = -1.0
+            message.linear_acceleration_covariance[0] = -1.0
         self._imu_pub.publish(message)
+
+    def _publish_gps(self, telemetry: TerrainTelemetryPayload) -> None:
+        if not self._gps_enabled:
+            return
+        fix = NavSatFix()
+        fix.header.stamp = self.get_clock().now().to_msg()
+        fix.header.frame_id = self._frame_gps
+        fix.status.service = NavSatStatus.SERVICE_GPS
+        if telemetry.gps_flags & GPS_FIX_VALID:
+            fix.status.status = NavSatStatus.STATUS_FIX
+            fix.latitude = telemetry.gps_latitude_e7 / 1.0e7
+            fix.longitude = telemetry.gps_longitude_e7 / 1.0e7
+        else:
+            fix.status.status = NavSatStatus.STATUS_NO_FIX
+            fix.latitude = float('nan')
+            fix.longitude = float('nan')
+        fix.altitude = float('nan')
+        fix.position_covariance_type = NavSatFix.COVARIANCE_TYPE_UNKNOWN
+        self._gps_fix_pub.publish(fix)
+        if telemetry.gps_flags & GPS_SPEED_VALID:
+            speed = Float32()
+            speed.data = telemetry.gps_speed_mm_s / 1000.0
+            self._gps_speed_pub.publish(speed)
 
     def _publish_status(self) -> None:
         now = self._now()
@@ -450,14 +518,18 @@ class TerrainBridgeNode(Node):
         message.header.frame_id = self._frame_tof
         if telemetry is None:
             message.tof_distance_m = float('nan')
+            message.tof_filtered_m = float('nan')
+            message.tof_reference_m = float('nan')
+            message.tof_error_m = float('nan')
+            message.tof_change_m = float('nan')
             message.tof_valid = False
+            message.tof_alert = TerrainStatus.TOF_INVALID
+            message.terrain_hazard = True
             message.fault_bits = 0
             message.telemetry_age = float('inf')
-            message.yaw_rad = float('nan')
             message.pitch_rad = float('nan')
             message.roll_rad = float('nan')
-            message.bno_valid = False
-            message.bno_calibration = 0
+            message.mpu_valid = False
         else:
             message.tof_distance_m = (
                 telemetry.tof_distance_mm / 1000.0
@@ -465,30 +537,29 @@ class TerrainBridgeNode(Node):
                 else float('nan')
             )
             message.tof_valid = bool(telemetry.tof_valid)
+            message.tof_filtered_m = telemetry.tof_filtered_mm / 1000.0
+            message.tof_reference_m = telemetry.tof_reference_mm / 1000.0
+            message.tof_error_m = telemetry.tof_error_mm / 1000.0
+            message.tof_change_m = telemetry.tof_change_mm / 1000.0
+            message.tof_alert = telemetry.tof_alert
+            message.terrain_hazard = (
+                not telemetry.tof_valid
+                or telemetry.tof_alert
+                in (TerrainStatus.TOF_RAISED, TerrainStatus.TOF_DROP)
+            )
             message.fault_bits = telemetry.fault_bits
             message.telemetry_age = float(
                 max(0.0, now - self._last_telemetry_time)
             )
-            message.bno_valid = bool(telemetry.bno_valid)
-            message.bno_calibration = telemetry.bno_calibration
-            message.yaw_rad = (
-                telemetry.bno_heading_mrad / 1000.0
-                if telemetry.bno_valid else float('nan')
-            )
+            message.mpu_valid = bool(telemetry.mpu_valid)
             message.pitch_rad = (
-                telemetry.bno_pitch_mrad / 1000.0
-                if telemetry.bno_valid else float('nan')
+                telemetry.mpu_pitch_mrad / 1000.0
+                if telemetry.mpu_valid else float('nan')
             )
             message.roll_rad = (
-                telemetry.bno_roll_mrad / 1000.0
-                if telemetry.bno_valid else float('nan')
+                telemetry.mpu_roll_mrad / 1000.0
+                if telemetry.mpu_valid else float('nan')
             )
-        message.mpu_valid = False
-        message.leg_state = int(
-            getattr(TerrainStatus, 'LEG_SAFE_STOP', 4)
-        )
-        message.retracted_limit = False
-        message.deployed_limit = False
         self._status_pub.publish(message)
 
     def _diagnostic_tick(self) -> None:
@@ -528,15 +599,21 @@ class TerrainBridgeNode(Node):
         elif not (self._capabilities & CAP_TOF10120):
             status.level = DiagnosticStatus.ERROR
             status.message = 'Terrain firmware lacks TOF-10120 capability'
-        elif not (self._capabilities & CAP_BNO055):
+        elif not (self._capabilities & CAP_MPU6050):
             status.level = DiagnosticStatus.ERROR
-            status.message = 'Terrain firmware lacks BNO055 capability'
+            status.message = 'Terrain firmware lacks MPU6050 capability'
         elif telemetry is None or not telemetry.tof_valid:
             status.level = DiagnosticStatus.ERROR
             status.message = 'TOF-10120 reading invalid'
-        elif not telemetry.bno_valid:
+        elif not telemetry.mpu_valid:
             status.level = DiagnosticStatus.ERROR
-            status.message = 'BNO055 reading invalid'
+            status.message = 'MPU6050 reading invalid'
+        elif self._gps_enabled and not (self._capabilities & CAP_GPS):
+            status.level = DiagnosticStatus.WARN
+            status.message = 'Terrain firmware lacks GPS capability'
+        elif self._gps_enabled and not (telemetry.gps_flags & GPS_FIX_VALID):
+            status.level = DiagnosticStatus.WARN
+            status.message = 'GPS enabled; waiting for a valid fix'
         elif (
             self._parser.crc_error_count
             or self._parser.frame_error_count
@@ -548,7 +625,7 @@ class TerrainBridgeNode(Node):
             status.message = 'terrain link active with malformed frames'
         else:
             status.level = DiagnosticStatus.OK
-            status.message = 'terrain link, TOF-10120 and BNO055 active'
+            status.message = 'terrain link, TOF-10120 and MPU6050 active'
         age = (
             float('inf') if self._last_telemetry_time is None
             else max(0.0, now - self._last_telemetry_time)
@@ -591,13 +668,13 @@ class TerrainBridgeNode(Node):
                 ),
             ),
             KeyValue(
-                key='bno_valid',
-                value=str(bool(telemetry and telemetry.bno_valid)).lower(),
+                key='mpu6050_valid',
+                value=str(bool(telemetry and telemetry.mpu_valid)).lower(),
             ),
             KeyValue(
-                key='bno_calibration',
+                key='gps_fix_valid',
                 value=(
-                    f'0x{telemetry.bno_calibration:02x}'
+                    str(bool(telemetry.gps_flags & GPS_FIX_VALID)).lower()
                     if telemetry is not None else 'unknown'
                 ),
             ),

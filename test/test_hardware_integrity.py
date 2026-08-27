@@ -14,7 +14,7 @@ TERRAIN_PROTOCOL = ROOT / "firmware/terrain_mcu/protocol.h"
 PYTHON_PROTOCOL = (
     ROOT / "src/safestride_bridge/safestride_bridge/protocol.py"
 )
-BNO_DRIVER = ROOT / "firmware/terrain_mcu/bno055_sensor.cpp"
+MPU_DRIVER = ROOT / "firmware/terrain_mcu/mpu6050_sensor.cpp"
 BRIDGE = (
     ROOT
     / "src/safestride_bridge/safestride_bridge/serial_bridge_node.py"
@@ -46,12 +46,11 @@ class TestHardwareIntegrity(unittest.TestCase):
         cls.drive_protocol = DRIVE_PROTOCOL.read_text(encoding="utf-8")
         cls.terrain_protocol = TERRAIN_PROTOCOL.read_text(encoding="utf-8")
         cls.python_protocol = PYTHON_PROTOCOL.read_text(encoding="utf-8")
-        cls.bno = BNO_DRIVER.read_text(encoding="utf-8")
+        cls.mpu = MPU_DRIVER.read_text(encoding="utf-8")
 
     def test_drive_active_pins_are_unique(self):
         names = (
             "LEFT_HALL_PIN",
-            "RIGHT_HALL_PIN",
             "MOTOR_PWM_PIN",
             "MOTOR_IN1_PIN",
             "MOTOR_IN2_PIN",
@@ -103,7 +102,7 @@ class TestHardwareIntegrity(unittest.TestCase):
     def test_magnet_bench_mode_is_explicit_and_bounded(self):
         self.assertEqual(
             constant_expression(self.config, "MAGNET_BENCH_MODE"),
-            "true",
+            "false",
         )
         pwm = int(
             constant_expression(self.config, "MAGNET_BENCH_PWM")
@@ -132,27 +131,28 @@ class TestHardwareIntegrity(unittest.TestCase):
         )
         for path in ROS_CONFIGS:
             text = path.read_text(encoding="utf-8")
-            self.assertIn("allow_magnet_bench_mode: true", text)
-            self.assertIn("auto_arm_magnet_bench_mode: true", text)
-            self.assertIn("require_deadman: false", text)
+            self.assertIn("allow_magnet_bench_mode: false", text)
+            self.assertIn("auto_arm_magnet_bench_mode: false", text)
+            self.assertIn("require_deadman: true", text)
+            self.assertIn("require_range_sensors: true", text)
 
     def test_terrain_uses_i2c_without_gpio_actuator_outputs(self):
         self.assertIn("Wire.begin()", self.terrain)
         self.assertNotIn("analogWrite(", self.terrain)
         self.assertNotRegex(self.terrain, r"\battachInterrupt\s*\(")
-        self.assertIn("g_bno.update(now_ms)", self.terrain)
-        self.assertIn("REG_OPR_MODE", self.bno)
-        self.assertNotIn("digitalWrite(", self.bno)
+        self.assertIn("g_mpu.update(now_ms)", self.terrain)
+        self.assertIn("REG_WHO_AM_I", self.mpu)
+        self.assertNotIn("digitalWrite(", self.mpu)
 
     def test_protocol_compatibility_constants_are_synchronized(self):
         for protocol in (self.drive_protocol, self.terrain_protocol):
-            self.assertEqual(constant_expression(protocol, "VERSION"), "3U")
+            self.assertEqual(constant_expression(protocol, "VERSION"), "4U")
             self.assertEqual(
-                constant_expression(protocol, "SCHEMA_ID"), "0x0301U"
+                constant_expression(protocol, "SCHEMA_ID"), "0x0401U"
             )
             self.assertEqual(
                 constant_expression(protocol, "FIRMWARE_RELEASE_ID"),
-                "20260816UL",
+                "20260826UL",
             )
             self.assertEqual(
                 constant_expression(protocol, "HELLO_PAYLOAD_SIZE"),
@@ -162,10 +162,31 @@ class TestHardwareIntegrity(unittest.TestCase):
                 constant_expression(protocol, "SESSION_START_PAYLOAD_SIZE"),
                 "12U",
             )
-        self.assertIn("PROTOCOL_VERSION = 3", self.python_protocol)
-        self.assertIn("PROTOCOL_SCHEMA_ID = 0x0301", self.python_protocol)
+        self.assertIn("PROTOCOL_VERSION = 4", self.python_protocol)
+        self.assertIn("PROTOCOL_SCHEMA_ID = 0x0401", self.python_protocol)
         self.assertIn(
-            "FIRMWARE_RELEASE_ID = 20260816", self.python_protocol
+            "FIRMWARE_RELEASE_ID = 20260826", self.python_protocol
+        )
+
+    def test_calibrated_single_left_hall_and_pressure(self):
+        self.assertEqual(constant_expression(self.config, "LEFT_HALL_PIN"), "2U")
+        self.assertEqual(constant_expression(self.config, "HALL_ACTIVE_LEVEL"), "LOW")
+        self.assertEqual(
+            constant_expression(self.config, "HALL_PULSES_PER_WHEEL_REV"),
+            "6UL",
+        )
+        self.assertEqual(constant_expression(self.config, "HALL_CALIBRATED"), "true")
+        self.assertEqual(
+            constant_expression(self.config, "PRESSURE_LEFT_PRESENT_THRESHOLD"),
+            "25.0F",
+        )
+        self.assertEqual(
+            constant_expression(self.config, "PRESSURE_RIGHT_PRESENT_THRESHOLD"),
+            "25.0F",
+        )
+        self.assertEqual(
+            constant_expression(self.config, "PRESSURE_THRESHOLDS_CALIBRATED"),
+            "true",
         )
 
 

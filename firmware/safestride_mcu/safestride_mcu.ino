@@ -32,9 +32,7 @@ constexpr uint8_t STATUS_STATE_SHIFT = 8U;
 // Fault values match safestride_interfaces/msg/WalkerStatus.msg.
 constexpr uint16_t FAULT_MOTOR_DRIVER = 1U << 1U;
 constexpr uint16_t FAULT_LEFT_HALL = 1U << 3U;
-constexpr uint16_t FAULT_RIGHT_HALL = 1U << 4U;
-
-constexpr uint32_t CAP_TWO_HALL_SENSORS = 1UL << 0U;
+constexpr uint32_t CAP_SINGLE_LEFT_HALL = 1UL << 0U;
 constexpr uint32_t CAP_TWO_RANGES = 1UL << 1U;
 constexpr uint32_t CAP_BATTERY = 1UL << 2U;
 constexpr uint32_t CAP_TWO_CURRENTS = 1UL << 3U;
@@ -48,11 +46,8 @@ constexpr uint8_t PRESSURE_FLAG_RIGHT_PRESENT = 1U << 1U;
 constexpr uint8_t PRESSURE_FLAG_CALIBRATED = 1U << 2U;
 
 volatile uint32_t g_left_hall_pulse_count = 0UL;
-volatile uint32_t g_right_hall_pulse_count = 0UL;
 volatile uint32_t g_left_hall_last_pulse_us = 0UL;
-volatile uint32_t g_right_hall_last_pulse_us = 0UL;
 volatile uint32_t g_left_hall_period_us = 0UL;
-volatile uint32_t g_right_hall_period_us = 0UL;
 
 proto::FrameReceiver g_receiver;
 DriveController g_drive;
@@ -131,33 +126,22 @@ void leftHallIsr() {
       g_left_hall_period_us);
 }
 
-void rightHallIsr() {
-  recordHallPulse(
-      g_right_hall_pulse_count,
-      g_right_hall_last_pulse_us,
-      g_right_hall_period_us);
-}
-
 void readHallSamples(
     uint32_t now_us,
     HallSample& left,
     HallSample& right) {
   uint32_t left_last_us = 0UL;
-  uint32_t right_last_us = 0UL;
   noInterrupts();
   left.pulse_count = g_left_hall_pulse_count;
-  right.pulse_count = g_right_hall_pulse_count;
   left.period_us = g_left_hall_period_us;
-  right.period_us = g_right_hall_period_us;
   left_last_us = g_left_hall_last_pulse_us;
-  right_last_us = g_right_hall_last_pulse_us;
   interrupts();
   left.age_us = left_last_us == 0UL
       ? 0xFFFFFFFFUL
       : now_us - left_last_us;
-  right.age_us = right_last_us == 0UL
-      ? 0xFFFFFFFFUL
-      : now_us - right_last_us;
+  // The shared drive has one physical Hall input. Keep the legacy two-wheel
+  // telemetry layout by mirroring the left measurement into the right field.
+  right = left;
 }
 
 uint32_t makeBootId() {
@@ -320,7 +304,7 @@ int16_t readCurrentMa(uint8_t pin) {
 
 void sendHello() {
   uint8_t payload[proto::HELLO_PAYLOAD_SIZE];
-  uint32_t capabilities = CAP_TWO_HALL_SENSORS | CAP_DEADMAN |
+  uint32_t capabilities = CAP_SINGLE_LEFT_HALL | CAP_DEADMAN |
                           CAP_PRESSURE_TELEMETRY;
   if (cfg::ENABLE_ESTOP) {
     capabilities |= CAP_ESTOP;
@@ -376,9 +360,15 @@ void sendTelemetry() {
   proto::writeU16(payload + 30U, g_last_command_sequence);
   proto::writeU16(
       payload + 32U,
-      static_cast<uint16_t>(g_pressure.leftFiltered() + 0.5F));
+      g_pressure.leftRaw());
   proto::writeU16(
       payload + 34U,
+      g_pressure.rightRaw());
+  proto::writeU16(
+      payload + 36U,
+      static_cast<uint16_t>(g_pressure.leftFiltered() + 0.5F));
+  proto::writeU16(
+      payload + 38U,
       static_cast<uint16_t>(g_pressure.rightFiltered() + 0.5F));
   uint8_t pressure_flags = 0U;
   if (g_pressure.leftPresent()) {
@@ -390,8 +380,8 @@ void sendTelemetry() {
   if (g_pressure.calibrated()) {
     pressure_flags |= PRESSURE_FLAG_CALIBRATED;
   }
-  payload[36U] = pressure_flags;
-  payload[37U] = static_cast<uint8_t>(g_pressure.alert());
+  payload[40U] = pressure_flags;
+  payload[41U] = static_cast<uint8_t>(g_pressure.alert());
 
   proto::sendFrame(
       Serial,
@@ -585,9 +575,7 @@ void runControlLoop(uint32_t now_us) {
   if (cfg::MAGNET_BENCH_MODE) {
     const uint32_t pulse_hold_us =
         static_cast<uint32_t>(cfg::MAGNET_BENCH_PULSE_HOLD_MS) * 1000UL;
-    const bool magnet_pulse_recent =
-        left_hall.age_us <= pulse_hold_us ||
-        right_hall.age_us <= pulse_hold_us;
+    const bool magnet_pulse_recent = left_hall.age_us <= pulse_hold_us;
     g_drive.updateMagnetBench(
         elapsed_us,
         left_hall,
@@ -606,9 +594,6 @@ void runControlLoop(uint32_t now_us) {
   if (hall_faults != 0U) {
     if ((hall_faults & DriveController::HALL_FAULT_LEFT) != 0U) {
       g_fault_bits |= FAULT_LEFT_HALL;
-    }
-    if ((hall_faults & DriveController::HALL_FAULT_RIGHT) != 0U) {
-      g_fault_bits |= FAULT_RIGHT_HALL;
     }
     immediateStop(ControllerState::FAULT, false);
     g_stationary_tracking = false;
@@ -650,26 +635,15 @@ void setup() {
     pinMode(cfg::DRIVER_FAULT_PIN, INPUT_PULLUP);
   }
   pinMode(cfg::LEFT_HALL_PIN, INPUT_PULLUP);
-  pinMode(cfg::RIGHT_HALL_PIN, INPUT_PULLUP);
 
   const int left_interrupt =
       digitalPinToInterrupt(cfg::LEFT_HALL_PIN);
-  const int right_interrupt =
-      digitalPinToInterrupt(cfg::RIGHT_HALL_PIN);
   if (left_interrupt == NOT_AN_INTERRUPT) {
     g_fault_bits |= FAULT_LEFT_HALL;
   } else {
     attachInterrupt(
         left_interrupt,
         leftHallIsr,
-        cfg::HALL_ACTIVE_LEVEL == LOW ? FALLING : RISING);
-  }
-  if (right_interrupt == NOT_AN_INTERRUPT) {
-    g_fault_bits |= FAULT_RIGHT_HALL;
-  } else {
-    attachInterrupt(
-        right_interrupt,
-        rightHallIsr,
         cfg::HALL_ACTIVE_LEVEL == LOW ? FALLING : RISING);
   }
 

@@ -6,7 +6,6 @@ import unittest
 from safestride_bridge.protocol import (
     BOARD_ROLE_DRIVE,
     COMMAND_STRUCT,
-    GPS_TELEMETRY_STRUCT,
     HEADER_STRUCT,
     TELEMETRY_STRUCT,
     TERRAIN_TELEMETRY_STRUCT,
@@ -16,7 +15,6 @@ from safestride_bridge.protocol import (
     Frame,
     FrameDecodeError,
     FrameParser,
-    GpsTelemetryPayload,
     HelloPayload,
     PacketType,
     PayloadDecodeError,
@@ -269,19 +267,29 @@ class TestPayloads(unittest.TestCase):
             tof_reference_mm=500,
             tof_error_mm=210,
             tof_change_mm=-15,
-            bno_heading_mrad=1571,
-            bno_roll_mrad=-120,
-            bno_pitch_mrad=340,
-            bno_valid=1,
-            bno_calibration=0xFF,
+            mpu_accel_x_mg=10,
+            mpu_accel_y_mg=-20,
+            mpu_accel_z_mg=1000,
+            mpu_gyro_x_mrad_s=31,
+            mpu_gyro_y_mrad_s=-42,
+            mpu_gyro_z_mrad_s=53,
+            mpu_roll_mrad=-120,
+            mpu_pitch_mrad=340,
+            mpu_valid=1,
             fault_bits=0,
+            gps_latitude_e7=375665000,
+            gps_longitude_e7=1269780000,
+            gps_speed_mm_s=1234,
+            gps_flags=3,
+            gps_satellites=9,
         )
         self.assertEqual(
             payload.pack(),
             struct.pack(
-                '<HBBHHhhhhhBBH',
+                '<HBBHHhhhhhhhhhhBHiiIBB',
                 725, 1, 2, 710, 500, 210, -15,
-                1571, -120, 340, 1, 0xFF, 0,
+                10, -20, 1000, 31, -42, 53, -120, 340, 1, 0,
+                375665000, 1269780000, 1234, 3, 9,
             ),
         )
         self.assertEqual(
@@ -291,21 +299,6 @@ class TestPayloads(unittest.TestCase):
             TerrainTelemetryPayload.unpack(payload.pack()), payload
         )
 
-    def test_gps_telemetry_exact_layout(self):
-        payload = GpsTelemetryPayload(
-            latitude_e7=375665000,
-            longitude_e7=1269780000,
-            speed_mm_s=1234,
-            flags=0x03,
-            satellites=9,
-        )
-        self.assertEqual(
-            payload.pack(),
-            struct.pack('<iiIBB', 375665000, 1269780000, 1234, 3, 9),
-        )
-        self.assertEqual(len(payload.pack()), GPS_TELEMETRY_STRUCT.size)
-        self.assertEqual(GpsTelemetryPayload.unpack(payload.pack()), payload)
-
     def test_wrong_payload_size_is_rejected(self):
         with self.assertRaises(PayloadDecodeError):
             HelloPayload.unpack(b'\x00')
@@ -314,7 +307,7 @@ class TestPayloads(unittest.TestCase):
         with self.assertRaises(PayloadDecodeError):
             TelemetryPayload.unpack(b'')
         with self.assertRaises(PayloadDecodeError):
-            GpsTelemetryPayload.unpack(b'\x00' * 13)
+            TerrainTelemetryPayload.unpack(b'\x00' * 13)
 
     def test_command_rejects_invalid_enable_and_reserved(self):
         with self.assertRaises(ValueError):
@@ -343,8 +336,8 @@ class TestPayloads(unittest.TestCase):
             TelemetryPayload(*values).pack()
 
     def test_terrain_telemetry_rejects_invalid_alert_fields(self):
-        values = [0] * 8
-        values[2] = 4
+        values = [0] * 22
+        values[2] = 6
         with self.assertRaises(PayloadDecodeError):
             TerrainTelemetryPayload.unpack(
                 TERRAIN_TELEMETRY_STRUCT.pack(*values)
@@ -352,22 +345,14 @@ class TestPayloads(unittest.TestCase):
         with self.assertRaises(ValueError):
             TerrainTelemetryPayload(*values).pack()
 
-    def test_gps_telemetry_rejects_invalid_fields(self):
+    def test_terrain_telemetry_rejects_reserved_gps_flags(self):
+        values = [0] * 22
+        values[20] = 0x04
         with self.assertRaises(ValueError):
-            GpsTelemetryPayload(0, 0, 0, 0x04, 0).pack()
-        with self.assertRaises(ValueError):
-            GpsTelemetryPayload(900000001, 0, 0, 1, 0).pack()
+            TerrainTelemetryPayload(*values).pack()
         with self.assertRaises(PayloadDecodeError):
-            GpsTelemetryPayload.unpack(
-                GPS_TELEMETRY_STRUCT.pack(1, 1, 0, 0, 0)
-            )
-        with self.assertRaises(PayloadDecodeError):
-            GpsTelemetryPayload.unpack(
-                GPS_TELEMETRY_STRUCT.pack(0, 0, 1, 0, 0)
-            )
-        with self.assertRaises(PayloadDecodeError):
-            GpsTelemetryPayload.unpack(
-                GPS_TELEMETRY_STRUCT.pack(0, 0, 500001, 2, 0)
+            TerrainTelemetryPayload.unpack(
+                TERRAIN_TELEMETRY_STRUCT.pack(*values)
             )
 
 

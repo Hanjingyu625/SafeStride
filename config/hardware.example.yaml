@@ -21,13 +21,11 @@ drive:
   hall_calibrated: true
   hall_sensor_layout: single_left
   pressure:
-    # Light-touch bench values only; replace after handle calibration.
-    left_pressed_threshold: 40
-    right_pressed_threshold: 40
+    left_pressed_threshold: 25
+    right_pressed_threshold: 25
     left_active_high: true
     right_active_high: true
 terrain:
-  leg_output_enabled: false
   gps:
     module: BE-220
     uno_rx_pin: D8
@@ -37,13 +35,11 @@ terrain:
   tof:
     interface: I2C
     address_7bit: 0x52
-    mount_height_m: null
+    mount_height_m: 0.25
     mount_pitch_deg: null
-  leg:
-    motion_timeout_s: 4.0
-    max_deploy_wheel_speed_mps: 0.03
-    require_retracted_limit: true
-    require_deployed_limit: true
+  imu:
+    module: GY-521 MPU6050
+    address_7bit: 0x68
 perception:
   model_path: models/road_surface.onnx
   model_sha256: CHANGE_ME

@@ -31,28 +31,25 @@ constexpr int32_t MAX_DECEL_MRAD_S2 = 2500L;
 constexpr int32_t ARM_MAX_MEASURED_SPEED_MRAD_S = 100L;
 constexpr uint16_t ARM_STATIONARY_DWELL_MS = 250U;
 
-// One single-output Hall sensor is installed per wheel. The interrupt counts
-// falling edges and the controller estimates speed from the pulse period.
-// A single channel cannot measure direction independently; velocity sign is
-// derived from the commanded direction of the shared motor driver.
+// One single-output Hall sensor is installed on the LEFT wheel only. D2 uses
+// interrupt 0 on the Uno and counts falling edges. Six magnets are fitted to
+// that wheel. The shared motor driver means the measured speed is mirrored to
+// both ROS wheel fields; it is not independent right-wheel odometry.
 constexpr uint8_t LEFT_HALL_PIN = 2U;
-constexpr uint8_t RIGHT_HALL_PIN = 3U;
 constexpr uint8_t HALL_ACTIVE_LEVEL = LOW;
 // Reject sub-millisecond electrical chatter without discarding valid pulses
 // if the measured pulse-per-revolution value is increased later.
 constexpr uint32_t HALL_MIN_PULSE_INTERVAL_US = 500UL;
 constexpr uint32_t HALL_ZERO_TIMEOUT_US = 1500000UL;
-// Measure this with the standalone sensor bench. Keep HALL_CALIBRATED false
-// until both channels produce the verified number of pulses per wheel turn.
-constexpr uint32_t HALL_PULSES_PER_WHEEL_REV = 1UL;
-constexpr bool HALL_CALIBRATED = false;
+constexpr uint32_t HALL_PULSES_PER_WHEEL_REV = 6UL;
+constexpr bool HALL_CALIBRATED = true;
 
 // Temporary no-wheel hardware test. When enabled, either Hall input pulse
 // opens a short, low-PWM motor window after an explicit ROS arm request.
 // This deliberately bypasses Hall calibration, pressure dead-man, stationary
 // dwell, and Hall plausibility checks. Session and command watchdogs remain
 // active. Set this false before fitting wheels or beginning normal operation.
-constexpr bool MAGNET_BENCH_MODE = true;
+constexpr bool MAGNET_BENCH_MODE = false;
 constexpr uint8_t MAGNET_BENCH_PWM = 60U;
 constexpr uint16_t MAGNET_BENCH_PULSE_HOLD_MS = 750U;
 // Hand-moved magnets can take several seconds between approaches. Retain the
@@ -90,13 +87,15 @@ constexpr uint8_t PRESSURE_LEFT_PIN = A0;
 constexpr uint8_t PRESSURE_RIGHT_PIN = A1;
 constexpr uint16_t PRESSURE_SAMPLE_PERIOD_MS = 100U;
 constexpr float PRESSURE_FILTER_ALPHA = 0.2F;
+constexpr uint8_t PRESSURE_ADC_SAMPLES = 8U;
+constexpr float PRESSURE_PRESENT_HYSTERESIS = 3.0F;
 // Watch /handle/pressure with the motors isolated, then set each channel's
 // polarity and threshold halfway between its released and held readings.
 constexpr bool PRESSURE_LEFT_ACTIVE_HIGH = true;
 constexpr bool PRESSURE_RIGHT_ACTIVE_HIGH = true;
-constexpr float PRESSURE_LEFT_PRESENT_THRESHOLD = 100.0F;
-constexpr float PRESSURE_RIGHT_PRESENT_THRESHOLD = 100.0F;
-constexpr bool PRESSURE_THRESHOLDS_CALIBRATED = false;
+constexpr float PRESSURE_LEFT_PRESENT_THRESHOLD = 25.0F;
+constexpr float PRESSURE_RIGHT_PRESENT_THRESHOLD = 25.0F;
+constexpr bool PRESSURE_THRESHOLDS_CALIBRATED = true;
 constexpr float PRESSURE_IMBALANCE_THRESHOLD = 300.0F;
 constexpr float PRESSURE_SUDDEN_CHANGE_THRESHOLD = 150.0F;
 
@@ -199,5 +198,15 @@ static_assert(
         PRESSURE_RIGHT_PRESENT_THRESHOLD >= 0.0F &&
         PRESSURE_RIGHT_PRESENT_THRESHOLD <= 1023.0F,
     "pressure thresholds must fit the ADC range");
+static_assert(
+    PRESSURE_ADC_SAMPLES > 0U,
+    "pressure ADC averaging requires at least one sample");
+static_assert(
+    PRESSURE_PRESENT_HYSTERESIS >= 0.0F &&
+        PRESSURE_PRESENT_HYSTERESIS <
+            PRESSURE_LEFT_PRESENT_THRESHOLD &&
+        PRESSURE_PRESENT_HYSTERESIS <
+            PRESSURE_RIGHT_PRESENT_THRESHOLD,
+    "pressure hysteresis must be below both thresholds");
 
 }  // namespace safestride_config

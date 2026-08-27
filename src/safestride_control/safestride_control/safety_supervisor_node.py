@@ -16,7 +16,11 @@ from rclpy.qos import (
 )
 from sensor_msgs.msg import Range
 
-from safestride_interfaces.msg import SurfaceCondition, WalkerStatus
+from safestride_interfaces.msg import (
+    SurfaceCondition,
+    TerrainStatus,
+    WalkerStatus,
+)
 from .safety_logic import finite_parameter
 
 
@@ -65,6 +69,7 @@ class SafetySupervisor(Node):
             'surface_topic', '/perception/surface_condition'
         )
         self.declare_parameter('status_topic', '/walker/status')
+        self.declare_parameter('terrain_status_topic', '/terrain/status')
         self.declare_parameter('diagnostics_topic', '/diagnostics')
         self.declare_parameter('output_frame_id', 'base_link')
 
@@ -204,6 +209,8 @@ class SafetySupervisor(Node):
         self._last_command_time: Optional[float] = None
         self._last_status: Optional[WalkerStatus] = None
         self._last_status_time: Optional[float] = None
+        self._last_terrain: Optional[TerrainStatus] = None
+        self._last_terrain_time: Optional[float] = None
         self._last_surface: Optional[SurfaceCondition] = None
         self._last_surface_time: Optional[float] = None
         self._ranges: Dict[str, Dict[str, object]] = {
@@ -258,6 +265,12 @@ class SafetySupervisor(Node):
             status_qos,
         )
         self.create_subscription(
+            TerrainStatus,
+            str(self.get_parameter('terrain_status_topic').value),
+            self._terrain_callback,
+            status_qos,
+        )
+        self.create_subscription(
             SurfaceCondition,
             str(self.get_parameter('surface_topic').value),
             self._surface_callback,
@@ -279,7 +292,7 @@ class SafetySupervisor(Node):
         )
 
         self.get_logger().info(
-            'Safety supervisor ready at %.1f Hz; ranges are %s and '
+            'Safety supervisor ready at %.1f Hz; terrain TOF is %s and '
             'surface perception is %s'
             % (
                 self._publish_rate,
@@ -298,6 +311,10 @@ class SafetySupervisor(Node):
     def _status_callback(self, msg: WalkerStatus) -> None:
         self._last_status = msg
         self._last_status_time = self._now_seconds()
+
+    def _terrain_callback(self, msg: TerrainStatus) -> None:
+        self._last_terrain = msg
+        self._last_terrain_time = self._now_seconds()
 
     def _surface_callback(self, msg: SurfaceCondition) -> None:
         self._last_surface = msg
@@ -399,6 +416,40 @@ class SafetySupervisor(Node):
             return ['angular_command_unsupported']
         return []
 
+    def _terrain_reasons(self, now: float) -> List[str]:
+        if self._last_terrain is None:
+            return ['terrain_status_missing'] if self._require_ranges else []
+        if self._age(now, self._last_terrain_time) > self._range_timeout:
+            return ['terrain_status_stale'] if self._require_ranges else []
+
+        terrain = self._last_terrain
+        reasons: List[str] = []
+        telemetry_age = float(terrain.telemetry_age)
+        if (
+            not math.isfinite(telemetry_age)
+            or telemetry_age < 0.0
+            or telemetry_age > self._max_telemetry_age
+        ):
+            reasons.append('terrain_telemetry_stale')
+        if (
+            not terrain.tof_valid
+            or terrain.tof_alert == TerrainStatus.TOF_INVALID
+        ):
+            reasons.append('terrain_tof_invalid')
+        elif terrain.tof_alert == TerrainStatus.TOF_RAISED:
+            reasons.append('terrain_raised_obstacle')
+        elif terrain.tof_alert == TerrainStatus.TOF_DROP:
+            reasons.append('terrain_drop')
+        elif terrain.tof_alert not in (
+            TerrainStatus.TOF_NORMAL,
+            TerrainStatus.TOF_CANDIDATE_RAISED,
+            TerrainStatus.TOF_CANDIDATE_DROP,
+        ):
+            reasons.append('terrain_alert_invalid')
+        if terrain.fault_bits & TerrainStatus.FAULT_TOF_INVALID:
+            reasons.append('terrain_tof_fault')
+        return reasons
+
     def _range_scale(self, distance: float) -> float:
         if distance <= self._stop_distance:
             return 0.0
@@ -425,13 +476,9 @@ class SafetySupervisor(Node):
             )
             valid = bool(sample['valid'])
 
-            if not fresh:
-                if self._require_ranges:
-                    reasons.append('%s_range_stale' % side)
-                continue
-            if not valid:
-                if self._require_ranges:
-                    reasons.append('%s_range_invalid' % side)
+            if not fresh or not valid:
+                # Front-facing ranges are optional. require_range_sensors now
+                # refers to the installed downward TOF TerrainStatus stream.
                 continue
 
             distance = float(sample['distance'])
@@ -565,6 +612,7 @@ class SafetySupervisor(Node):
 
         hard_stop_reasons = self._command_reasons(now)
         hard_stop_reasons.extend(self._status_reasons(now))
+        hard_stop_reasons.extend(self._terrain_reasons(now))
         range_reasons, distances, range_scales = self._range_state(now)
         hard_stop_reasons.extend(range_reasons)
         (
@@ -682,6 +730,14 @@ class SafetySupervisor(Node):
             'surface_missing',
             'surface_stale',
             'surface_invalid',
+            'terrain_status_missing',
+            'terrain_status_stale',
+            'terrain_telemetry_stale',
+            'terrain_tof_invalid',
+            'terrain_raised_obstacle',
+            'terrain_drop',
+            'terrain_alert_invalid',
+            'terrain_tof_fault',
         }
         if any(reason in severe for reason in hard_stop_reasons):
             diagnostic.level = DiagnosticStatus.ERROR

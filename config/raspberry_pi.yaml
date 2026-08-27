@@ -13,17 +13,17 @@ serial_bridge:
       ttl_ms: 200
       arm_max_wheel_speed_rad_s: 0.10
       max_abs_angular_z_rad_s: 0.0
-      # Temporary no-wheel test. Must match firmware MAGNET_BENCH_MODE.
-      allow_magnet_bench_mode: true
-      auto_arm_magnet_bench_mode: true
+      allow_magnet_bench_mode: false
+      auto_arm_magnet_bench_mode: false
       arm_confirmation_timeout_s: 1.0
     telemetry: {timeout_s: 0.30}
     diagnostics: {publish_rate_hz: 1.0}
     base:
-      hall_pulses_per_revolution: 1
+      hall_pulses_per_revolution: 6
       max_wheel_speed_rad_s: 3.0
     range: {min_m: 0.02, max_m: 4.0, field_of_view_rad: 0.35}
-    battery: {empty_voltage: 0.0, full_voltage: 0.0}
+    # Nominal pack voltage is known, but no battery-to-ADC divider is fitted.
+    battery: {nominal_voltage: 12.0, empty_voltage: 0.0, full_voltage: 0.0}
     frames:
       odom: odom
       base: base_footprint
@@ -56,10 +56,13 @@ terrain_bridge:
     telemetry: {timeout_s: 0.30}
     diagnostics: {publish_rate_hz: 1.0}
     range: {min_m: 0.10, max_m: 2.0, field_of_view_rad: 0.052}
-    frames: {tof: terrain_tof_link, bno: imu_link}
+    gps: {enabled: true}
+    frames: {tof: terrain_tof_link, imu: imu_link, gps: gps_link}
     topics:
       tof: /terrain/tof
       imu: /terrain/imu
+      gps_fix: /gps/fix
+      gps_speed: /gps/speed
       status: /terrain/status
       diagnostics: /diagnostics
 
@@ -71,10 +74,9 @@ safety_supervisor:
     status_timeout: 0.50
     max_telemetry_age: 0.50
     range_timeout: 0.35
-    # The terrain TOF faces downward and cannot replace front obstacle ranges.
-    require_range_sensors: false
-    # Temporary bench mode: pressure is still published but does not inhibit.
-    require_deadman: false
+    # This now requires the downward TOF terrain status, not front-facing range.
+    require_range_sensors: true
+    require_deadman: true
     max_forward_velocity: 0.15
     max_reverse_velocity: 0.08
     max_angular_velocity: 0.0
@@ -89,13 +91,16 @@ safety_supervisor:
     left_range_topic: /range/front_left
     right_range_topic: /range/front_right
     status_topic: /walker/status
+    terrain_status_topic: /terrain/status
     diagnostics_topic: /diagnostics
     output_frame_id: base_link
 
 gps_node:
   ros__parameters:
-    port: /dev/serial/by-id/CHANGE_ME_BE220
-    baudrate: 115200
+    # Optional direct-to-Pi fallback. Normal operation receives GPS through
+    # the Terrain Uno and terrain_bridge.
+    port: /dev/safestride-gps
+    baudrate: 9600
     poll_rate_hz: 50.0
     reconnect_period_s: 1.0
     frame_id: gps_link
@@ -104,8 +109,9 @@ gps_node:
 
 crosswalk_controller:
   ros__parameters:
-    crosswalk_file: /home/CHANGE_ME/SafeStride/data/generated/standard_crosswalks.json
-    api_key_file: /etc/safestride/signal_api_key.txt
+    # Empty files keep the node in readiness-monitor mode without crashing.
+    crosswalk_file: ''
+    api_key_file: ''
     # Set this manually unless each crosswalk JSON record contains itstId.
     intersection_id: ''
     update_rate_hz: 5.0
@@ -126,3 +132,17 @@ crosswalk_controller:
     status_topic: /crosswalk/status
     diagnostics_topic: /diagnostics
     output_frame_id: base_link
+
+foxglove_bridge:
+  ros__parameters:
+    port: 8765
+    address: 0.0.0.0
+    topic_whitelist:
+      - ^/(diagnostics|walker/status|wheel/hall|handle/pressure|battery_state)$
+      - ^/terrain/(tof|imu|status)$
+      - ^/(gps/fix|gps/speed|crosswalk/status|odom|tf|tf_static|robot_description)$
+    service_whitelist: ['(?!)']
+    param_whitelist: ['(?!)']
+    client_topic_whitelist: ['(?!)']
+    capabilities: [connectionGraph, assets]
+    sysinfo: true

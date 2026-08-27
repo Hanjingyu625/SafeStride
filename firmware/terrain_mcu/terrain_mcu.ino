@@ -7,7 +7,8 @@
 #endif
 
 #include "config.h"
-#include "bno055_sensor.h"
+#include "gps_receiver.h"
+#include "mpu6050_sensor.h"
 #include "protocol.h"
 #include "tof10120_sensor.h"
 
@@ -19,36 +20,21 @@ namespace cfg = safestride_terrain_config;
 namespace proto = safestride_protocol;
 
 constexpr uint32_t CAP_TOF10120 = 1UL << 8U;
-constexpr uint32_t CAP_BNO055 = 1UL << 9U;
+constexpr uint32_t CAP_MPU6050 = 1UL << 9U;
+constexpr uint32_t CAP_GPS = 1UL << 10U;
 constexpr uint16_t FAULT_TOF_INVALID = 1U << 0U;
-constexpr uint16_t FAULT_BNO_INVALID = 1U << 1U;
-
-enum class LegState : uint8_t {
-  STOWED,
-  DEPLOYING,
-  DEPLOYED,
-  RETRACTING,
-  SAFE_STOP,
-  FAULT,
-};
+constexpr uint16_t FAULT_MPU_INVALID = 1U << 1U;
 
 proto::FrameReceiver g_receiver;
 Tof10120Sensor g_tof;
-Bno055Sensor g_bno;
-LegState g_leg_state = LegState::SAFE_STOP;
+Mpu6050Sensor g_mpu;
+GpsReceiver g_gps;
 uint32_t g_boot_id = 0UL;
 uint32_t g_session_id = 0UL;
 bool g_session_active = false;
 uint16_t g_tx_sequence = 0U;
 uint32_t g_last_hello_ms = 0UL;
 uint32_t g_last_telemetry_ms = 0UL;
-
-void disableLegImmediately() {
-  // Leg hardware is intentionally not armed by this sensor-only firmware.
-  // Add verified enable/direction pins, limit inputs and a command watchdog
-  // before changing this state.
-  g_leg_state = LegState::SAFE_STOP;
-}
 
 uint32_t makeBootId() {
   uint32_t value = 0UL;
@@ -99,8 +85,11 @@ void sendHello() {
   uint8_t payload[proto::HELLO_PAYLOAD_SIZE];
   proto::writeU32(payload + 0U, g_boot_id);
   uint32_t capabilities = CAP_TOF10120;
-  if (cfg::ENABLE_BNO055) {
-    capabilities |= CAP_BNO055;
+  if (cfg::ENABLE_MPU6050) {
+    capabilities |= CAP_MPU6050;
+  }
+  if (cfg::ENABLE_GPS) {
+    capabilities |= CAP_GPS;
   }
   proto::writeU32(payload + 4U, capabilities);
   payload[8U] = proto::BOARD_ROLE_TERRAIN;
@@ -131,16 +120,26 @@ void sendTelemetry() {
       payload + 6U, roundedUnsigned16(g_tof.referenceDistanceMm()));
   proto::writeI16(payload + 8U, roundedSigned16(g_tof.errorMm()));
   proto::writeI16(payload + 10U, roundedSigned16(g_tof.changeMm()));
-  proto::writeI16(payload + 12U, g_bno.headingMrad());
-  proto::writeI16(payload + 14U, g_bno.rollMrad());
-  proto::writeI16(payload + 16U, g_bno.pitchMrad());
-  payload[18U] = g_bno.valid() ? 1U : 0U;
-  payload[19U] = g_bno.calibration();
+  proto::writeI16(payload + 12U, g_mpu.accelXMg());
+  proto::writeI16(payload + 14U, g_mpu.accelYMg());
+  proto::writeI16(payload + 16U, g_mpu.accelZMg());
+  proto::writeI16(payload + 18U, g_mpu.gyroXMradS());
+  proto::writeI16(payload + 20U, g_mpu.gyroYMradS());
+  proto::writeI16(payload + 22U, g_mpu.gyroZMradS());
+  proto::writeI16(payload + 24U, g_mpu.rollMrad());
+  proto::writeI16(payload + 26U, g_mpu.pitchMrad());
+  payload[28U] = g_mpu.valid() ? 1U : 0U;
   uint16_t faults = g_tof.valid() ? 0U : FAULT_TOF_INVALID;
-  if (cfg::ENABLE_BNO055 && !g_bno.valid()) {
-    faults |= FAULT_BNO_INVALID;
+  if (cfg::ENABLE_MPU6050 && !g_mpu.valid()) {
+    faults |= FAULT_MPU_INVALID;
   }
-  proto::writeU16(payload + 20U, faults);
+  proto::writeU16(payload + 29U, faults);
+  const GpsSample gps = g_gps.sample(millis());
+  proto::writeI32(payload + 31U, gps.latitude_e7);
+  proto::writeI32(payload + 35U, gps.longitude_e7);
+  proto::writeU32(payload + 39U, gps.speed_mm_s);
+  payload[43U] = gps.flags;
+  payload[44U] = gps.satellites;
   proto::sendFrame(
       Serial,
       proto::TYPE_TERRAIN_TELEMETRY,
@@ -184,12 +183,12 @@ void setup() {
   MCUSR = 0U;
   wdt_disable();
 #endif
-  disableLegImmediately();
   Wire.begin();
   Serial.begin(cfg::SERIAL_BAUD);
   const uint32_t now_ms = millis();
   g_tof.begin(now_ms);
-  g_bno.begin(now_ms);
+  g_mpu.begin(now_ms);
+  g_gps.begin();
   g_boot_id = makeBootId();
   g_last_hello_ms = now_ms - cfg::HELLO_PERIOD_MS;
   g_last_telemetry_ms = now_ms;
@@ -202,11 +201,11 @@ void loop() {
 #if defined(ARDUINO_ARCH_AVR)
   wdt_reset();
 #endif
-  disableLegImmediately();
   processHostProtocol();
   const uint32_t now_ms = millis();
+  g_gps.poll();
   g_tof.update(now_ms);
-  g_bno.update(now_ms);
+  g_mpu.update(now_ms);
   if (now_ms - g_last_hello_ms >= cfg::HELLO_PERIOD_MS) {
     g_last_hello_ms = now_ms;
     sendHello();

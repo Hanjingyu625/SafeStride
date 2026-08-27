@@ -20,6 +20,7 @@
   <exec_depend>safestride_navigation</exec_depend>
   <exec_depend>safestride_perception</exec_depend>
   <exec_depend>safestride_sensors</exec_depend>
+  <exec_depend>foxglove_bridge</exec_depend>
   <exec_depend>xacro</exec_depend>
 
   <export>

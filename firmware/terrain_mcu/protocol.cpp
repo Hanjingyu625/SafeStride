@@ -163,6 +163,10 @@ uint16_t readU16(const uint8_t* data) {
          (static_cast<uint16_t>(data[1]) << 8U);
 }
 
+int16_t readI16(const uint8_t* data) {
+  return static_cast<int16_t>(readU16(data));
+}
+
 uint32_t readU32(const uint8_t* data) {
   return static_cast<uint32_t>(data[0]) |
          (static_cast<uint32_t>(data[1]) << 8U) |
@@ -184,6 +188,10 @@ void writeU32(uint8_t* data, uint32_t value) {
   data[1] = static_cast<uint8_t>((value >> 8U) & 0xFFUL);
   data[2] = static_cast<uint8_t>((value >> 16U) & 0xFFUL);
   data[3] = static_cast<uint8_t>((value >> 24U) & 0xFFUL);
+}
+
+void writeI32(uint8_t* data, int32_t value) {
+  writeU32(data, static_cast<uint32_t>(value));
 }
 
 bool sendFrame(

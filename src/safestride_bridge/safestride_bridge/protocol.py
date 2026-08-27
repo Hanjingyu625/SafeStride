@@ -14,9 +14,9 @@ import struct
 from typing import ClassVar, Iterable, List
 
 
-PROTOCOL_VERSION = 3
-PROTOCOL_SCHEMA_ID = 0x0301
-FIRMWARE_RELEASE_ID = 20260816
+PROTOCOL_VERSION = 4
+PROTOCOL_SCHEMA_ID = 0x0401
+FIRMWARE_RELEASE_ID = 20260826
 
 BOARD_ROLE_DRIVE = 1
 BOARD_ROLE_TERRAIN = 2
@@ -29,8 +29,10 @@ CRC_STRUCT = struct.Struct('<H')
 HELLO_STRUCT = struct.Struct('<IIBBHI')
 SESSION_START_STRUCT = struct.Struct('<IBBHI')
 COMMAND_STRUCT = struct.Struct('<iHBB')
-TELEMETRY_STRUCT = struct.Struct('<iiiiHHHhhHHHHHBB')
-TERRAIN_TELEMETRY_STRUCT = struct.Struct('<HBBHHhhhhhBBH')
+TELEMETRY_STRUCT = struct.Struct('<iiiiHHHhhHHHHHHHBB')
+TERRAIN_TELEMETRY_STRUCT = struct.Struct(
+    '<HBBHHhhhhhhhhhhBHiiIBB'
+)
 
 
 class ProtocolError(ValueError):
@@ -471,11 +473,17 @@ class TelemetryPayload:
     last_command_sequence: int
     pressure_left_raw: int = 0xFFFF
     pressure_right_raw: int = 0xFFFF
+    pressure_left_filtered: int = 0xFFFF
+    pressure_right_filtered: int = 0xFFFF
     pressure_flags: int = 0
     pressure_alert: int = 0
     TYPE: ClassVar[PacketType] = PacketType.TELEMETRY
 
     def pack(self) -> bytes:
+        if self.pressure_flags & ~0x07:
+            raise ValueError('pressure_flags contains reserved bits')
+        if self.pressure_alert not in (0, 1, 2):
+            raise ValueError('pressure_alert must be 0, 1 or 2')
         return TELEMETRY_STRUCT.pack(
             int(self.hall_left_pulses),
             int(self.hall_right_pulses),
@@ -491,6 +499,8 @@ class TelemetryPayload:
             _u16('last_command_sequence', self.last_command_sequence),
             _u16('pressure_left_raw', self.pressure_left_raw),
             _u16('pressure_right_raw', self.pressure_right_raw),
+            _u16('pressure_left_filtered', self.pressure_left_filtered),
+            _u16('pressure_right_filtered', self.pressure_right_filtered),
             _u8('pressure_flags', self.pressure_flags),
             _u8('pressure_alert', self.pressure_alert),
         )
@@ -498,7 +508,16 @@ class TelemetryPayload:
     @classmethod
     def unpack(cls, data: bytes) -> 'TelemetryPayload':
         _require_size('TELEMETRY', data, TELEMETRY_STRUCT.size)
-        return cls(*TELEMETRY_STRUCT.unpack(data))
+        payload = cls(*TELEMETRY_STRUCT.unpack(data))
+        if payload.pressure_flags & ~0x07:
+            raise PayloadDecodeError(
+                'pressure_flags contains reserved bits'
+            )
+        if payload.pressure_alert not in (0, 1, 2):
+            raise PayloadDecodeError(
+                'pressure_alert must be 0, 1 or 2'
+            )
+        return payload
 
 
 @dataclass(frozen=True)
@@ -512,19 +531,32 @@ class TerrainTelemetryPayload:
     tof_reference_mm: int
     tof_error_mm: int
     tof_change_mm: int
-    bno_heading_mrad: int
-    bno_roll_mrad: int
-    bno_pitch_mrad: int
-    bno_valid: int
-    bno_calibration: int
+    mpu_accel_x_mg: int
+    mpu_accel_y_mg: int
+    mpu_accel_z_mg: int
+    mpu_gyro_x_mrad_s: int
+    mpu_gyro_y_mrad_s: int
+    mpu_gyro_z_mrad_s: int
+    mpu_roll_mrad: int
+    mpu_pitch_mrad: int
+    mpu_valid: int
     fault_bits: int
+    gps_latitude_e7: int
+    gps_longitude_e7: int
+    gps_speed_mm_s: int
+    gps_flags: int
+    gps_satellites: int
     TYPE: ClassVar[PacketType] = PacketType.TERRAIN_TELEMETRY
 
     def pack(self) -> bytes:
         if self.tof_valid not in (0, 1):
             raise ValueError('tof_valid must be 0 or 1')
-        if self.bno_valid not in (0, 1):
-            raise ValueError('bno_valid must be 0 or 1')
+        if not 0 <= self.tof_alert <= 5:
+            raise ValueError('tof_alert must be in [0, 5]')
+        if self.mpu_valid not in (0, 1):
+            raise ValueError('mpu_valid must be 0 or 1')
+        if self.gps_flags & ~0x03:
+            raise ValueError('gps_flags contains reserved bits')
         return TERRAIN_TELEMETRY_STRUCT.pack(
             _u16('tof_distance_mm', self.tof_distance_mm),
             _u8('tof_valid', self.tof_valid),
@@ -533,12 +565,21 @@ class TerrainTelemetryPayload:
             _u16('tof_reference_mm', self.tof_reference_mm),
             int(self.tof_error_mm),
             int(self.tof_change_mm),
-            int(self.bno_heading_mrad),
-            int(self.bno_roll_mrad),
-            int(self.bno_pitch_mrad),
-            _u8('bno_valid', self.bno_valid),
-            _u8('bno_calibration', self.bno_calibration),
+            int(self.mpu_accel_x_mg),
+            int(self.mpu_accel_y_mg),
+            int(self.mpu_accel_z_mg),
+            int(self.mpu_gyro_x_mrad_s),
+            int(self.mpu_gyro_y_mrad_s),
+            int(self.mpu_gyro_z_mrad_s),
+            int(self.mpu_roll_mrad),
+            int(self.mpu_pitch_mrad),
+            _u8('mpu_valid', self.mpu_valid),
             _u16('fault_bits', self.fault_bits),
+            int(self.gps_latitude_e7),
+            int(self.gps_longitude_e7),
+            _u32('gps_speed_mm_s', self.gps_speed_mm_s),
+            _u8('gps_flags', self.gps_flags),
+            _u8('gps_satellites', self.gps_satellites),
         )
 
     @classmethod
@@ -549,6 +590,10 @@ class TerrainTelemetryPayload:
         payload = cls(*TERRAIN_TELEMETRY_STRUCT.unpack(data))
         if payload.tof_valid not in (0, 1):
             raise PayloadDecodeError('tof_valid must be 0 or 1')
-        if payload.bno_valid not in (0, 1):
-            raise PayloadDecodeError('bno_valid must be 0 or 1')
+        if not 0 <= payload.tof_alert <= 5:
+            raise PayloadDecodeError('tof_alert must be in [0, 5]')
+        if payload.mpu_valid not in (0, 1):
+            raise PayloadDecodeError('mpu_valid must be 0 or 1')
+        if payload.gps_flags & ~0x03:
+            raise PayloadDecodeError('gps_flags contains reserved bits')
         return payload

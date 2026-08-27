@@ -404,13 +404,5 @@ void DriveController::updateHallPlausibility(
           output_allowed)) {
     hall_fault_mask_ |= HALL_FAULT_LEFT;
   }
-  if (updateHallMonitor(
-          right_hall_monitor_,
-          right_hall.pulse_count,
-          appliedTargetMradS(),
-          rightVelocityMradS(),
-          elapsed_us,
-          output_allowed)) {
-    hall_fault_mask_ |= HALL_FAULT_RIGHT;
-  }
+  (void)right_hall;
 }

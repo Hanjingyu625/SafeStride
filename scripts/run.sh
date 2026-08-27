@@ -4,14 +4,9 @@ set -euo pipefail
 workspace="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 config="${SAFESTRIDE_CONFIG:-${workspace}/config/raspberry_pi.yaml}"
 enable_terrain="${SAFESTRIDE_ENABLE_TERRAIN:-true}"
-enable_perception="${SAFESTRIDE_ENABLE_PERCEPTION:-true}"
+enable_perception="${SAFESTRIDE_ENABLE_PERCEPTION:-false}"
 enable_cruise="${SAFESTRIDE_ENABLE_CRUISE:-true}"
-enable_crosswalk="${SAFESTRIDE_ENABLE_CROSSWALK:-false}"
-
-if [[ "${enable_crosswalk}" == "true" && "${enable_cruise}" == "true" ]]; then
-  echo "Crosswalk control selected; disabling the separate cruise publisher."
-  enable_cruise=false
-fi
+enable_crosswalk="${SAFESTRIDE_ENABLE_CROSSWALK:-true}"
 
 check_serial_role() {
   local port="$1"
@@ -103,5 +98,6 @@ exec ros2 launch safestride_bringup safestride.launch.py \
   perception_classes_path:="${SAFESTRIDE_PERCEPTION_CLASSES:-${workspace}/raspberry_pi/road_surface_inference/target_classes.json}" \
   perception_camera_index:="${SAFESTRIDE_PERCEPTION_CAMERA_INDEX:-0}" \
   perception_camera_backend:="${SAFESTRIDE_PERCEPTION_CAMERA_BACKEND:-v4l2}" \
-  enable_gps:="${SAFESTRIDE_ENABLE_GPS:-false}" \
-  enable_crosswalk:="${enable_crosswalk}"
+  enable_gps:="${SAFESTRIDE_ENABLE_GPS:-true}" \
+  enable_crosswalk:="${enable_crosswalk}" \
+  enable_foxglove:="${SAFESTRIDE_ENABLE_FOXGLOVE:-false}"

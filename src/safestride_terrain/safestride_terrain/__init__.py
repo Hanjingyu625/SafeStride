@@ -1,1 +1,0 @@
-"""SafeStride terrain coordination."""

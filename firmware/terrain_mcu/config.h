@@ -33,17 +33,19 @@ constexpr float TOF_FILTER_ALPHA = 0.3F;
 constexpr float TOF_REFERENCE_ALPHA = 0.02F;
 constexpr float TOF_ERROR_THRESHOLD_MM = 60.0F;
 constexpr float TOF_CHANGE_THRESHOLD_MM = 10.0F;
+constexpr float TOF_REFERENCE_FREEZE_THRESHOLD_MM = 30.0F;
+constexpr uint8_t TOF_BASELINE_SAMPLES = 10U;
 constexpr uint8_t TOF_REQUIRED_FRAMES = 4U;
 constexpr uint16_t TOF_RED_HOLD_MS = 1000U;
 
-// BNO055 shares the Uno A4/A5 I2C bus with the TOF-10120. The driver probes
-// both legal addresses so the ADR pin may be tied either low or high.
-constexpr bool ENABLE_BNO055 = true;
-constexpr uint8_t BNO055_ADDRESS_LOW = 0x28U;
-constexpr uint8_t BNO055_ADDRESS_HIGH = 0x29U;
-constexpr uint16_t BNO055_SAMPLE_PERIOD_MS = 50U;
-constexpr uint16_t BNO055_RECONNECT_PERIOD_MS = 1000U;
-constexpr uint8_t BNO055_MAX_CONSECUTIVE_ERRORS = 3U;
+// GY-521 MPU6050 shares A4/A5 with the TOF. AD0 selects 0x68 or 0x69.
+constexpr bool ENABLE_MPU6050 = true;
+constexpr uint8_t MPU6050_ADDRESS_LOW = 0x68U;
+constexpr uint8_t MPU6050_ADDRESS_HIGH = 0x69U;
+constexpr uint16_t MPU6050_SAMPLE_PERIOD_MS = 50U;
+constexpr uint16_t MPU6050_RECONNECT_PERIOD_MS = 1000U;
+constexpr uint8_t MPU6050_MAX_CONSECUTIVE_ERRORS = 3U;
+constexpr float MPU6050_ATTITUDE_ALPHA = 0.15F;
 
 static_assert(
     TOF_MIN_VALID_DISTANCE_MM < TOF_MAX_VALID_DISTANCE_MM,
@@ -63,6 +65,9 @@ static_assert(
 static_assert(
     TOF_REQUIRED_FRAMES > 0U,
     "TOF required frame count must be positive");
+static_assert(
+    TOF_BASELINE_SAMPLES >= TOF_REQUIRED_FRAMES,
+    "TOF baseline must contain enough samples");
 static_assert(
     GPS_RX_PIN == 8U && GPS_TX_PIN == 9U,
     "AltSoftSerial on Arduino Uno requires GPS RX/TX pins D8/D9");

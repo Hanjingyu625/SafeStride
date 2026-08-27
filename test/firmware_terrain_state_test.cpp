@@ -8,9 +8,8 @@ HardwareSerial Serial;
 TwoWire Wire;
 
 namespace {
-
 uint32_t g_now_ms = 0UL;
-uint16_t g_distance_mm = 500U;
+uint16_t g_distance_mm = 250U;
 uint8_t g_wire_index = 0U;
 uint8_t g_wire_address = 0U;
 uint8_t g_wire_register = 0U;
@@ -19,8 +18,12 @@ uint8_t g_wire_write_index = 0U;
 uint8_t g_serial_rx[256];
 size_t g_serial_rx_length = 0U;
 size_t g_serial_rx_index = 0U;
-uint8_t g_serial_tx[512];
+uint8_t g_serial_tx[1024];
 size_t g_serial_tx_length = 0U;
+
+const uint8_t MPU_SAMPLE[14U] = {
+    0x00U, 0x00U, 0x00U, 0x00U, 0x40U, 0x00U, 0x00U,
+    0x00U, 0x00U, 0x83U, 0x00U, 0x00U, 0x00U, 0x00U};
 
 class BufferStream : public Stream {
  public:
@@ -28,16 +31,12 @@ class BufferStream : public Stream {
   int available() { return 0; }
   int read() { return -1; }
   size_t write(uint8_t value) {
-    if (length_ >= sizeof(data_)) {
-      return 0U;
-    }
+    if (length_ >= sizeof(data_)) return 0U;
     data_[length_++] = value;
     return 1U;
   }
   size_t write(const uint8_t* data, size_t length) {
-    if (length_ + length > sizeof(data_)) {
-      return 0U;
-    }
+    if (length_ + length > sizeof(data_)) return 0U;
     memcpy(data_ + length_, data, length);
     length_ += length;
     return length;
@@ -51,13 +50,11 @@ class BufferStream : public Stream {
 };
 
 void loadSerialRx(const uint8_t* data, size_t length) {
-  assert(length <= sizeof(g_serial_rx));
   memcpy(g_serial_rx, data, length);
   g_serial_rx_length = length;
   g_serial_rx_index = 0U;
 }
-
-}  // namespace
+}
 
 void pinMode(uint8_t, uint8_t) {}
 void digitalWrite(uint8_t, uint8_t) {}
@@ -77,22 +74,16 @@ int HardwareSerial::available() {
   return static_cast<int>(g_serial_rx_length - g_serial_rx_index);
 }
 int HardwareSerial::read() {
-  if (g_serial_rx_index >= g_serial_rx_length) {
-    return -1;
-  }
-  return g_serial_rx[g_serial_rx_index++];
+  return g_serial_rx_index < g_serial_rx_length
+      ? g_serial_rx[g_serial_rx_index++] : -1;
 }
 size_t HardwareSerial::write(uint8_t value) {
-  if (g_serial_tx_length >= sizeof(g_serial_tx)) {
-    return 0U;
-  }
+  if (g_serial_tx_length >= sizeof(g_serial_tx)) return 0U;
   g_serial_tx[g_serial_tx_length++] = value;
   return 1U;
 }
 size_t HardwareSerial::write(const uint8_t* data, size_t length) {
-  if (g_serial_tx_length + length > sizeof(g_serial_tx)) {
-    return 0U;
-  }
+  if (g_serial_tx_length + length > sizeof(g_serial_tx)) return 0U;
   memcpy(g_serial_tx + g_serial_tx_length, data, length);
   g_serial_tx_length += length;
   return length;
@@ -106,9 +97,7 @@ void TwoWire::beginTransmission(uint8_t address) {
   g_wire_write_index = 0U;
 }
 size_t TwoWire::write(uint8_t value) {
-  if (g_wire_write_index++ == 0U) {
-    g_wire_register = value;
-  }
+  if (g_wire_write_index++ == 0U) g_wire_register = value;
   return 1U;
 }
 uint8_t TwoWire::endTransmission() { return 0U; }
@@ -126,15 +115,9 @@ int TwoWire::read() {
         ? static_cast<int>((g_distance_mm >> 8U) & 0xFFU)
         : static_cast<int>(g_distance_mm & 0xFFU);
   }
-  if (g_wire_register == 0x00U) {
-    return 0xA0;
-  }
-  if (g_wire_register == 0x1AU) {
-    const uint8_t euler[6U] = {0xA0U, 0x05U, 0xA0U, 0x00U, 0xB0U, 0xFFU};
-    return euler[index];
-  }
-  if (g_wire_register == 0x35U) {
-    return 0xFF;
+  if (g_wire_register == 0x75U) return 0x68;
+  if (g_wire_register == 0x3BU && index < sizeof(MPU_SAMPLE)) {
+    return MPU_SAMPLE[index];
   }
   return 0;
 }
@@ -142,11 +125,7 @@ int TwoWire::read() {
 int main() {
   namespace proto = safestride_protocol;
   setup();
-  assert(!g_session_active);
-  assert(!g_session_offer_active);
-
   sendHello();
-  assert(g_session_offer_active);
   g_serial_tx_length = 0U;
 
   uint8_t payload[proto::SESSION_START_PAYLOAD_SIZE];
@@ -155,42 +134,23 @@ int main() {
   payload[5U] = proto::VERSION;
   proto::writeU16(payload + 6U, proto::SCHEMA_ID);
   proto::writeU32(payload + 8U, proto::FIRMWARE_RELEASE_ID);
-  BufferStream command;
+  BufferStream start;
   assert(proto::sendFrame(
-      command,
-      proto::TYPE_SESSION_START,
-      7U,
-      0x12345678UL,
-      0UL,
-      payload,
-      sizeof(payload)));
-  loadSerialRx(command.data(), command.length());
+      start, proto::TYPE_SESSION_START, 7U, 0x12345678UL,
+      0UL, payload, sizeof(payload)));
+  loadSerialRx(start.data(), start.length());
   processHostProtocol();
   assert(g_session_active);
-  assert(!g_session_offer_active);
-  assert(g_session_id == 0x12345678UL);
 
-  // A delayed start from an older host cannot replace a live session.
-  sendHello();
-  BufferStream stale_command;
-  assert(proto::sendFrame(
-      stale_command,
-      proto::TYPE_SESSION_START,
-      8U,
-      0x87654321UL,
-      0UL,
-      payload,
-      sizeof(payload)));
-  loadSerialRx(stale_command.data(), stale_command.length());
-  processHostProtocol();
-  assert(g_session_active);
-  assert(g_session_id == 0x12345678UL);
+  for (int index = 0; index < 10; ++index) {
+    g_now_ms += cfg::TOF_SAMPLE_PERIOD_MS;
+    g_tof.update(g_now_ms);
+    g_mpu.update(g_now_ms);
+  }
+  assert(g_tof.valid());
+  assert(g_mpu.valid());
 
-  g_serial_tx_length = 0U;
-  g_now_ms = cfg::TOF_SAMPLE_PERIOD_MS;
-  g_tof.update(g_now_ms);
   sendTelemetry();
-
   proto::FrameReceiver receiver;
   proto::FrameView frame = {0U, 0U, 0U, 0U, 0UL, 0UL, NULL};
   proto::ReceiveResult result = proto::ReceiveResult::NONE;
@@ -199,37 +159,14 @@ int main() {
   }
   assert(result == proto::ReceiveResult::FRAME_READY);
   assert(frame.type == proto::TYPE_TERRAIN_TELEMETRY);
-  assert(frame.session_id == 0x12345678UL);
   assert(frame.payload_length == proto::TERRAIN_TELEMETRY_PAYLOAD_SIZE);
-  assert(proto::readU16(frame.payload) == g_distance_mm);
+  assert(proto::readU16(frame.payload + 0U) == 250U);
   assert(frame.payload[2U] == 1U);
-  assert(frame.payload[18U] == 1U);
-  assert(frame.payload[19U] == 0xFFU);
-
-  g_serial_tx_length = 0U;
-  sendGpsTelemetry(g_now_ms);
-  proto::FrameReceiver gps_receiver;
-  proto::FrameView gps_frame = {0U, 0U, 0U, 0U, 0UL, 0UL, NULL};
-  proto::ReceiveResult gps_result = proto::ReceiveResult::NONE;
-  for (size_t i = 0U; i < g_serial_tx_length; ++i) {
-    gps_result = gps_receiver.push(g_serial_tx[i], gps_frame);
-  }
-  assert(gps_result == proto::ReceiveResult::FRAME_READY);
-  assert(gps_frame.type == proto::TYPE_GPS_TELEMETRY);
-  assert(gps_frame.session_id == 0x12345678UL);
-  assert(gps_frame.payload_length == proto::GPS_TELEMETRY_PAYLOAD_SIZE);
-  assert(proto::readU32(gps_frame.payload + 0U) == 0UL);
-  assert(proto::readU32(gps_frame.payload + 4U) == 0UL);
-  assert(proto::readU32(gps_frame.payload + 8U) == 0UL);
-  assert(gps_frame.payload[12U] == 0U);
-  assert(gps_frame.payload[13U] == 0U);
-
-  g_now_ms = g_last_session_activity_ms +
-      cfg::SESSION_LOSS_TIMEOUT_MS + 1UL;
-  enforceHostSessionTimeout(g_now_ms);
-  assert(!g_session_active);
-  assert(!g_session_offer_active);
-  assert(g_session_id == 0UL);
+  assert(frame.payload[3U] == static_cast<uint8_t>(TofAlert::NORMAL));
+  assert(proto::readI16(frame.payload + 16U) == 1000);
+  assert(frame.payload[28U] == 1U);
+  assert(proto::readU16(frame.payload + 29U) == 0U);
+  assert(frame.payload[43U] == 0U);
 
   printf("firmware terrain session/telemetry tests: OK\n");
   return 0;

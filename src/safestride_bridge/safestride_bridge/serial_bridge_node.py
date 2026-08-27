@@ -58,7 +58,7 @@ PRESSURE_LEFT_PRESENT = 1 << 0
 PRESSURE_RIGHT_PRESENT = 1 << 1
 PRESSURE_CALIBRATED = 1 << 2
 CAP_PRESSURE_TELEMETRY = 1 << 6
-CAP_TWO_HALL_SENSORS = 1 << 0
+CAP_SINGLE_LEFT_HALL = 1 << 0
 CAP_MAGNET_BENCH_MODE = 1 << 7
 
 # Firmware state values encoded in status_bits[10:8].
@@ -204,13 +204,14 @@ class SerialBridgeNode(Node):
             ('diagnostics.publish_rate_hz', 1.0),
             ('base.wheel_radius_m', 0.15),
             ('base.wheel_separation_m', 0.55),
-            ('base.hall_pulses_per_revolution', 1),
+            ('base.hall_pulses_per_revolution', 6),
             ('base.max_wheel_speed_rad_s', 3.0),
             ('range.min_m', 0.02),
             ('range.max_m', 4.0),
             ('range.field_of_view_rad', 0.35),
             ('battery.empty_voltage', 0.0),
             ('battery.full_voltage', 0.0),
+            ('battery.nominal_voltage', 12.0),
             ('frames.odom', 'odom'),
             ('frames.base', 'base_footprint'),
             ('frames.range_left', 'front_left_range_link'),
@@ -402,6 +403,13 @@ class SerialBridgeNode(Node):
             minimum=0.0,
             maximum=1000.0,
         )
+        self._battery_nominal = finite_float(
+            'battery.nominal_voltage',
+            self._value('battery.nominal_voltage'),
+            minimum=0.0,
+            maximum=1000.0,
+            minimum_inclusive=False,
+        )
         if (
             (self._battery_empty != 0.0 or self._battery_full != 0.0)
             and self._battery_full <= self._battery_empty
@@ -530,7 +538,7 @@ class SerialBridgeNode(Node):
                 bool(telemetry.status_bits & STATUS_HALL_CALIBRATED)
                 or magnet_bench_mode
             )
-            and bool(self._capabilities & CAP_TWO_HALL_SENSORS)
+            and bool(self._capabilities & CAP_SINGLE_LEFT_HALL)
             and not bool(telemetry.status_bits & STATUS_ESTOP)
             and not bool(
                 telemetry.status_bits & STATUS_WATCHDOG_TIMEOUT
@@ -900,7 +908,7 @@ class SerialBridgeNode(Node):
             response.success = False
             response.message = 'cannot enable: controller session is inactive'
             return response
-        if not (self._capabilities & CAP_TWO_HALL_SENSORS):
+        if not (self._capabilities & CAP_SINGLE_LEFT_HALL):
             response.success = False
             response.message = 'cannot enable: Hall feedback is unavailable'
             return response
@@ -1105,6 +1113,10 @@ class SerialBridgeNode(Node):
         hall.calibrated = bool(
             telemetry.status_bits & STATUS_HALL_CALIBRATED
         )
+        hall.left_sensor_present = bool(
+            self._capabilities & CAP_SINGLE_LEFT_HALL
+        )
+        hall.right_sensor_present = False
         self._hall_pub.publish(hall)
 
         joints = JointState()
@@ -1241,6 +1253,16 @@ class SerialBridgeNode(Node):
             if telemetry.pressure_right_raw == 0xFFFF
             else float(telemetry.pressure_right_raw)
         )
+        message.left_filtered = (
+            float('nan')
+            if telemetry.pressure_left_filtered == 0xFFFF
+            else float(telemetry.pressure_left_filtered)
+        )
+        message.right_filtered = (
+            float('nan')
+            if telemetry.pressure_right_filtered == 0xFFFF
+            else float(telemetry.pressure_right_filtered)
+        )
         message.left_present = bool(
             telemetry.pressure_flags & PRESSURE_LEFT_PRESENT
         )
@@ -1250,6 +1272,7 @@ class SerialBridgeNode(Node):
         message.calibrated = bool(
             telemetry.pressure_flags & PRESSURE_CALIBRATED
         )
+        message.alert = telemetry.pressure_alert
         self._pressure_pub.publish(message)
 
     @staticmethod
@@ -1408,7 +1431,7 @@ class SerialBridgeNode(Node):
         ):
             status.level = DiagnosticStatus.ERROR
             status.message = 'emergency stop is active'
-        elif not (self._capabilities & CAP_TWO_HALL_SENSORS):
+        elif not (self._capabilities & CAP_SINGLE_LEFT_HALL):
             status.level = DiagnosticStatus.ERROR
             status.message = 'drive firmware lacks Hall feedback'
         elif (
@@ -1536,6 +1559,14 @@ class SerialBridgeNode(Node):
                     if telemetry is not None
                     else 'unknown'
                 ),
+            ),
+            KeyValue(
+                key='hall_layout',
+                value='left_only_mirrored',
+            ),
+            KeyValue(
+                key='battery_nominal_voltage_v',
+                value=f'{self._battery_nominal:.1f}',
             ),
             KeyValue(
                 key='hall_calibrated',

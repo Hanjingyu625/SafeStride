@@ -12,7 +12,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/HandlePressure.msg"
   "msg/WheelHall.msg"
   "msg/CrosswalkStatus.msg"
-  "srv/SetLegState.srv"
   DEPENDENCIES std_msgs
 )
 

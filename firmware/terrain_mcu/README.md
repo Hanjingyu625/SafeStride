@@ -1,30 +1,20 @@
-# Terrain MCU 펌웨어
+# Terrain Uno firmware
 
-Arduino Uno가 TOF-10120과 BNO055를 50 ms마다 읽고 프로토콜 v3 텔레메트리로
-Raspberry Pi에 전송한다. 상태 LED 출력은 사용하지 않으며 결과는
-`/terrain/tof`, `/terrain/imu`, `/terrain/status`, `/diagnostics`에서 확인한다.
+TOF-10120, GY-521 MPU6050과 BE-220 GPS를 읽어 protocol v4 텔레메트리로 보낸다.
 
-## 핀맵
+- A4/A5: TOF `0x52`, MPU6050 `0x68` 또는 `0x69`
+- D8/D9: BE-220 AltSoftSerial RX/TX, 9600 baud
+- 주기: TOF/MPU 50 ms, GPS parser 상시 poll
 
-| 기능 | Uno 핀 |
-|---|---:|
-| I2C SDA | A4 |
-| I2C SCL | A5 |
-| 센서 공통 GND | GND |
+TOF는 10샘플 기준면을 만든 뒤 EMA alpha 0.3, adaptive reference alpha 0.02,
+error 60 mm, change 10 mm, 같은 방향 4회로 raised/drop을 확정한다. 후보·확정
+중에는 기준값 갱신을 멈추고 확정 결과는 최소 1초 유지한다.
 
-TOF-10120 주소는 `0x52`, BNO055는 ADR 상태에 따라 `0x28` 또는 `0x29`이며
-펌웨어가 두 주소를 차례로 탐색한다.
-
-TOF 유효 범위는 100~2000 mm이다. 필터 거리와 느린 기준 거리의 차이가
-60 mm를 넘으면 후보가 되고, 10 mm 이상의 상승이 4회 연속되면 단차로
-판정한다. LED 대신 모든 상태를 직렬 텔레메트리와 ROS 토픽으로만 보낸다.
+MPU6050은 ±2 g, ±250 deg/s로 설정한다. roll/pitch는 가속도 중력 방향으로
+계산하며 yaw는 제공하지 않는다.
 
 ```bash
 arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
 arduino-cli upload --fqbn arduino:avr:uno -p /dev/safestride-terrain \
   firmware/terrain_mcu
 ```
-
-BNO055는 NDOF 모드로 초기화되며 Euler orientation과 calibration byte를
-전송한다. MPU-9250/AK8963, 다리 액추에이터와 limit 입력은 아직 구현하지
-않았으며 핀·극성이 확정되기 전까지 동작시키지 않는다.

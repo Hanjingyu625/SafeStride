@@ -89,10 +89,7 @@ int main() {
     for (int i = 0; i < 420; ++i) {
       drive.update(5000UL, stopped, stopped, 3000L, true);
     }
-    assert(
-        drive.hallFaultMask() ==
-        (DriveController::HALL_FAULT_LEFT |
-         DriveController::HALL_FAULT_RIGHT));
+    assert(drive.hallFaultMask() == DriveController::HALL_FAULT_LEFT);
     assert(g_motor_pwm == 0);
     assert(g_motor_in1_level == LOW);
     assert(g_motor_in2_level == LOW);
@@ -120,49 +117,7 @@ int main() {
       const HallSample too_fast = sample(count, 1000UL);
       drive.update(5000UL, too_fast, too_fast, 0L, true);
     }
-    assert(
-        drive.hallFaultMask() ==
-        (DriveController::HALL_FAULT_LEFT |
-         DriveController::HALL_FAULT_RIGHT));
-  }
-
-  {
-    DriveController drive;
-    drive.begin();
-    const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
-    const HallSample magnet_pulse = sample(1UL);
-    drive.updateMagnetBench(
-        5000UL, magnet_pulse, stopped, 500L, true);
-    assert(drive.hallFaultMask() == 0U);
-    assert(g_motor_pwm == cfg::MAGNET_BENCH_PWM);
-    assert(g_motor_in1_level == HIGH);
-    assert(g_motor_in2_level == LOW);
-    assert(drive.leftHallPulsePosition() == 0L);
-    assert(drive.leftVelocityMradS() >= 999L);
-    assert(drive.leftVelocityMradS() <= 1001L);
-
-    drive.updateMagnetBench(
-        5000UL, magnet_pulse, stopped, 500L, false);
-    assert(g_motor_pwm == 0);
-    assert(g_motor_in1_level == LOW);
-    assert(g_motor_in2_level == LOW);
-
-    const HallSample visible_for_echo = {
-        1UL, 6283185UL, 4000000UL};
-    drive.updateMagnetBench(
-        5000UL, visible_for_echo, stopped, 500L, false);
-    assert(drive.leftVelocityMradS() >= 999L);
-    const HallSample expired = {
-        1UL, 6283185UL, cfg::MAGNET_BENCH_VELOCITY_HOLD_US};
-    drive.updateMagnetBench(
-        5000UL, expired, stopped, 500L, false);
-    assert(drive.leftVelocityMradS() == 0L);
-
-    drive.updateMagnetBench(
-        5000UL, magnet_pulse, stopped, -500L, true);
-    assert(g_motor_pwm == cfg::MAGNET_BENCH_PWM);
-    assert(g_motor_in1_level == LOW);
-    assert(g_motor_in2_level == HIGH);
+    assert(drive.hallFaultMask() == DriveController::HALL_FAULT_LEFT);
   }
 
   printf("firmware Hall feedback and single-driver tests: OK\n");

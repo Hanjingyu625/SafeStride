@@ -1,66 +1,22 @@
-# SafeStride system architecture
-
-SafeStride uses three independently supervised computers. Linux may request
-motion, but it must never be the only layer capable of stopping an actuator.
-
-## Responsibility split
-
-| Controller | Connected hardware | Responsibility |
-|---|---|---|
-| Raspberry Pi | Camera, two USB serial links | ROS 2, road-surface classification, crosswalk logic, logging and high-level requests |
-| Drive Uno | One left-wheel Hall speed sensor, two handle pressure sensors, one shared motor driver | Final common wheel enable, velocity control and Hall watchdog; E-stop input is reserved but not implemented |
-| Terrain Uno | TOF-10120, BE-220 GPS, future IMUs/leg hardware | TOF/GPS acquisition; future step and leg state machine |
-
-The pressure sensors form a two-channel handle-presence/dead-man input, not a
-calibrated weight measurement. Losing either hand requests a safe stop unless a
-later validated operating mode explicitly permits one-hand use.
-
-## Data flow
+# Architecture
 
 ```text
-Terrain Uno GPS -> navigation/crosswalk ---+
-Pi camera -> TorchScript surface estimate -+-> safety supervisor -> Drive Uno
-Terrain Uno -> step/attitude/state --------+          |
-                                                      +-> terrain coordinator -> Terrain Uno
+Drive Uno telemetry ----> serial_bridge ----+
+                                            +-> safety_supervisor -> Drive Uno command
+Terrain Uno telemetry --> terrain_bridge ---+
+  TOF / MPU6050 / GPS          |
+                              +-> diagnostics / Foxglove / crosswalk monitor
 ```
 
-Surface-classifier output is advisory. It applies a bounded 0.0–1.25 speed
-scale but may not write PWM, enable motors or bypass stale sensor checks. The
-result is clamped again by the absolute ROS speed limits. Unknown, stale or
-low-confidence classification stops motion when perception is enabled.
+Drive Uno가 PWM, command watchdog, Hall plausibility와 압력 dead-man을 최종
+집행한다. Raspberry Pi safety supervisor는 Drive 상태와 Terrain TOF 상태가
+신선하고 유효할 때만 명령을 전달한다.
 
-TOF may propose a step. Leg deployment additionally requires low wheel speed,
-valid attitude, both hands present, fresh Pi permission, valid limit switches
-and an MCU-local timeout. Any failed condition stops wheel and leg motion.
+TOF 확정 hazard, serial timeout, invalid TOF, dead-man 해제 또는 Drive MCU fault가
+발생하면 ROS는 0 명령을 즉시 발행하고 이후 송신을 억제한다. 다시 움직이려면
+hazard가 사라진 뒤 `/walker/set_enabled`로 명시적으로 활성화해야 한다. MPU와
+GPS 오류는 각 bridge 진단에 표시하지만 단독으로 모터를 차단하지 않는다.
 
-## ROS packages
-
-- `safestride_interfaces`: shared message contracts.
-- `safestride_bridge`: fail-safe Drive Uno serial bridge.
-- `safestride_control`: ROS-side wheel command safety supervisor.
-- `safestride_sensors`: BE-220 NMEA and sensor adapters.
-- `safestride_navigation`: crosswalk geometry, V2X timing and automatic crossing policy.
-- `safestride_perception`: Pi camera classifier and surface speed policy.
-- `safestride_terrain`: terrain and leg coordination policy.
-- `safestride_bringup`: launch and deployment configuration.
-- `safestride_description`: geometry and sensor frames.
-
-## Non-negotiable safety boundaries
-
-1. Motor PWM/enable inputs need external bias that disables drivers during reset.
-2. Before an E-stop is implemented, testing requires a separate physical motor-power disconnect; a future E-stop must interrupt driver enable electrically, not only through software.
-3. The leg requires retracted and deployed limit switches.
-4. Both Unos invalidate their sessions after a watchdog timeout.
-5. Deployment is forbidden above the configured wheel-speed threshold.
-6. Initial builds keep all motor output disabled in configuration.
-
-## Downhill control boundary
-
-Slope detection must not directly request reverse motor rotation in the current
-hardware. The single-output Hall sensor cannot measure true wheel direction,
-the deployed firmware has no valid pitch source, and battery/current sensing is
-disabled. A future downhill controller should first remove forward assist and
-request a safe speed reduction. Active electric braking requires a validated
-direction-capable encoder, pitch estimate, current and DC-bus voltage limits,
-a driver and battery explicitly rated for the selected braking method, and an
-independent mechanical stopping path.
+GPS와 횡단보도 기능은 기본적으로 관찰 전용이다. 지도와 API가 없어도 진단을
+발행하지만 motion command 경로에는 참여하지 않는다. Foxglove도 기본 비활성이며
+활성화할 때 publish/service/parameter 기능을 제한한 읽기 전용 설정을 사용한다.
