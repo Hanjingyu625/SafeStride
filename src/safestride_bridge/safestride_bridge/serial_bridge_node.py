@@ -177,9 +177,15 @@ class SerialBridgeNode(Node):
             1.0 / self._diagnostic_rate_hz, self._diagnostic_tick
         )
 
+        mode_summary = (
+            'dead-man direct drive is active at '
+            f'{self._deadman_forward_velocity:.3f} m/s'
+            if self._deadman_direct_drive
+            else 'level-triggered enable is active'
+        )
         self.get_logger().info(
             f'configured serial bridge for {self._port} at '
-            f'{self._baudrate} baud; level-triggered enable is active'
+            f'{self._baudrate} baud; {mode_summary}'
         )
 
     def _declare_parameters(self) -> None:
@@ -193,6 +199,8 @@ class SerialBridgeNode(Node):
             ('command.publish_rate_hz', 50.0),
             ('command.timeout_s', 0.20),
             ('command.ttl_ms', 200),
+            ('command.deadman_direct_drive', False),
+            ('command.deadman_forward_velocity_m_s', 0.10),
             ('command.max_abs_angular_z_rad_s', 0.0),
             ('command.allow_magnet_bench_mode', False),
             ('command.auto_arm_magnet_bench_mode', False),
@@ -288,6 +296,16 @@ class SerialBridgeNode(Node):
             self._value('command.ttl_ms'),
             minimum=20,
             maximum=250,
+        )
+        self._deadman_direct_drive = bool(
+            self._value('command.deadman_direct_drive')
+        )
+        self._deadman_forward_velocity = finite_float(
+            'command.deadman_forward_velocity_m_s',
+            self._value('command.deadman_forward_velocity_m_s'),
+            minimum=0.0,
+            maximum=10.0,
+            minimum_inclusive=False,
         )
         self._max_abs_angular_z = finite_float(
             'command.max_abs_angular_z_rad_s',
@@ -807,7 +825,9 @@ class SerialBridgeNode(Node):
             self._level_enable_blocked = False
         response.success = True
         response.message = (
-            'level enable allowed; motion follows dead-man and fresh '
+            'level enable allowed; motion follows the dead-man directly'
+            if self._deadman_direct_drive
+            else 'level enable allowed; motion follows dead-man and fresh '
             'velocity commands'
         )
         return response
@@ -826,26 +846,32 @@ class SerialBridgeNode(Node):
             self._send_command(0, False)
             return
 
-        fresh = (
-            self._last_command_time is not None
-            and (now - self._last_command_time) <= self._command_timeout
-        )
+        if self._deadman_direct_drive:
+            target_linear = self._deadman_forward_velocity
+            self._command_timed_out = False
+        else:
+            fresh = (
+                self._last_command_time is not None
+                and (now - self._last_command_time) <= self._command_timeout
+            )
 
-        if not fresh:
-            if not self._command_timed_out:
-                self.get_logger().warning(
-                    'velocity command timed out; commanding a disabled stop'
-                )
-            self._command_timed_out = True
-            self._send_command(0, False)
-            return
+            if not fresh:
+                if not self._command_timed_out:
+                    self.get_logger().warning(
+                        'velocity command timed out; commanding a disabled '
+                        'stop'
+                    )
+                self._command_timed_out = True
+                self._send_command(0, False)
+                return
+            target_linear = self._target_linear
 
         enable = not self._level_enable_blocked and link_ok and remote_safe
         if not enable:
             self._send_command(0, False)
             return
 
-        target = self._target_linear / self._wheel_radius
+        target = target_linear / self._wheel_radius
         target = max(
             -self._max_wheel_speed,
             min(self._max_wheel_speed, target),
@@ -1336,11 +1362,23 @@ class SerialBridgeNode(Node):
             ),
             KeyValue(
                 key='enable_mode',
-                value='level_triggered',
+                value=(
+                    'deadman_level_triggered'
+                    if self._deadman_direct_drive
+                    else 'command_level_triggered'
+                ),
             ),
             KeyValue(
                 key='level_enable_blocked',
                 value=str(self._level_enable_blocked).lower(),
+            ),
+            KeyValue(
+                key='deadman_direct_drive',
+                value=str(self._deadman_direct_drive).lower(),
+            ),
+            KeyValue(
+                key='deadman_forward_velocity_m_s',
+                value=f'{self._deadman_forward_velocity:.3f}',
             ),
             KeyValue(
                 key='magnet_bench_auto_arm',

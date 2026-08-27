@@ -140,7 +140,19 @@ class TestHardwareIntegrity(unittest.TestCase):
     def test_drive_enable_is_level_triggered(self):
         self.assertIn("_level_enable_blocked = False", self.bridge)
         self.assertIn("key='enable_mode'", self.bridge)
-        self.assertIn("value='level_triggered'", self.bridge)
+        self.assertIn("'deadman_level_triggered'", self.bridge)
+        self.assertIn("('command.deadman_direct_drive', False)", self.bridge)
+        self.assertIn(
+            "('command.deadman_forward_velocity_m_s', 0.10)",
+            self.bridge,
+        )
+        self.assertIn(
+            "target_linear = self._deadman_forward_velocity", self.bridge
+        )
+        for path in ROS_CONFIGS:
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("deadman_direct_drive: true", text)
+            self.assertIn("deadman_forward_velocity_m_s: 0.10", text)
         self.assertNotIn("_enabled_requested", self.bridge)
         self.assertNotIn("_arm_confirmed", self.bridge)
         self.assertNotIn("_clear_enable_request", self.bridge)

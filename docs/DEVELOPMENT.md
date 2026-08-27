@@ -46,8 +46,12 @@ the Drive MCU, Terrain MCU and ROS bridge must be updated together.
 
 For unattended startup, first review `config/raspberry_pi.yaml`, install the
 udev rules, build successfully, and then run `bash scripts/install_service.sh`.
-Drive enable is level-triggered by live safety inputs after startup.
-Keep cruise disabled during initial sensor and lifted-wheel tests.
+The deployed config uses dead-man direct drive. While both pressure channels
+are active and the Drive link has no MCU fault, the bridge streams a fixed
+0.10 m/s forward target without waiting for `/cmd_vel_safe`. Releasing either
+pressure input immediately sends a disabled stop. Set
+`command.deadman_direct_drive` to `false` to restore supervised velocity input.
+Keep the wheels lifted during initial tests.
 
 Put the supplied shapefile in `data/external/crosswalk_shp/` and converted JSON
 in `data/generated/`. Store YOLO weights in GitHub Releases or an artifact store

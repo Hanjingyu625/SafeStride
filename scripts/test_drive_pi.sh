@@ -33,15 +33,10 @@ unset ROS_LOCALHOST_ONLY
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
 export ROS_AUTOMATIC_DISCOVERY_RANGE="${ROS_AUTOMATIC_DISCOVERY_RANGE:-SUBNET}"
 
-publisher_pid=""
 cleanup() {
   set +e
   timeout 3s ros2 service call /walker/set_enabled std_srvs/srv/SetBool \
     "{data: false}" >/dev/null 2>&1
-  if [[ -n "${publisher_pid}" ]]; then
-    kill "${publisher_pid}" >/dev/null 2>&1
-    wait "${publisher_pid}" >/dev/null 2>&1
-  fi
 }
 trap cleanup EXIT INT TERM
 
@@ -71,35 +66,6 @@ if grep -Eq 'fault_bits: [1-9][0-9]*' <<<"${status}"; then
   exit 1
 fi
 
-ros2 topic pub --rate 20 /cmd_vel geometry_msgs/msg/TwistStamped \
-  "{header: {frame_id: base_link}, twist: {linear: {x: 0.10}, angular: {z: 0.0}}}" \
-  >/tmp/safestride-cmd-vel.log 2>&1 &
-publisher_pid="$!"
-
-safe_linear=""
-for _ in {1..20}; do
-  safe_command="$(
-    timeout 2s ros2 topic echo /cmd_vel_safe --once 2>/dev/null || true
-  )"
-  safe_linear="$(
-    awk '
-      /^  linear:/ { in_linear = 1; next }
-      in_linear && /^    x:/ { print $2; exit }
-    ' <<<"${safe_command}"
-  )"
-  if [[ -n "${safe_linear}" ]] &&
-      awk -v value="${safe_linear}" \
-        'BEGIN { exit !(value > 0.0) }'; then
-    break
-  fi
-  safe_linear=""
-  sleep 0.1
-done
-if [[ -z "${safe_linear}" ]]; then
-  echo "No positive /cmd_vel_safe received; check safety_supervisor output" >&2
-  exit 1
-fi
-
 response="$(
   ros2 service call /walker/set_enabled std_srvs/srv/SetBool \
     "{data: true}"
@@ -110,7 +76,7 @@ if ! grep -Eq 'success(=|: )[Tt]rue' <<<"${response}"; then
   exit 1
 fi
 
-echo "Drive level-enable allowed for ${duration}s at 0.10 m/s."
+echo "Dead-man direct drive allowed for ${duration}s at 0.10 m/s."
 echo "Hold the pressure dead-man; releasing it disables motor output."
 echo "The left D2 Hall sensor must keep producing pulses or firmware will fault-stop."
 sleep "${duration}"

@@ -11,6 +11,8 @@ serial_bridge:
       publish_rate_hz: 50.0
       timeout_s: 0.20
       ttl_ms: 200
+      deadman_direct_drive: true
+      deadman_forward_velocity_m_s: 0.10
       max_abs_angular_z_rad_s: 0.0
       allow_magnet_bench_mode: false
       auto_arm_magnet_bench_mode: false
