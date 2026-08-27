@@ -660,10 +660,11 @@ class SafetySupervisor(Node):
                     dt,
                 )
 
-        # Keep forwarding a valid supervised command while DISARMED so an
-        # explicit enable request can activate the controller. Other invalid
-        # or stale inputs publish one immediate zero and then go silent,
-        # forcing the bridge timeout to disarm the MCU.
+        # Keep forwarding a valid supervised command while DISARMED so the
+        # level-triggered bridge can activate the controller as soon as the
+        # physical dead-man input is active. Other invalid or stale inputs
+        # publish one immediate zero and then go silent, forcing the bridge
+        # timeout to disarm the MCU.
         may_stream_command = (
             not hard_stop_reasons
             or set(hard_stop_reasons).issubset({'disarmed'})

@@ -106,11 +106,12 @@ response="$(
 )"
 echo "${response}"
 if ! grep -Eq 'success(=|: )[Tt]rue' <<<"${response}"; then
-  echo "Drive enable request was rejected" >&2
+  echo "Drive level-enable request was rejected" >&2
   exit 1
 fi
 
-echo "Drive armed for ${duration}s at 0.10 m/s in Hall-feedback mode."
+echo "Drive level-enable allowed for ${duration}s at 0.10 m/s."
+echo "Hold the pressure dead-man; releasing it disables motor output."
 echo "The left D2 Hall sensor must keep producing pulses or firmware will fault-stop."
 sleep "${duration}"
 echo "Test complete; sending disable command."

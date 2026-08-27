@@ -8,7 +8,7 @@ from .safety_logic import finite_parameter
 
 
 class CruiseCommandNode(Node):
-    """Continuously request a bounded base speed; arming remains separate."""
+    """Continuously request a bounded base speed for safety limiting."""
 
     def __init__(self) -> None:
         super().__init__('cruise_command')
@@ -42,8 +42,8 @@ class CruiseCommandNode(Node):
             1.0 / publish_rate, self._publish_command
         )
         self.get_logger().info(
-            'default cruise request ready at %.3f m/s; explicit motor enable '
-            'is still required' % self._speed
+            'default cruise request ready at %.3f m/s; drive enable follows '
+            'live safety inputs' % self._speed
         )
 
     def _publish_command(self) -> None:

@@ -108,12 +108,10 @@ class SerialBridgeNode(Node):
         self._session_started = False
         self._tx_sequence = 0
 
-        self._enabled_requested = False
+        self._level_enable_blocked = False
         self._last_command_time: Optional[float] = None
         self._target_linear = 0.0
         self._command_timed_out = True
-        self._arm_confirmed = False
-        self._arm_confirmation_deadline: Optional[float] = None
 
         self._last_telemetry_time: Optional[float] = None
         self._last_telemetry: Optional[TelemetryPayload] = None
@@ -181,7 +179,7 @@ class SerialBridgeNode(Node):
 
         self.get_logger().info(
             f'configured serial bridge for {self._port} at '
-            f'{self._baudrate} baud; starts disarmed'
+            f'{self._baudrate} baud; level-triggered enable is active'
         )
 
     def _declare_parameters(self) -> None:
@@ -195,11 +193,9 @@ class SerialBridgeNode(Node):
             ('command.publish_rate_hz', 50.0),
             ('command.timeout_s', 0.20),
             ('command.ttl_ms', 200),
-            ('command.arm_max_wheel_speed_rad_s', 0.10),
             ('command.max_abs_angular_z_rad_s', 0.0),
             ('command.allow_magnet_bench_mode', False),
             ('command.auto_arm_magnet_bench_mode', False),
-            ('command.arm_confirmation_timeout_s', 1.0),
             ('telemetry.timeout_s', 0.30),
             ('diagnostics.publish_rate_hz', 1.0),
             ('base.wheel_radius_m', 0.15),
@@ -293,12 +289,6 @@ class SerialBridgeNode(Node):
             minimum=20,
             maximum=250,
         )
-        self._arm_max_wheel_speed = finite_float(
-            'command.arm_max_wheel_speed_rad_s',
-            self._value('command.arm_max_wheel_speed_rad_s'),
-            minimum=0.0,
-            maximum=100.0,
-        )
         self._max_abs_angular_z = finite_float(
             'command.max_abs_angular_z_rad_s',
             self._value('command.max_abs_angular_z_rad_s'),
@@ -319,13 +309,6 @@ class SerialBridgeNode(Node):
                 'auto-arm magnet bench mode requires '
                 'allow_magnet_bench_mode=true'
             )
-        self._arm_confirmation_timeout = finite_float(
-            'command.arm_confirmation_timeout_s',
-            self._value('command.arm_confirmation_timeout_s'),
-            minimum=0.0,
-            maximum=10.0,
-            minimum_inclusive=False,
-        )
         self._telemetry_timeout = finite_float(
             'telemetry.timeout_s',
             self._value('telemetry.timeout_s'),
@@ -416,11 +399,6 @@ class SerialBridgeNode(Node):
         ):
             raise ValueError(
                 'battery.full_voltage must exceed battery.empty_voltage'
-            )
-        if self._arm_max_wheel_speed > self._max_wheel_speed:
-            raise ValueError(
-                'command.arm_max_wheel_speed_rad_s must not exceed '
-                'base.max_wheel_speed_rad_s'
             )
         command_period = 1.0 / self._command_rate_hz
         if command_period >= self._command_timeout:
@@ -527,16 +505,21 @@ class SerialBridgeNode(Node):
     def _remote_allows_enable(self, telemetry: TelemetryPayload) -> bool:
         firmware_state = self._firmware_state(telemetry)
         magnet_bench_mode = self._magnet_bench_mode_active(telemetry)
+        if magnet_bench_mode and not self._auto_arm_magnet_bench_mode:
+            return False
+        bench_feedback_bypass = (
+            magnet_bench_mode and self._auto_arm_magnet_bench_mode
+        )
         return (
             self._firmware_status_consistent(telemetry)
             and bool(telemetry.status_bits & STATUS_SESSION)
             and (
                 bool(telemetry.status_bits & STATUS_DEADMAN)
-                or magnet_bench_mode
+                or bench_feedback_bypass
             )
             and (
                 bool(telemetry.status_bits & STATUS_HALL_CALIBRATED)
-                or magnet_bench_mode
+                or bench_feedback_bypass
             )
             and bool(self._capabilities & CAP_SINGLE_LEFT_HALL)
             and not bool(telemetry.status_bits & STATUS_ESTOP)
@@ -547,18 +530,12 @@ class SerialBridgeNode(Node):
             and firmware_state in (FW_DISARMED, FW_ARMED)
         )
 
-    def _clear_enable_request(self) -> None:
-        self._enabled_requested = False
-        self._arm_confirmed = False
-        self._arm_confirmation_deadline = None
-
     def _reset_link_state(self) -> None:
         self._session_id = 0
         self._boot_id = 0
         self._capabilities = 0
         self._compatibility_error = None
         self._session_started = False
-        self._clear_enable_request()
         self._last_command_time = None
         self._command_timed_out = True
         self._last_telemetry_time = None
@@ -663,33 +640,6 @@ class SerialBridgeNode(Node):
         self._last_telemetry_sequence = frame.sequence
         self._last_telemetry_time = now
         self._last_telemetry = telemetry
-        firmware_state = self._firmware_state(telemetry)
-        controller_armed = bool(
-            telemetry.status_bits & STATUS_MOTOR_ENABLED
-        ) and firmware_state == FW_ARMED
-        if (
-            self._enabled_requested
-            and controller_armed
-            and not self._arm_confirmed
-        ):
-            if (
-                self._arm_confirmation_deadline is not None
-                and now >= self._arm_confirmation_deadline
-            ):
-                self._clear_enable_request()
-                self._send_command(0, False)
-                self.get_logger().warning(
-                    'ignored late ARMED confirmation; '
-                    'explicit re-enable required'
-                )
-            else:
-                self._arm_confirmed = True
-                self._arm_confirmation_deadline = None
-        elif self._arm_confirmed and not controller_armed:
-            self._clear_enable_request()
-            self.get_logger().warning(
-                'controller disarmed unexpectedly; explicit re-enable required'
-            )
         self._publish_telemetry(telemetry)
 
     def _handle_hello(
@@ -747,7 +697,6 @@ class SerialBridgeNode(Node):
             self._session_id = session_id
             self._boot_id = hello.boot_id
             self._capabilities = hello.capabilities
-            self._clear_enable_request()
             self._last_command_time = None
             self._command_timed_out = True
             self._last_telemetry_time = None
@@ -824,7 +773,6 @@ class SerialBridgeNode(Node):
                 self._target_linear = 0.0
                 self._last_command_time = None
                 self._command_timed_out = True
-                self._clear_enable_request()
             self.get_logger().error(
                 'discarded angular command: one shared motor driver '
                 'supports straight motion only',
@@ -839,144 +787,28 @@ class SerialBridgeNode(Node):
             self._command_timed_out = False
 
     def _on_set_enabled(self, request, response):
-        now = self._now_monotonic()
         if not request.data:
             with self._lock:
-                self._clear_enable_request()
+                self._level_enable_blocked = True
             delivered = self._send_command(0, False)
             response.success = delivered
             if delivered:
                 response.message = (
-                    'local enable gate closed and disable command sent'
+                    'level enable blocked and disable command sent'
                 )
             else:
                 response.message = (
-                    'local enable gate closed, but the disable command could '
+                    'level enable blocked, but the disable command could '
                     'not be delivered; controller watchdog stop is expected'
                 )
             return response
 
-        if not self._link_ok(now):
-            response.success = False
-            response.message = 'cannot enable: controller telemetry is stale'
-            return response
-        telemetry = self._last_telemetry
-        if telemetry is None:
-            response.success = False
-            response.message = 'cannot enable: no controller telemetry'
-            return response
-        if not self._firmware_status_consistent(telemetry):
-            response.success = False
-            response.message = (
-                'cannot enable: controller status fields are inconsistent'
-            )
-            return response
-        if telemetry.status_bits & STATUS_ESTOP:
-            response.success = False
-            response.message = 'cannot enable: emergency stop is active'
-            return response
-        if telemetry.status_bits & STATUS_WATCHDOG_TIMEOUT:
-            response.success = False
-            response.message = (
-                'cannot enable: controller watchdog reset is pending'
-            )
-            return response
-        firmware_state = self._firmware_state(telemetry)
-        if firmware_state == FW_ESTOP:
-            response.success = False
-            response.message = 'cannot enable: controller is in ESTOP state'
-            return response
-        if telemetry.fault_bits:
-            response.success = False
-            response.message = (
-                f'cannot enable: controller fault 0x'
-                f'{telemetry.fault_bits:04x}'
-            )
-            return response
-        if firmware_state == FW_FAULT:
-            response.success = False
-            response.message = 'cannot enable: controller is in FAULT state'
-            return response
-        if firmware_state == FW_SAFE_STOP:
-            response.success = False
-            response.message = (
-                'cannot enable: controller is in SAFE_STOP; '
-                'wait for the disabled reset command'
-            )
-            return response
-        if not (telemetry.status_bits & STATUS_SESSION):
-            response.success = False
-            response.message = 'cannot enable: controller session is inactive'
-            return response
-        if not (self._capabilities & CAP_SINGLE_LEFT_HALL):
-            response.success = False
-            response.message = 'cannot enable: Hall feedback is unavailable'
-            return response
-        firmware_magnet_bench_mode = bool(
-            telemetry.status_bits & STATUS_MAGNET_BENCH_MODE
-            and self._capabilities & CAP_MAGNET_BENCH_MODE
-        )
-        if firmware_magnet_bench_mode and not self._allow_magnet_bench_mode:
-            response.success = False
-            response.message = (
-                'cannot enable: firmware magnet bench mode is not allowed '
-                'by ROS configuration'
-            )
-            return response
-        magnet_bench_mode = self._magnet_bench_mode_active(telemetry)
-        if (
-            not magnet_bench_mode
-            and not (telemetry.status_bits & STATUS_HALL_CALIBRATED)
-        ):
-            response.success = False
-            response.message = (
-                'cannot enable: Hall pulses per revolution are not calibrated'
-            )
-            return response
-        if (
-            not magnet_bench_mode
-            and not (telemetry.status_bits & STATUS_DEADMAN)
-        ):
-            response.success = False
-            response.message = 'cannot enable: dead-man switch is not active'
-            return response
-        maximum_measured_speed_mrad_s = int(
-            round(self._arm_max_wheel_speed * 1000.0)
-        )
-        if (
-            not magnet_bench_mode
-            and (
-                abs(telemetry.velocity_left_mrad_s)
-                > maximum_measured_speed_mrad_s
-                or abs(telemetry.velocity_right_mrad_s)
-                > maximum_measured_speed_mrad_s
-            )
-        ):
-            response.success = False
-            response.message = (
-                'cannot enable: powered wheels are not stationary'
-            )
-            return response
-        if (
-            self._last_command_time is None
-            or now - self._last_command_time > self._command_timeout
-        ):
-            response.success = False
-            response.message = 'cannot enable: no fresh velocity command'
-            return response
-
         with self._lock:
-            self._enabled_requested = True
-            self._arm_confirmed = False
-            self._arm_confirmation_deadline = (
-                now + self._arm_confirmation_timeout
-            )
+            self._level_enable_blocked = False
         response.success = True
         response.message = (
-            'magnet bench armed; each Hall pulse opens a short motor window'
-            if magnet_bench_mode
-            else 'enable gate opened; motion still requires fresh velocity '
-            'commands'
+            'level enable allowed; motion follows dead-man and fresh '
+            'velocity commands'
         )
         return response
 
@@ -991,7 +823,6 @@ class SerialBridgeNode(Node):
             and self._remote_allows_enable(telemetry)
         )
         if not link_ok or not remote_safe:
-            self._clear_enable_request()
             self._send_command(0, False)
             return
 
@@ -1006,43 +837,10 @@ class SerialBridgeNode(Node):
                     'velocity command timed out; commanding a disabled stop'
                 )
             self._command_timed_out = True
-            self._clear_enable_request()
             self._send_command(0, False)
             return
 
-        if (
-            self._auto_arm_magnet_bench_mode
-            and not self._enabled_requested
-            and telemetry is not None
-            and self._magnet_bench_mode_active(telemetry)
-        ):
-            self._enabled_requested = True
-            self._arm_confirmed = False
-            self._arm_confirmation_deadline = (
-                now + self._arm_confirmation_timeout
-            )
-            self.get_logger().warning(
-                'auto-arming temporary magnet bench mode for a fresh '
-                'velocity command'
-            )
-
-        if (
-            self._enabled_requested
-            and not self._arm_confirmed
-            and (
-                self._arm_confirmation_deadline is None
-                or now >= self._arm_confirmation_deadline
-            )
-        ):
-            self.get_logger().warning(
-                'controller did not confirm ARMED before the deadline; '
-                'explicit re-enable required'
-            )
-            self._clear_enable_request()
-            self._send_command(0, False)
-            return
-
-        enable = self._enabled_requested and link_ok and remote_safe
+        enable = not self._level_enable_blocked and link_ok and remote_safe
         if not enable:
             self._send_command(0, False)
             return
@@ -1537,8 +1335,12 @@ class SerialBridgeNode(Node):
                 ),
             ),
             KeyValue(
-                key='enabled_requested',
-                value=str(self._enabled_requested).lower(),
+                key='enable_mode',
+                value='level_triggered',
+            ),
+            KeyValue(
+                key='level_enable_blocked',
+                value=str(self._level_enable_blocked).lower(),
             ),
             KeyValue(
                 key='magnet_bench_auto_arm',

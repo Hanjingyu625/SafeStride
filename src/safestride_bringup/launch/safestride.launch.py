@@ -110,8 +110,8 @@ def generate_launch_description() -> LaunchDescription:
                 'enable_cruise',
                 default_value='true',
                 description=(
-                    'Publish the default straight-line request; explicit '
-                    'motor enable remains required.'
+                    'Publish the default straight-line request; drive enable '
+                    'follows live safety inputs.'
                 ),
             ),
             DeclareLaunchArgument(

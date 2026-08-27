@@ -46,7 +46,7 @@ the Drive MCU, Terrain MCU and ROS bridge must be updated together.
 
 For unattended startup, first review `config/raspberry_pi.yaml`, install the
 udev rules, build successfully, and then run `bash scripts/install_service.sh`.
-The service starts disarmed and never calls the enable service automatically.
+Drive enable is level-triggered by live safety inputs after startup.
 Keep cruise disabled during initial sensor and lifted-wheel tests.
 
 Put the supplied shapefile in `data/external/crosswalk_shp/` and converted JSON

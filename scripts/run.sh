@@ -86,7 +86,8 @@ unset ROS_LOCALHOST_ONLY
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
 export ROS_AUTOMATIC_DISCOVERY_RANGE="${ROS_AUTOMATIC_DISCOVERY_RANGE:-SUBNET}"
 
-# Startup never calls /walker/set_enabled. Arming remains an explicit action.
+# Drive enable is level-triggered by live safety inputs; /walker/set_enabled
+# false remains available as a manual stop until true clears the block.
 exec ros2 launch safestride_bringup safestride.launch.py \
   config_file:="${config}" \
   wheel_radius:="${SAFESTRIDE_WHEEL_RADIUS_M:-0.15}" \

@@ -137,6 +137,14 @@ class TestHardwareIntegrity(unittest.TestCase):
             self.assertIn("require_deadman: true", text)
             self.assertIn("require_range_sensors: true", text)
 
+    def test_drive_enable_is_level_triggered(self):
+        self.assertIn("_level_enable_blocked = False", self.bridge)
+        self.assertIn("key='enable_mode'", self.bridge)
+        self.assertIn("value='level_triggered'", self.bridge)
+        self.assertNotIn("_enabled_requested", self.bridge)
+        self.assertNotIn("_arm_confirmed", self.bridge)
+        self.assertNotIn("_clear_enable_request", self.bridge)
+
     def test_terrain_uses_i2c_without_gpio_actuator_outputs(self):
         self.assertIn("Wire.begin()", self.terrain)
         self.assertNotIn("analogWrite(", self.terrain)
