@@ -87,6 +87,7 @@ class TestHardwareIntegrity(unittest.TestCase):
         self.assertEqual(
             constant_expression(self.config, "ENABLE_ESTOP"), "false"
         )
+        self.assertEqual(constant_expression(self.config, "ESTOP_PIN"), "12U")
         self.assertIn("if (!cfg::ENABLE_ESTOP)", self.drive)
         self.assertRegex(
             self.drive,
@@ -179,6 +180,14 @@ class TestHardwareIntegrity(unittest.TestCase):
         self.assertEqual(
             constant_expression(self.config, "PRESSURE_LEFT_PRESENT_THRESHOLD"),
             "25.0F",
+        )
+        self.assertEqual(
+            constant_expression(self.config, "PRESSURE_LEFT_PIN"),
+            "A1",
+        )
+        self.assertEqual(
+            constant_expression(self.config, "PRESSURE_RIGHT_PIN"),
+            "A2",
         )
         self.assertEqual(
             constant_expression(self.config, "PRESSURE_RIGHT_PRESENT_THRESHOLD"),

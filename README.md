@@ -13,7 +13,7 @@ Raspberry Pi 4, Ubuntu Server 24.04, ROS 2 Jazzy와 Arduino Uno 2대로 구성�
       +-> LM2596 5 V -> Raspberry Pi -> Drive Uno (USB)
                               +--------> Terrain Uno (USB)
 
-Drive Uno:   shared motor output, left D2 Hall, A0/A1 pressure
+Drive Uno:   shared motor output, left D2 Hall, A1/A2 pressure
 Terrain Uno: downward TOF-10120, GY-521 MPU6050, BE-220 GPS
 Raspberry Pi: serial bridges -> safety supervisor -> diagnostics/Foxglove
 ```

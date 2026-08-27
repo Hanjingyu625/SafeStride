@@ -1,8 +1,8 @@
 #include <Arduino.h>
 
 constexpr uint8_t HALL_PIN = 2U;
-constexpr uint8_t PRESSURE_LEFT_PIN = A0;
-constexpr uint8_t PRESSURE_RIGHT_PIN = A1;
+constexpr uint8_t PRESSURE_LEFT_PIN = A1;
+constexpr uint8_t PRESSURE_RIGHT_PIN = A2;
 constexpr uint8_t MOTOR_PWM_PIN = 5U;
 constexpr uint8_t MOTOR_IN1_PIN = 6U;
 constexpr uint8_t MOTOR_IN2_PIN = 8U;

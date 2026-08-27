@@ -18,8 +18,9 @@ FND 표시가 12 V로 일정해도 Pi 단자의 5 V 순간 강하는 별도 측�
 |---:|---|
 | D2 | 왼쪽 휠 Hall, `INPUT_PULLUP`, `FALLING`, 자석 6개 |
 | D5/D6/D8 | 공통 모터드라이버 PWM/IN1/IN2 |
-| A0/A1 | 좌우 압력센서, threshold 25 |
-| A2 | 예약, 현재 미사용 |
+| A1/A2 | 좌우 압력센서, threshold 25 |
+| A0 | 예약, 현재 미사용 |
+| D12 | E-stop placeholder, currently unused |
 | D13 | 선택적 driver fault, 기본 비활성 |
 
 두 모터는 한 드라이버 출력에 연결되므로 서로 다른 속도나 제자리 회전은 지원하지
