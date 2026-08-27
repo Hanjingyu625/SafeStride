@@ -31,7 +31,7 @@ colcon test
 colcon test-result --verbose
 ```
 
-Flash one Uno at a time with wheel/leg motor power isolated. Use stable paths
+Flash one Uno at a time with motor-driver 12 V power isolated. Use stable paths
 under `/dev/serial/by-id/`; never assume `ttyACM0` ordering.
 
 Copy and edit `deploy/udev/99-safestride.rules.example`, then install it only
@@ -41,14 +41,13 @@ path is BE-220 -> Terrain Uno D8 -> `/dev/safestride-terrain`; the separate
 Pi GPS serial node is only a fallback and must not run at the same time.
 
 Both Arduino sketches must be flashed after a wire-protocol change. Protocol
-v3 is intentionally incompatible with older firmware, so
+v4 is intentionally incompatible with older firmware, so
 the Drive MCU, Terrain MCU and ROS bridge must be updated together.
 
 For unattended startup, first review `config/raspberry_pi.yaml`, install the
 udev rules, build successfully, and then run `bash scripts/install_service.sh`.
-The service starts disarmed. The temporary magnet-bench configuration may
-auto-arm only while a fresh straight-line command is being received; disable
-that option before normal wheel-on-ground operation.
+The service starts disarmed and never calls the enable service automatically.
+Keep cruise disabled during initial sensor and lifted-wheel tests.
 
 Put the supplied shapefile in `data/external/crosswalk_shp/` and converted JSON
 in `data/generated/`. Store YOLO weights in GitHub Releases or an artifact store
@@ -64,12 +63,12 @@ controller alongside ROS. See `docs/CROSSWALK.md` for data conversion,
 Ubuntu Server has no desktop requirement. Runtime perception must not call GUI
 functions such as `cv2.imshow`. The current prototype uses a CPU TorchScript
 model and a USB camera through Linux V4L2. Install its isolated Python
-environment. `scripts/run.sh` starts perception and the 0.08 m/s cruise request
-by default:
+environment. Perception is disabled by default. Enable it explicitly only after
+the sensor-only and lifted-wheel tests:
 
 ```bash
 bash scripts/install_perception.sh
-bash scripts/run.sh
+SAFESTRIDE_ENABLE_PERCEPTION=true bash scripts/run.sh
 ```
 
 Set `SAFESTRIDE_PERCEPTION_CAMERA_INDEX` if the camera is not `/dev/video0`.

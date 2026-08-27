@@ -39,7 +39,7 @@ Raspberry Pi: serial bridges -> safety supervisor -> diagnostics/Foxglove
 bash scripts/install_ubuntu_24_04.sh
 bash scripts/build.sh
 bash scripts/test.sh
-bash scripts/run.sh
+SAFESTRIDE_ENABLE_CRUISE=false bash scripts/run.sh
 ```
 
 운영 직렬 장치는 `/dev/safestride-drive`, `/dev/safestride-terrain`이다. 펌웨어는
@@ -68,6 +68,7 @@ arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
 ## 검사
 
 - 자동 테스트: `bash scripts/test.sh`
+- Pi 연결·실행·topic 확인: [Raspberry Pi 사용 가이드](docs/RASPBERRY_PI_RUN_GUIDE_KO.md)
 - 실제 ROS launch integration: `test_safety_supervisor_launch.py`
 - Pi와 두 Uno HIL: `bash scripts/hil_smoke_test.sh` (모터를 arm하지 않음)
 - 배선·실물 확인: [ROS 하드웨어 테스트](docs/ROS_HARDWARE_TEST_KO.md)

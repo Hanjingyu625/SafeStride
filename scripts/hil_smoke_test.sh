@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-workspace="${SAFESTRIDE_WORKSPACE:-/opt/safestride}"
+default_workspace="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+workspace="${SAFESTRIDE_WORKSPACE:-${default_workspace}}"
 config="${SAFESTRIDE_CONFIG:-${workspace}/config/raspberry_pi.yaml}"
 
 for device in /dev/safestride-drive /dev/safestride-terrain; do
