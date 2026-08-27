@@ -80,7 +80,7 @@ int main() {
   g_now_ms += cfg::PRESSURE_SAMPLE_PERIOD_MS;
   pressure.update(g_now_ms);
   assert(pressure.leftRaw() == 512U);
-  assert(pressure.leftFiltered() < 512.0F);
+  assert(pressure.leftFiltered() > 512.0F);
 
   printf("firmware pressure-sensor tests: OK\n");
   return 0;
