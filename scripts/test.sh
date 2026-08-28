@@ -7,9 +7,18 @@ source /opt/ros/jazzy/setup.bash
 set -u
 cd "${workspace}"
 bash -n "${workspace}"/scripts/*.sh
-python3 "${workspace}/test/test_hardware_integrity.py"
+python3 -m unittest "${workspace}/test/test_hardware_integrity.py"
 python3 "${workspace}/test/test_bench_config_sync.py"
 python3 "${workspace}/tools/serial_probe.py" --help >/dev/null
+python3 -m unittest "${workspace}/test/test_road_surface_training.py"
+if command -v arduino-cli >/dev/null 2>&1; then
+  arduino-cli compile --fqbn arduino:avr:uno \
+    "${workspace}/firmware/safestride_mcu"
+  arduino-cli compile --fqbn arduino:avr:uno \
+    "${workspace}/firmware/terrain_mcu"
+else
+  echo "arduino-cli not found; skipping full Uno sketch compilation." >&2
+fi
 if [[ ! -f install/setup.bash ]]; then
   echo "Run ./scripts/build.sh first." >&2
   exit 1

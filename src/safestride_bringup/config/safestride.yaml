@@ -112,6 +112,35 @@ safety_supervisor:
     diagnostics_topic: /diagnostics
     output_frame_id: base_link
 
+cruise_command:
+  ros__parameters:
+    speed_mps: 0.08
+    publish_rate_hz: 20.0
+    command_topic: /cmd_vel
+    frame_id: base_link
+
+surface_perception:
+  ros__parameters:
+    camera:
+      index: 0
+      backend: v4l2
+      width: 640
+      height: 480
+      reconnect_period_s: 2.0
+    model:
+      path: ''
+      classes_path: ''
+      confidence_threshold: 0.65
+      min_top1_margin: 0.15
+      ema_alpha: 0.75
+      cpu_threads: 1
+      version: ''
+    inference_rate_hz: 1.0
+    diagnostic_rate_hz: 1.0
+    surface_topic: /perception/surface_condition
+    diagnostics_topic: /diagnostics
+    frame_id: camera_link
+
 gps_node:
   ros__parameters:
     port: /dev/safestride-gps

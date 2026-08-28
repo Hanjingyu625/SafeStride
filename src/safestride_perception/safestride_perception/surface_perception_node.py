@@ -15,7 +15,7 @@ from rclpy.qos import qos_profile_sensor_data
 
 from safestride_interfaces.msg import SurfaceCondition
 
-from .surface_policy import speed_scale
+from .surface_policy import prediction_is_confident, speed_scale
 
 
 MODEL_CLASSIFICATIONS = {
@@ -65,7 +65,9 @@ class SurfacePerceptionNode(Node):
         self.declare_parameter('model.path', '')
         self.declare_parameter('model.classes_path', '')
         self.declare_parameter('model.confidence_threshold', 0.65)
+        self.declare_parameter('model.min_top1_margin', 0.15)
         self.declare_parameter('model.ema_alpha', 0.75)
+        self.declare_parameter('model.cpu_threads', 1)
         self.declare_parameter('model.version', '')
         self.declare_parameter('inference_rate_hz', 1.0)
         self.declare_parameter('diagnostic_rate_hz', 1.0)
@@ -100,12 +102,24 @@ class SurfacePerceptionNode(Node):
             0.0,
             1.0,
         )
+        self._min_top1_margin = _finite_parameter(
+            'model.min_top1_margin',
+            self.get_parameter('model.min_top1_margin').value,
+            0.0,
+            1.0,
+        )
         self._ema_alpha = _finite_parameter(
             'model.ema_alpha',
             self.get_parameter('model.ema_alpha').value,
             0.0,
             1.0,
         )
+        cpu_threads = self.get_parameter('model.cpu_threads').value
+        if isinstance(cpu_threads, bool) or not isinstance(cpu_threads, int):
+            raise ValueError('model.cpu_threads must be an integer')
+        self._cpu_threads = cpu_threads
+        if not 1 <= self._cpu_threads <= 4:
+            raise ValueError('model.cpu_threads must be between 1 and 4')
         self._inference_rate = _finite_parameter(
             'inference_rate_hz',
             self.get_parameter('inference_rate_hz').value,
@@ -134,6 +148,8 @@ class SurfacePerceptionNode(Node):
         self._cv2 = cv2
         self._np = np
         self._torch = torch
+        self._torch.set_num_threads(self._cpu_threads)
+        self._cv2.setNumThreads(1)
 
         model_path = Path(str(self.get_parameter('model.path').value))
         classes_path = Path(
@@ -189,6 +205,7 @@ class SurfacePerceptionNode(Node):
         self._ema_probabilities = None
         self._last_label = 'unavailable'
         self._last_confidence = math.nan
+        self._last_margin = math.nan
         self._last_scale = 0.0
         self._last_valid = False
         self._last_error = 'camera_not_open'
@@ -283,9 +300,17 @@ class SurfacePerceptionNode(Node):
         index = int(self._np.argmax(self._ema_probabilities))
         label = self._classes[index]
         confidence = float(self._ema_probabilities[index])
+        runner_up = float(
+            self._np.partition(self._ema_probabilities, -2)[-2]
+        )
+        margin = confidence - runner_up
         valid = (
-            math.isfinite(confidence)
-            and confidence >= self._confidence_threshold
+            prediction_is_confident(
+                confidence,
+                runner_up,
+                self._confidence_threshold,
+                self._min_top1_margin,
+            )
             and label in MODEL_CLASSIFICATIONS
         )
         scale = (
@@ -296,6 +321,7 @@ class SurfacePerceptionNode(Node):
         return {
             'label': label,
             'confidence': confidence,
+            'margin': margin,
             'classification': MODEL_CLASSIFICATIONS.get(
                 label, SurfaceCondition.UNKNOWN
             ),
@@ -355,9 +381,15 @@ class SurfacePerceptionNode(Node):
 
         self._last_label = str(result['label'])
         self._last_confidence = float(result['confidence'])
+        self._last_margin = float(result['margin'])
         self._last_scale = float(result['scale'])
         self._last_valid = bool(result['valid'])
-        self._last_error = '' if self._last_valid else 'low_confidence'
+        if self._last_valid:
+            self._last_error = ''
+        elif self._last_confidence >= self._confidence_threshold:
+            self._last_error = 'ambiguous_prediction'
+        else:
+            self._last_error = 'low_confidence'
         self._publish_surface(
             classification=int(result['classification']),
             confidence=self._last_confidence,
@@ -392,7 +424,16 @@ class SurfacePerceptionNode(Node):
                 ),
             ),
             KeyValue(key='speed_scale', value='%.3f' % self._last_scale),
+            KeyValue(
+                key='top1_margin',
+                value=(
+                    'unavailable'
+                    if not math.isfinite(self._last_margin)
+                    else '%.3f' % self._last_margin
+                ),
+            ),
             KeyValue(key='valid', value=str(self._last_valid).lower()),
+            KeyValue(key='cpu_threads', value=str(self._cpu_threads)),
             KeyValue(key='model_version', value=self._model_version),
             KeyValue(key='camera_backend', value=self._camera_backend),
         ]
