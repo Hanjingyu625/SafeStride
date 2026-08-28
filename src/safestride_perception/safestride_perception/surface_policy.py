@@ -1,4 +1,6 @@
-"""Convert road-surface classifier output into a bounded speed scale."""
+"""Validate road-surface predictions and convert them to speed limits."""
+
+import math
 
 SCALES = {
     'smooth': 1.20,
@@ -16,6 +18,24 @@ SCALES = {
     'step': 0.0,
     'hole': 0.0,
 }
+
+
+def prediction_is_confident(
+    confidence: float,
+    runner_up_confidence: float,
+    threshold: float = 0.65,
+    min_margin: float = 0.15,
+) -> bool:
+    """Accept a prediction only when top-1 is strong and unambiguous."""
+    values = (confidence, runner_up_confidence, threshold, min_margin)
+    if not all(math.isfinite(value) for value in values):
+        return False
+    if not all(0.0 <= value <= 1.0 for value in values):
+        return False
+    return (
+        confidence >= threshold
+        and confidence - runner_up_confidence >= min_margin
+    )
 
 
 def speed_scale(

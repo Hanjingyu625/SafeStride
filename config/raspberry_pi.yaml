@@ -118,7 +118,9 @@ surface_perception:
       path: ''
       classes_path: ''
       confidence_threshold: 0.65
+      min_top1_margin: 0.15
       ema_alpha: 0.75
+      cpu_threads: 1
       version: ''
     inference_rate_hz: 1.0
     diagnostic_rate_hz: 1.0

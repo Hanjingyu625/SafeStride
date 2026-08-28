@@ -1,4 +1,14 @@
-from safestride_perception.surface_policy import speed_scale
+from safestride_perception.surface_policy import (
+    prediction_is_confident,
+    speed_scale,
+)
+
+
+def test_prediction_requires_confidence_and_clear_top1_margin():
+    assert prediction_is_confident(0.80, 0.30)
+    assert not prediction_is_confident(0.70, 0.62)
+    assert not prediction_is_confident(0.60, 0.20)
+    assert not prediction_is_confident(float('nan'), 0.20)
 
 
 def test_unknown_and_low_confidence_stop():

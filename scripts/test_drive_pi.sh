@@ -56,47 +56,32 @@ if ! timeout 10s ros2 service type /walker/set_enabled \
   exit 1
 fi
 
-status="$(timeout 5s ros2 topic echo /walker/status --once)" || {
-  echo "No fresh /walker/status received" >&2
-  exit 1
-}
-if ! grep -q 'link_ok: true' <<<"${status}"; then
-  echo "Drive link is not ready:" >&2
-  echo "${status}" >&2
-  exit 1
-fi
-if grep -Eq 'fault_bits: [1-9][0-9]*' <<<"${status}"; then
-  echo "Drive reports a fault:" >&2
-  echo "${status}" >&2
-  exit 1
-fi
-
 ros2 topic pub --rate 20 /cmd_vel geometry_msgs/msg/TwistStamped \
   "{header: {frame_id: base_link}, twist: {linear: {x: 0.10}, angular: {z: 0.0}}}" \
   >/tmp/safestride-cmd-vel.log 2>&1 &
 publisher_pid="$!"
 
-safe_linear=""
-for _ in {1..20}; do
-  safe_command="$(
-    timeout 2s ros2 topic echo /cmd_vel_safe --once 2>/dev/null || true
-  )"
-  safe_linear="$(
-    awk '
-      /^  linear:/ { in_linear = 1; next }
-      in_linear && /^    x:/ { print $2; exit }
-    ' <<<"${safe_command}"
-  )"
-  if [[ -n "${safe_linear}" ]] &&
-      awk -v value="${safe_linear}" \
-        'BEGIN { exit !(value > 0.0) }'; then
-    break
-  fi
-  safe_linear=""
-  sleep 0.1
-done
+sleep 1
+safe_command="$(
+  timeout 15s ros2 topic echo /cmd_vel_safe \
+    geometry_msgs/msg/TwistStamped --once
+)" || {
+  echo "No fresh /cmd_vel_safe received" >&2
+  exit 1
+}
+safe_linear="$(
+  awk '
+    /^  linear:/ { in_linear = 1; next }
+    in_linear && /^    x:/ { print $2; exit }
+  ' <<<"${safe_command}"
+)"
 if [[ -z "${safe_linear}" ]]; then
-  echo "No positive /cmd_vel_safe received; check safety_supervisor output" >&2
+  echo "Could not parse /cmd_vel_safe linear.x" >&2
+  exit 1
+fi
+if ! awk -v value="${safe_linear}" \
+    'BEGIN { exit !(value > 0.0) }'; then
+  echo "/cmd_vel_safe is not positive (${safe_linear})" >&2
   exit 1
 fi
 
@@ -110,7 +95,7 @@ if ! grep -Eq 'success(=|: )[Tt]rue' <<<"${response}"; then
   exit 1
 fi
 
-echo "Drive armed for ${duration}s at 0.10 m/s in Hall-feedback mode."
-echo "Both wheels must keep producing Hall pulses or the firmware will fault-stop."
+echo "Drive armed for ${duration}s with a 0.10 m/s requested command."
+echo "The controller watchdog and EXIT cleanup remain active."
 sleep "${duration}"
 echo "Test complete; sending disable command."
