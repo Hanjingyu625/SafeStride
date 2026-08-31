@@ -10,18 +10,18 @@ Raspberry Pi 4, Ubuntu Server 24.04, ROS 2 Jazzy와 Arduino Uno 2대로 구성�
 
 ```text
 12 V battery ---------------------------> motor driver
-      +-> LM2596 5 V -> Raspberry Pi -> Drive Uno (USB)
+      +-> XL4015 5 V -> Raspberry Pi -> Drive Uno (USB)
                               +--------> Terrain Uno (USB)
                               +--------> BE-220 GPS (serial)
 
-Drive Uno:   shared motor output, left D2 Hall, A1/A2 pressure
+Drive Uno:   shared motor output, left D2 Hall, left A2/right A1 pressure
 Terrain Uno: downward TOF-10120, GY-521 MPU6050
 Raspberry Pi: BE-220 GPS + serial bridges -> safety supervisor -> diagnostics/Foxglove
 ```
 
 - 왼쪽 휠 홀센서만 사용하며 D2/FALLING, 자석 6개로 설정되어 있다. 공통
   드라이브 구조라 오른쪽 ROS 값은 왼쪽 측정값을 복제한 추정치다.
-- 압력센서 임계값은 좌우 ADC 25이고 dead-man으로 동작한다.
+- 압력센서 임계값은 좌우 ADC 80이고 dead-man으로 동작한다.
   ROS 시작 또는 serial 재연결 뒤에는 `/walker/set_enabled true`를 명시적으로
   호출해야 하며, 압력 입력만으로 자동 재시작하지 않는다.
 - TOF는 약 25 cm 아래 지면을 향한다. 초기 기준면 학습 후 EMA 거리,
@@ -47,7 +47,7 @@ SAFESTRIDE_ENABLE_CRUISE=false bash scripts/run.sh
 ```
 
 운영 직렬 장치는 `/dev/safestride-drive`, `/dev/safestride-terrain`, GPIO UART
-`/dev/ttyS0`이다. 펌웨어는
+`/dev/serial0`이다. 펌웨어는
 프로토콜 v4이므로 두 Uno와 Pi 소프트웨어를 함께 갱신한다.
 
 ```bash

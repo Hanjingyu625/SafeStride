@@ -1,14 +1,14 @@
 #include <Arduino.h>
 
 constexpr uint8_t HALL_PIN = 2U;
-constexpr uint8_t PRESSURE_LEFT_PIN = A1;
-constexpr uint8_t PRESSURE_RIGHT_PIN = A2;
+constexpr uint8_t PRESSURE_LEFT_PIN = A2;
+constexpr uint8_t PRESSURE_RIGHT_PIN = A1;
 constexpr uint8_t MOTOR_PWM_PIN = 5U;
 constexpr uint8_t MOTOR_IN1_PIN = 6U;
 constexpr uint8_t MOTOR_IN2_PIN = 8U;
 constexpr uint32_t HALL_MIN_PULSE_INTERVAL_US = 500UL;
 constexpr uint32_t HALL_PULSES_PER_REV = 6UL;
-constexpr float PRESSURE_THRESHOLD = 25.0F;
+constexpr float PRESSURE_THRESHOLD = 80.0F;
 
 volatile uint32_t g_pulses = 0UL;
 volatile uint32_t g_last_pulse_us = 0UL;

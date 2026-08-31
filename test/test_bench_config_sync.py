@@ -32,9 +32,11 @@ class TestBenchConfigSync(unittest.TestCase):
             constant(production, "HALL_PULSES_PER_WHEEL_REV"), "6UL"
         )
         self.assertIn("constexpr uint8_t HALL_PIN = 2U;", bench)
+        self.assertIn("constexpr uint8_t PRESSURE_LEFT_PIN = A2;", bench)
+        self.assertIn("constexpr uint8_t PRESSURE_RIGHT_PIN = A1;", bench)
         self.assertIn("constexpr uint32_t HALL_PULSES_PER_REV = 6UL;", bench)
         self.assertIn("attachInterrupt(digitalPinToInterrupt(HALL_PIN), hallIsr, FALLING)", bench)
-        self.assertIn("constexpr float PRESSURE_THRESHOLD = 25.0F;", bench)
+        self.assertIn("constexpr float PRESSURE_THRESHOLD = 80.0F;", bench)
         self.assertIn("digitalWrite(MOTOR_PWM_PIN, LOW);", bench)
 
     def test_terrain_bench_has_only_installed_i2c_sensors(self):

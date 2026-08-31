@@ -48,7 +48,7 @@ check_serial_device() {
   local role="$2"
   if [[ ! -e "${port}" ]]; then
     echo "${role} port is missing: ${port}" >&2
-    echo "Configure the GPS udev rule or disable GPS explicitly." >&2
+    echo "Enable the Raspberry Pi GPIO UART or disable GPS explicitly." >&2
     exit 1
   fi
   if [[ ! -r "${port}" || ! -w "${port}" ]]; then
@@ -67,7 +67,7 @@ if [[ "${config}" == "${workspace}/config/raspberry_pi.yaml" &&
       /dev/safestride-terrain 8583030333935131E120 Terrain
   fi
   if [[ "${enable_gps}" == "true" ]]; then
-    check_serial_device /dev/ttyS0 GPS
+    check_serial_device /dev/serial0 GPS
   fi
 fi
 

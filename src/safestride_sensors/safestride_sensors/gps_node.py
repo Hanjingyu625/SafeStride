@@ -20,7 +20,7 @@ from .nmea import parse_fix
 class GpsNode(Node):
     def __init__(self) -> None:
         super().__init__('gps_node')
-        self.declare_parameter('port', '/dev/serial/by-id/CHANGE_ME_BE220')
+        self.declare_parameter('port', '/dev/serial0')
         self.declare_parameter('baudrate', 115200)
         self.declare_parameter('poll_rate_hz', 50.0)
         self.declare_parameter('reconnect_period_s', 1.0)

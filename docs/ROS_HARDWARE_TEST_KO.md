@@ -15,11 +15,11 @@ arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
 ## 2. 센서 단독 확인
 
 - 왼쪽 휠 1회전에서 D2 Hall pulse가 6 증가한다.
-- A1/A2를 누르면 각각 raw가 25 이상이고 양손에서 dead-man이 true다.
+- 왼쪽 A2/오른쪽 A1을 누르면 각각 raw가 80 이상이고 양손에서 dead-man이 true다.
 - TOF 정지 기준면은 약 0.25 m이며 초기 10샘플 후 valid가 true가 된다.
 - GY-521을 기울이면 `/terrain/imu`와 status roll/pitch가 변한다. MPU가 아직
   연결되지 않은 경우 진단은 WARN이지만 TOF 단차 정지 시험은 계속할 수 있다.
-- BE-220은 Terrain Uno가 아니라 Raspberry Pi의 `/dev/ttyS0`에 직접
+- BE-220은 Terrain Uno가 아니라 Raspberry Pi의 `/dev/serial0`에 직접
   연결한다. 유효한 NMEA no-fix 문장은 `/gps/fix`의 NO_FIX로 발행된다.
 
 ```bash

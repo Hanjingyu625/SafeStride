@@ -124,7 +124,7 @@ surface_perception:
 gps_node:
   ros__parameters:
     # BE-220 is connected directly to the Raspberry Pi, not the Terrain Uno.
-    port: /dev/ttyS0
+    port: /dev/serial0
     baudrate: 115200
     poll_rate_hz: 50.0
     reconnect_period_s: 1.0

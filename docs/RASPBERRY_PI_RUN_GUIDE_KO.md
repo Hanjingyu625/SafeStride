@@ -13,7 +13,7 @@
 Ubuntu PC -- SSH/Ethernet or Wi-Fi --> Raspberry Pi 4
                                          |
                                          +-- USB --> Drive Uno
-                                         |           D2 left Hall, A1/A2 pressure
+                                         |           D2 left Hall, left A2/right A1 pressure
                                          |
                                          +-- USB --> Terrain Uno
                                          |           TOF10120, MPU6050
@@ -147,8 +147,8 @@ done
 
 출력된 `ID_SERIAL_SHORT`가
 `deploy/udev/99-safestride.rules`의 Drive/Terrain 값과 일치하는지 확인한다.
-GPS는 `deploy/udev/99-safestride.rules.example`의 GPS 행을 실제 USB-UART
-VID/PID/serial 값으로 채워 운영 규칙에 추가한다.
+GPS는 USB-UART 장치가 아니므로 udev 별칭을 만들지 않고 Pi GPIO UART
+별칭인 `/dev/serial0`을 사용한다.
 
 ```bash
 sudo install -m 0644 deploy/udev/99-safestride.rules \
@@ -160,10 +160,10 @@ sudo udevadm trigger
 장치를 다시 연결하고 두 Uno 링크와 Pi GPIO UART가 준비됐는지 확인한다.
 
 ```bash
-ls -l /dev/safestride-drive /dev/safestride-terrain /dev/ttyS0
+ls -l /dev/safestride-drive /dev/safestride-terrain /dev/serial0
 test -r /dev/safestride-drive && test -w /dev/safestride-drive
 test -r /dev/safestride-terrain && test -w /dev/safestride-terrain
-test -r /dev/ttyS0 && test -w /dev/ttyS0
+test -r /dev/serial0 && test -w /dev/serial0
 ```
 
 펌웨어 protocol v4가 두 Uno에 모두 올라가 있어야 한다. `arduino-cli`를 사용하는
@@ -204,7 +204,7 @@ SAFESTRIDE_ENABLE_PERCEPTION=false \
 bash scripts/run.sh
 ```
 
-`run.sh`는 `/dev/safestride-drive`, `/dev/safestride-terrain`, `/dev/ttyS0`의
+`run.sh`는 `/dev/safestride-drive`, `/dev/safestride-terrain`, `/dev/serial0`의
 존재를 확인하고 두 Uno의 serial 역할도 검증한다. 이
 실행은 `/walker/set_enabled`를 자동 호출하지 않으므로 Drive MCU는 disarmed
 상태여야 한다.
@@ -263,7 +263,7 @@ ros2 topic hz /terrain/imu
 - 물체를 가까이 유지: raised 후보 후 `tof_alert: 3`
 - 바닥을 멀리 이동: drop 후보 후 `tof_alert: 4`
 - MPU6050 미연결은 진단 WARN이지만 TOF 시험 자체는 가능함
-- GPS 노드가 `/dev/ttyS0`를 직접 열며, 유효한 NMEA no-fix 문장은
+- GPS 노드가 `/dev/serial0`을 직접 열며, 유효한 NMEA no-fix 문장은
   `/gps/fix`의 NO_FIX 상태로 발행됨
 - 지도·API 미설정 횡단보도 노드는 readiness WARN만 발행하며 모터 명령을 내지 않음
 
@@ -391,6 +391,6 @@ bash scripts/diagnose_pi_connection.sh
 journalctl -u safestride.service -n 200 --no-pager
 ```
 
-FND의 12 V 표시가 유지되어도 LM2596 이후 Pi 단자의 5 V 순간 강하는 별도로
+FND의 12 V 표시가 유지되어도 XL4015 이후 Pi 단자의 5 V 순간 강하는 별도로
 발생할 수 있다. 자세한 점검 순서는 [Pi 연결 진단](PI_CONNECTION_DIAGNOSIS.md)을
 참고한다.

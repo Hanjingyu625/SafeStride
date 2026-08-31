@@ -190,8 +190,8 @@ class TestHardwareIntegrity(unittest.TestCase):
         self.assertIn("executable='gps_node'", self.bringup_launch)
         runtime = ROS_CONFIGS[0].read_text(encoding="utf-8")
         template = ROS_CONFIGS[1].read_text(encoding="utf-8")
-        self.assertIn("port: /dev/ttyS0", runtime)
-        self.assertIn("port: /dev/safestride-gps", template)
+        self.assertIn("port: /dev/serial0", runtime)
+        self.assertIn("port: /dev/serial0", template)
         for text in (runtime, template):
             self.assertIn("baudrate: 115200", text)
 
@@ -250,19 +250,19 @@ class TestHardwareIntegrity(unittest.TestCase):
         self.assertEqual(constant_expression(self.config, "HALL_CALIBRATED"), "true")
         self.assertEqual(
             constant_expression(self.config, "PRESSURE_LEFT_PRESENT_THRESHOLD"),
-            "25.0F",
+            "80.0F",
         )
         self.assertEqual(
             constant_expression(self.config, "PRESSURE_LEFT_PIN"),
-            "A1",
-        )
-        self.assertEqual(
-            constant_expression(self.config, "PRESSURE_RIGHT_PIN"),
             "A2",
         )
         self.assertEqual(
+            constant_expression(self.config, "PRESSURE_RIGHT_PIN"),
+            "A1",
+        )
+        self.assertEqual(
             constant_expression(self.config, "PRESSURE_RIGHT_PRESENT_THRESHOLD"),
-            "25.0F",
+            "80.0F",
         )
         self.assertEqual(
             constant_expression(self.config, "PRESSURE_THRESHOLDS_CALIBRATED"),

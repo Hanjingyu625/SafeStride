@@ -37,7 +37,7 @@ under `/dev/serial/by-id/`; never assume `ttyACM0` ordering.
 Copy and edit `deploy/udev/99-safestride.rules.example`, then install it only
 after checking the unique serial attribute of each device. The runtime config
 expects `/dev/safestride-drive`, `/dev/safestride-terrain` and
-`/dev/ttyS0`. The GPS path is BE-220 -> Raspberry Pi GPIO serial ->
+`/dev/serial0`. The GPS path is BE-220 -> Raspberry Pi GPIO serial ->
 `gps_node`; Terrain Uno does not receive or relay GPS data.
 
 Both Arduino sketches must be flashed after a wire-protocol change. Protocol

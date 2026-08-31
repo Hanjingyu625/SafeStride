@@ -7,7 +7,7 @@ computers:
     serial_by_id: /dev/serial/by-id/CHANGE_ME_TERRAIN_UNO
     baudrate: 115200
   gps:
-    device: /dev/serial/by-id/CHANGE_ME_BE220
+    device: /dev/serial0
     baudrate: 115200
 crosswalk:
   data_file: data/generated/standard_crosswalks.json
@@ -24,8 +24,8 @@ drive:
   hall_calibrated: true
   hall_sensor_layout: single_left
   pressure:
-    left_pressed_threshold: 25
-    right_pressed_threshold: 25
+    left_pressed_threshold: 80
+    right_pressed_threshold: 80
     left_active_high: true
     right_active_high: true
 terrain:
