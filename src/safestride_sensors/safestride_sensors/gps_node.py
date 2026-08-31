@@ -1,6 +1,7 @@
 """Non-blocking BE-220 NMEA serial adapter for ROS 2."""
 
 import math
+import time
 from typing import Optional
 
 import rclpy
@@ -19,7 +20,7 @@ from .nmea import parse_fix
 class GpsNode(Node):
     def __init__(self) -> None:
         super().__init__('gps_node')
-        self.declare_parameter('port', '/dev/serial/by-id/CHANGE_ME_BE220')
+        self.declare_parameter('port', '/dev/serial0')
         self.declare_parameter('baudrate', 115200)
         self.declare_parameter('poll_rate_hz', 50.0)
         self.declare_parameter('reconnect_period_s', 1.0)
@@ -27,13 +28,24 @@ class GpsNode(Node):
         self.declare_parameter('fix_topic', '/gps/fix')
         self.declare_parameter('speed_topic', '/gps/speed')
 
-        self._port = str(self.get_parameter('port').value)
+        self._port = str(self.get_parameter('port').value).strip()
         self._baudrate = int(self.get_parameter('baudrate').value)
         poll_rate = float(self.get_parameter('poll_rate_hz').value)
         self._reconnect_period = float(
             self.get_parameter('reconnect_period_s').value
         )
-        if poll_rate <= 0.0 or self._reconnect_period <= 0.0:
+        if not self._port:
+            raise ValueError('GPS port must not be empty')
+        if not 1200 <= self._baudrate <= 2_000_000:
+            raise ValueError('GPS baudrate must be in [1200, 2000000]')
+        if (
+            not math.isfinite(poll_rate)
+            or not math.isfinite(self._reconnect_period)
+            or poll_rate <= 0.0
+            or poll_rate > 1000.0
+            or self._reconnect_period <= 0.0
+            or self._reconnect_period > 60.0
+        ):
             raise ValueError('GPS poll and reconnect periods must be positive')
 
         self._frame_id = str(self.get_parameter('frame_id').value)
@@ -58,7 +70,7 @@ class GpsNode(Node):
         )
 
     def _now(self) -> float:
-        return self.get_clock().now().nanoseconds * 1.0e-9
+        return time.monotonic()
 
     def _close(self) -> None:
         if self._device is not None:
@@ -112,8 +124,8 @@ class GpsNode(Node):
             else NavSatStatus.STATUS_NO_FIX
         )
         message.status.service = NavSatStatus.SERVICE_GPS
-        message.latitude = fix.latitude
-        message.longitude = fix.longitude
+        message.latitude = fix.latitude if fix.valid else math.nan
+        message.longitude = fix.longitude if fix.valid else math.nan
         message.altitude = math.nan
         message.position_covariance_type = NavSatFix.COVARIANCE_TYPE_UNKNOWN
         self._fix_publisher.publish(message)

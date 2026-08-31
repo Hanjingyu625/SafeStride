@@ -14,19 +14,27 @@ import struct
 from typing import ClassVar, Iterable, List
 
 
-PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = 4
+PROTOCOL_SCHEMA_ID = 0x0401
+FIRMWARE_RELEASE_ID = 20260826
+
+BOARD_ROLE_DRIVE = 1
+BOARD_ROLE_TERRAIN = 2
 FRAME_DELIMITER = 0x00
 MAX_RAW_FRAME_SIZE = 128
 
 HEADER_STRUCT = struct.Struct('<BBBBHHII')
 CRC_STRUCT = struct.Struct('<H')
 
-HELLO_STRUCT = struct.Struct('<II')
-SESSION_START_STRUCT = struct.Struct('<I')
+HELLO_STRUCT = struct.Struct('<IIBBHI')
+SESSION_START_STRUCT = struct.Struct('<IBBHI')
 COMMAND_STRUCT = struct.Struct('<iHBB')
 TELEMETRY_STRUCT = struct.Struct('<iiiiHHHhhHHHHHHHBB')
-TERRAIN_TELEMETRY_STRUCT = struct.Struct('<HBBHHhhH')
-GPS_TELEMETRY_STRUCT = struct.Struct('<iiIBB')
+# Protocol v4 keeps the original 45-byte payload for compatibility. The final
+# 14 bytes were GPS data and are now reserved because GPS is owned by the Pi.
+TERRAIN_TELEMETRY_STRUCT = struct.Struct(
+    '<HBBHHhhhhhhhhhhBH14x'
+)
 
 
 class ProtocolError(ValueError):
@@ -45,6 +53,17 @@ class CrcMismatchError(FrameDecodeError):
     """Raised when a packet CRC does not match its contents."""
 
 
+class UnsupportedVersionError(FrameDecodeError):
+    """Raised when a frame belongs to a different wire protocol."""
+
+    def __init__(self, observed: int, expected: int) -> None:
+        self.observed = int(observed)
+        self.expected = int(expected)
+        super().__init__(
+            f'unsupported protocol version {observed}; expected {expected}'
+        )
+
+
 class PayloadDecodeError(ProtocolError):
     """Raised when a typed payload has an unexpected size or value."""
 
@@ -57,7 +76,6 @@ class PacketType(IntEnum):
     COMMAND = 0x10
     TELEMETRY = 0x20
     TERRAIN_TELEMETRY = 0x21
-    GPS_TELEMETRY = 0x22
 
 
 def crc16_ccitt_false(data: bytes) -> int:
@@ -250,10 +268,7 @@ def decode_frame(encoded: bytes) -> Frame:
     ) = HEADER_STRUCT.unpack(raw[:HEADER_STRUCT.size])
 
     if version != PROTOCOL_VERSION:
-        raise FrameDecodeError(
-            f'unsupported protocol version {version}; '
-            f'expected {PROTOCOL_VERSION}'
-        )
+        raise UnsupportedVersionError(version, PROTOCOL_VERSION)
     if flags != 0:
         raise FrameDecodeError('unsupported nonzero header flags')
     if reserved != 0:
@@ -289,6 +304,8 @@ class FrameParser:
         self.frames_received = 0
         self.crc_error_count = 0
         self.frame_error_count = 0
+        self.version_error_count = 0
+        self.last_unsupported_version: int | None = None
 
     def reset(self, clear_counters: bool = False) -> None:
         """Discard a partial packet, optionally resetting statistics."""
@@ -299,6 +316,8 @@ class FrameParser:
             self.frames_received = 0
             self.crc_error_count = 0
             self.frame_error_count = 0
+            self.version_error_count = 0
+            self.last_unsupported_version = None
 
     def feed(self, data: Iterable[int]) -> List[Frame]:
         """Consume bytes and return every complete, valid frame."""
@@ -320,6 +339,9 @@ class FrameParser:
                     frame = decode_frame(bytes(self._buffer))
                 except CrcMismatchError:
                     self.crc_error_count += 1
+                except UnsupportedVersionError as error:
+                    self.version_error_count += 1
+                    self.last_unsupported_version = error.observed
                 except ProtocolError:
                     self.frame_error_count += 1
                 else:
@@ -354,12 +376,20 @@ class HelloPayload:
 
     boot_id: int
     capabilities: int
+    board_role: int
+    protocol_version: int = PROTOCOL_VERSION
+    schema_id: int = PROTOCOL_SCHEMA_ID
+    firmware_release_id: int = FIRMWARE_RELEASE_ID
     TYPE: ClassVar[PacketType] = PacketType.HELLO
 
     def pack(self) -> bytes:
         return HELLO_STRUCT.pack(
             _u32('boot_id', self.boot_id),
             _u32('capabilities', self.capabilities),
+            _u8('board_role', self.board_role),
+            _u8('protocol_version', self.protocol_version),
+            _u16('schema_id', self.schema_id),
+            _u32('firmware_release_id', self.firmware_release_id),
         )
 
     @classmethod
@@ -373,11 +403,19 @@ class SessionStartPayload:
     """SESSION_START payload sent by the host after a HELLO."""
 
     expected_boot_id: int
+    expected_board_role: int
+    protocol_version: int = PROTOCOL_VERSION
+    schema_id: int = PROTOCOL_SCHEMA_ID
+    firmware_release_id: int = FIRMWARE_RELEASE_ID
     TYPE: ClassVar[PacketType] = PacketType.SESSION_START
 
     def pack(self) -> bytes:
         return SESSION_START_STRUCT.pack(
-            _u32('expected_boot_id', self.expected_boot_id)
+            _u32('expected_boot_id', self.expected_boot_id),
+            _u8('expected_board_role', self.expected_board_role),
+            _u8('protocol_version', self.protocol_version),
+            _u16('schema_id', self.schema_id),
+            _u32('firmware_release_id', self.firmware_release_id),
         )
 
     @classmethod
@@ -445,9 +483,9 @@ class TelemetryPayload:
 
     def pack(self) -> bytes:
         if self.pressure_flags & ~0x07:
-            raise ValueError('pressure_flags contain reserved bits')
+            raise ValueError('pressure_flags contains reserved bits')
         if self.pressure_alert not in (0, 1, 2):
-            raise ValueError('pressure_alert must be 0, 1, or 2')
+            raise ValueError('pressure_alert must be 0, 1 or 2')
         return TELEMETRY_STRUCT.pack(
             int(self.hall_left_pulses),
             int(self.hall_right_pulses),
@@ -463,14 +501,8 @@ class TelemetryPayload:
             _u16('last_command_sequence', self.last_command_sequence),
             _u16('pressure_left_raw', self.pressure_left_raw),
             _u16('pressure_right_raw', self.pressure_right_raw),
-            _u16(
-                'pressure_left_filtered',
-                self.pressure_left_filtered,
-            ),
-            _u16(
-                'pressure_right_filtered',
-                self.pressure_right_filtered,
-            ),
+            _u16('pressure_left_filtered', self.pressure_left_filtered),
+            _u16('pressure_right_filtered', self.pressure_right_filtered),
             _u8('pressure_flags', self.pressure_flags),
             _u8('pressure_alert', self.pressure_alert),
         )
@@ -481,11 +513,11 @@ class TelemetryPayload:
         payload = cls(*TELEMETRY_STRUCT.unpack(data))
         if payload.pressure_flags & ~0x07:
             raise PayloadDecodeError(
-                'TELEMETRY pressure flags contain reserved bits'
+                'pressure_flags contains reserved bits'
             )
         if payload.pressure_alert not in (0, 1, 2):
             raise PayloadDecodeError(
-                'TELEMETRY pressure alert must be 0, 1, or 2'
+                'pressure_alert must be 0, 1 or 2'
             )
         return payload
 
@@ -501,14 +533,25 @@ class TerrainTelemetryPayload:
     tof_reference_mm: int
     tof_error_mm: int
     tof_change_mm: int
+    mpu_accel_x_mg: int
+    mpu_accel_y_mg: int
+    mpu_accel_z_mg: int
+    mpu_gyro_x_mrad_s: int
+    mpu_gyro_y_mrad_s: int
+    mpu_gyro_z_mrad_s: int
+    mpu_roll_mrad: int
+    mpu_pitch_mrad: int
+    mpu_valid: int
     fault_bits: int
     TYPE: ClassVar[PacketType] = PacketType.TERRAIN_TELEMETRY
 
     def pack(self) -> bytes:
         if self.tof_valid not in (0, 1):
             raise ValueError('tof_valid must be 0 or 1')
-        if self.tof_alert not in (0, 1, 2, 3):
-            raise ValueError('tof_alert must be between 0 and 3')
+        if not 0 <= self.tof_alert <= 5:
+            raise ValueError('tof_alert must be in [0, 5]')
+        if self.mpu_valid not in (0, 1):
+            raise ValueError('mpu_valid must be 0 or 1')
         return TERRAIN_TELEMETRY_STRUCT.pack(
             _u16('tof_distance_mm', self.tof_distance_mm),
             _u8('tof_valid', self.tof_valid),
@@ -517,6 +560,15 @@ class TerrainTelemetryPayload:
             _u16('tof_reference_mm', self.tof_reference_mm),
             int(self.tof_error_mm),
             int(self.tof_change_mm),
+            int(self.mpu_accel_x_mg),
+            int(self.mpu_accel_y_mg),
+            int(self.mpu_accel_z_mg),
+            int(self.mpu_gyro_x_mrad_s),
+            int(self.mpu_gyro_y_mrad_s),
+            int(self.mpu_gyro_z_mrad_s),
+            int(self.mpu_roll_mrad),
+            int(self.mpu_pitch_mrad),
+            _u8('mpu_valid', self.mpu_valid),
             _u16('fault_bits', self.fault_bits),
         )
 
@@ -528,69 +580,8 @@ class TerrainTelemetryPayload:
         payload = cls(*TERRAIN_TELEMETRY_STRUCT.unpack(data))
         if payload.tof_valid not in (0, 1):
             raise PayloadDecodeError('tof_valid must be 0 or 1')
-        if payload.tof_alert not in (0, 1, 2, 3):
-            raise PayloadDecodeError('tof_alert must be between 0 and 3')
-        return payload
-
-
-@dataclass(frozen=True)
-class GpsTelemetryPayload:
-    """Position and ground speed returned by the Terrain Uno GPS input."""
-
-    latitude_e7: int
-    longitude_e7: int
-    speed_mm_s: int
-    flags: int
-    satellites: int
-    TYPE: ClassVar[PacketType] = PacketType.GPS_TELEMETRY
-
-    FLAG_FIX_VALID: ClassVar[int] = 1 << 0
-    FLAG_SPEED_VALID: ClassVar[int] = 1 << 1
-
-    def pack(self) -> bytes:
-        if self.flags & ~0x03:
-            raise ValueError('GPS flags contain reserved bits')
-        if not -900000000 <= int(self.latitude_e7) <= 900000000:
-            raise ValueError('latitude_e7 is outside the valid range')
-        if not -1800000000 <= int(self.longitude_e7) <= 1800000000:
-            raise ValueError('longitude_e7 is outside the valid range')
-        if not self.flags & self.FLAG_FIX_VALID and (
-            self.latitude_e7 != 0 or self.longitude_e7 != 0
-        ):
-            raise ValueError('invalid GPS fix must contain zero coordinates')
-        if not self.flags & self.FLAG_SPEED_VALID and self.speed_mm_s != 0:
-            raise ValueError('invalid GPS speed must be zero')
-        if self.speed_mm_s > 500000:
-            raise ValueError('GPS speed exceeds the receiver limit')
-        return GPS_TELEMETRY_STRUCT.pack(
-            int(self.latitude_e7),
-            int(self.longitude_e7),
-            _u32('speed_mm_s', self.speed_mm_s),
-            _u8('flags', self.flags),
-            _u8('satellites', self.satellites),
-        )
-
-    @classmethod
-    def unpack(cls, data: bytes) -> 'GpsTelemetryPayload':
-        _require_size('GPS_TELEMETRY', data, GPS_TELEMETRY_STRUCT.size)
-        payload = cls(*GPS_TELEMETRY_STRUCT.unpack(data))
-        if payload.flags & ~0x03:
-            raise PayloadDecodeError('GPS flags contain reserved bits')
-        if not -900000000 <= payload.latitude_e7 <= 900000000:
-            raise PayloadDecodeError('latitude_e7 is outside valid range')
-        if not -1800000000 <= payload.longitude_e7 <= 1800000000:
-            raise PayloadDecodeError('longitude_e7 is outside valid range')
-        if not payload.flags & payload.FLAG_FIX_VALID and (
-            payload.latitude_e7 != 0 or payload.longitude_e7 != 0
-        ):
-            raise PayloadDecodeError(
-                'invalid GPS fix must contain zero coordinates'
-            )
-        if (
-            not payload.flags & payload.FLAG_SPEED_VALID
-            and payload.speed_mm_s != 0
-        ):
-            raise PayloadDecodeError('invalid GPS speed must be zero')
-        if payload.speed_mm_s > 500000:
-            raise PayloadDecodeError('GPS speed exceeds receiver limit')
+        if not 0 <= payload.tof_alert <= 5:
+            raise PayloadDecodeError('tof_alert must be in [0, 5]')
+        if payload.mpu_valid not in (0, 1):
+            raise PayloadDecodeError('mpu_valid must be 0 or 1')
         return payload

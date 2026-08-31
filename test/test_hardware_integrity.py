@@ -10,11 +10,22 @@ DRIVE_CONFIG = ROOT / "firmware/safestride_mcu/config.h"
 DRIVE_FIRMWARE = ROOT / "firmware/safestride_mcu/safestride_mcu.ino"
 TERRAIN_FIRMWARE = ROOT / "firmware/terrain_mcu/terrain_mcu.ino"
 TERRAIN_CONFIG = ROOT / "firmware/terrain_mcu/config.h"
-DRIVE_SKETCH_DIR = ROOT / "firmware/safestride_mcu"
-TERRAIN_SKETCH_DIR = ROOT / "firmware/terrain_mcu"
+DRIVE_PROTOCOL = ROOT / "firmware/safestride_mcu/protocol.h"
+TERRAIN_PROTOCOL = ROOT / "firmware/terrain_mcu/protocol.h"
+PYTHON_PROTOCOL = (
+    ROOT / "src/safestride_bridge/safestride_bridge/protocol.py"
+)
+MPU_DRIVER = ROOT / "firmware/terrain_mcu/mpu6050_sensor.cpp"
+BRINGUP_LAUNCH = (
+    ROOT / "src/safestride_bringup/launch/safestride.launch.py"
+)
 BRIDGE = (
     ROOT
     / "src/safestride_bridge/safestride_bridge/serial_bridge_node.py"
+)
+TERRAIN_BRIDGE = (
+    ROOT
+    / "src/safestride_bridge/safestride_bridge/terrain_bridge_node.py"
 )
 ROS_CONFIGS = (
     ROOT / "config/raspberry_pi.yaml",
@@ -41,11 +52,16 @@ class TestHardwareIntegrity(unittest.TestCase):
         cls.terrain = TERRAIN_FIRMWARE.read_text(encoding="utf-8")
         cls.terrain_config = TERRAIN_CONFIG.read_text(encoding="utf-8")
         cls.bridge = BRIDGE.read_text(encoding="utf-8")
+        cls.terrain_bridge = TERRAIN_BRIDGE.read_text(encoding="utf-8")
+        cls.drive_protocol = DRIVE_PROTOCOL.read_text(encoding="utf-8")
+        cls.terrain_protocol = TERRAIN_PROTOCOL.read_text(encoding="utf-8")
+        cls.python_protocol = PYTHON_PROTOCOL.read_text(encoding="utf-8")
+        cls.mpu = MPU_DRIVER.read_text(encoding="utf-8")
+        cls.bringup_launch = BRINGUP_LAUNCH.read_text(encoding="utf-8")
 
     def test_drive_active_pins_are_unique(self):
         names = (
             "LEFT_HALL_PIN",
-            "RIGHT_HALL_PIN",
             "MOTOR_PWM_PIN",
             "MOTOR_IN1_PIN",
             "MOTOR_IN2_PIN",
@@ -67,18 +83,6 @@ class TestHardwareIntegrity(unittest.TestCase):
             "1U", owners.values(), "D1 is reserved for USB serial"
         )
 
-    def test_production_sketches_have_one_ino_entry_point(self):
-        expected = {
-            DRIVE_SKETCH_DIR: "safestride_mcu.ino",
-            TERRAIN_SKETCH_DIR: "terrain_mcu.ino",
-        }
-        for directory, primary_name in expected.items():
-            with self.subTest(directory=directory):
-                ino_files = sorted(
-                    path.name for path in directory.glob("*.ino")
-                )
-                self.assertEqual(ino_files, [primary_name])
-
     def test_optional_inputs_do_not_overlap_each_other(self):
         names = (
             "ESTOP_PIN",
@@ -94,6 +98,7 @@ class TestHardwareIntegrity(unittest.TestCase):
         self.assertEqual(
             constant_expression(self.config, "ENABLE_ESTOP"), "false"
         )
+        self.assertEqual(constant_expression(self.config, "ESTOP_PIN"), "12U")
         self.assertIn("if (!cfg::ENABLE_ESTOP)", self.drive)
         self.assertRegex(
             self.drive,
@@ -106,101 +111,163 @@ class TestHardwareIntegrity(unittest.TestCase):
             r"capabilities\s*\|=\s*CAP_ESTOP;",
         )
 
-    def test_single_hall_feedback_configuration_is_consistent(self):
+    def test_magnet_bench_mode_is_explicit_and_bounded(self):
         self.assertEqual(
-            constant_expression(self.config, "ENABLE_HALL_FEEDBACK"),
-            "true",
+            constant_expression(self.config, "MAGNET_BENCH_MODE"),
+            "false",
         )
-        self.assertEqual(
-            constant_expression(self.config, "HALL_CALIBRATED"),
-            "true",
-        )
-        self.assertEqual(
-            constant_expression(self.config, "USE_SINGLE_HALL_SENSOR"),
-            "true",
-        )
-        self.assertEqual(
-            constant_expression(self.config, "HALL_PULSES_PER_WHEEL_REV"),
-            "6UL",
-        )
-        minimum_pwm = int(
-            constant_expression(self.config, "MOTOR_MIN_ACTIVE_PWM")
+        pwm = int(
+            constant_expression(self.config, "MAGNET_BENCH_PWM")
             .removesuffix("U")
         )
-        maximum_pwm = int(
-            constant_expression(self.config, "MAX_PWM").removesuffix("U")
+        hold_ms = int(
+            constant_expression(
+                self.config, "MAGNET_BENCH_PULSE_HOLD_MS"
+            ).removesuffix("U")
         )
-        self.assertGreater(minimum_pwm, 0)
-        self.assertLessEqual(minimum_pwm, maximum_pwm)
-        self.assertIn("if (cfg::ENABLE_HALL_FEEDBACK)", self.drive)
-        self.assertIn("openLoopPwm", (
-            ROOT / "firmware/safestride_mcu/motor_control.cpp"
-        ).read_text(encoding="utf-8"))
-        self.assertIn(
-            "('command.require_hall_feedback', True)",
-            self.bridge,
-        )
-        for path in ROS_CONFIGS:
-            text = path.read_text(encoding="utf-8")
-            self.assertIn("require_hall_feedback: true", text)
-            self.assertIn("hall_pulses_per_revolution: 6", text)
-        self.assertNotIn("MAGNET_BENCH_MODE", self.config)
-        self.assertNotIn("updateMagnetBench", self.drive)
+        self.assertGreater(pwm, 0)
+        self.assertLessEqual(pwm, 100)
+        self.assertGreater(hold_ms, 0)
+        self.assertLessEqual(hold_ms, 1000)
+        self.assertIn("output_allowed && magnet_pulse_recent", self.drive)
         self.assertIn("COMMAND_WATCHDOG_MAX_MS", self.config)
-        self.assertIn("CAP_SINGLE_HALL_SENSOR", self.drive)
-        self.assertIn("CAP_SINGLE_HALL_SENSOR", self.bridge)
 
-    def test_ros_blocks_legacy_magnet_bench_mode(self):
+    def test_ros_must_explicitly_allow_magnet_bench_mode(self):
         self.assertIn(
             "('command.allow_magnet_bench_mode', False)", self.bridge
         )
         self.assertIn("CAP_MAGNET_BENCH_MODE", self.bridge)
         self.assertIn("STATUS_MAGNET_BENCH_MODE", self.bridge)
+        self.assertIn(
+            "('command.auto_arm_magnet_bench_mode', False)", self.bridge
+        )
         for path in ROS_CONFIGS:
             text = path.read_text(encoding="utf-8")
             self.assertIn("allow_magnet_bench_mode: false", text)
+            self.assertIn("auto_arm_magnet_bench_mode: false", text)
+            self.assertIn("require_deadman: true", text)
+            self.assertIn("require_range_sensors: true", text)
 
-    def test_pressure_bench_interlock_is_explicit(self):
-        self.assertEqual(
-            constant_expression(self.config, "REQUIRE_DEADMAN"),
-            "true",
+    def test_drive_enable_is_level_triggered(self):
+        self.assertIn("_level_enable_blocked = True", self.bridge)
+        self.assertGreaterEqual(
+            self.bridge.count("self._level_enable_blocked = True"), 3
         )
-        self.assertEqual(
-            constant_expression(
-                self.config, "PRESSURE_LEFT_PRESENT_THRESHOLD"
-            ),
-            "40.0F",
+        self.assertIn("key='enable_mode'", self.bridge)
+        self.assertIn("'deadman_level_triggered'", self.bridge)
+        self.assertIn("('command.deadman_direct_drive', False)", self.bridge)
+        self.assertIn(
+            "('command.deadman_forward_velocity_m_s', 0.10)",
+            self.bridge,
         )
-        self.assertEqual(
-            constant_expression(
-                self.config, "PRESSURE_RIGHT_PRESENT_THRESHOLD"
-            ),
-            "40.0F",
+        self.assertIn(
+            "target_linear = self._deadman_forward_velocity", self.bridge
         )
         for path in ROS_CONFIGS:
-            self.assertIn(
-                "require_deadman: true",
-                path.read_text(encoding="utf-8"),
-            )
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("deadman_direct_drive: true", text)
+            self.assertIn("deadman_forward_velocity_m_s: 0.10", text)
+        self.assertNotIn("_enabled_requested", self.bridge)
+        self.assertNotIn("_arm_confirmed", self.bridge)
+        self.assertNotIn("_clear_enable_request", self.bridge)
+        self.assertEqual(
+            constant_expression(self.config, "DEADMAN_DIRECT_DRIVE"),
+            "true",
+        )
+        self.assertIn("!cfg::DEADMAN_DIRECT_DRIVE", self.drive)
 
     def test_terrain_uses_i2c_without_gpio_actuator_outputs(self):
         self.assertIn("Wire.begin()", self.terrain)
         self.assertNotIn("analogWrite(", self.terrain)
         self.assertNotRegex(self.terrain, r"\battachInterrupt\s*\(")
+        self.assertIn("g_mpu.update(now_ms)", self.terrain)
+        self.assertIn("REG_WHO_AM_I", self.mpu)
+        self.assertNotIn("digitalWrite(", self.mpu)
 
-    def test_terrain_gps_uses_altsoftserial_pins(self):
+    def test_raspberry_pi_owns_gps_receiver(self):
+        self.assertNotIn("GpsReceiver", self.terrain)
+        self.assertNotIn("ENABLE_GPS", self.terrain_config)
+        self.assertIn("executable='gps_node'", self.bringup_launch)
+        runtime = ROS_CONFIGS[0].read_text(encoding="utf-8")
+        template = ROS_CONFIGS[1].read_text(encoding="utf-8")
+        self.assertIn("port: /dev/serial0", runtime)
+        self.assertIn("port: /dev/serial0", template)
+        for text in (runtime, template):
+            self.assertIn("baudrate: 115200", text)
+
+    def test_mpu_sample_rate_matches_firmware_polling(self):
         self.assertEqual(
-            constant_expression(self.terrain_config, "GPS_RX_PIN"), "8U"
+            constant_expression(
+                self.terrain_config, "MPU6050_SAMPLE_RATE_DIVIDER"
+            ),
+            "49U",
+        )
+        self.assertIn("attitude_initialized_ = false", self.mpu)
+
+    def test_mpu_failure_is_diagnostic_warning_not_tof_failure(self):
+        self.assertRegex(
+            self.terrain_bridge,
+            r"not \(self\._capabilities & CAP_MPU6050\):\s+"
+            r"status\.level = DiagnosticStatus\.WARN",
+        )
+        self.assertRegex(
+            self.terrain_bridge,
+            r"not telemetry\.mpu_valid:\s+"
+            r"status\.level = DiagnosticStatus\.WARN",
+        )
+
+    def test_protocol_compatibility_constants_are_synchronized(self):
+        for protocol in (self.drive_protocol, self.terrain_protocol):
+            self.assertEqual(constant_expression(protocol, "VERSION"), "4U")
+            self.assertEqual(
+                constant_expression(protocol, "SCHEMA_ID"), "0x0401U"
+            )
+            self.assertEqual(
+                constant_expression(protocol, "FIRMWARE_RELEASE_ID"),
+                "20260826UL",
+            )
+            self.assertEqual(
+                constant_expression(protocol, "HELLO_PAYLOAD_SIZE"),
+                "16U",
+            )
+            self.assertEqual(
+                constant_expression(protocol, "SESSION_START_PAYLOAD_SIZE"),
+                "12U",
+            )
+        self.assertIn("PROTOCOL_VERSION = 4", self.python_protocol)
+        self.assertIn("PROTOCOL_SCHEMA_ID = 0x0401", self.python_protocol)
+        self.assertIn(
+            "FIRMWARE_RELEASE_ID = 20260826", self.python_protocol
+        )
+
+    def test_calibrated_single_left_hall_and_pressure(self):
+        self.assertEqual(constant_expression(self.config, "LEFT_HALL_PIN"), "2U")
+        self.assertEqual(constant_expression(self.config, "HALL_ACTIVE_LEVEL"), "LOW")
+        self.assertEqual(
+            constant_expression(self.config, "HALL_PULSES_PER_WHEEL_REV"),
+            "6UL",
+        )
+        self.assertEqual(constant_expression(self.config, "HALL_CALIBRATED"), "true")
+        self.assertEqual(
+            constant_expression(self.config, "PRESSURE_LEFT_PRESENT_THRESHOLD"),
+            "80.0F",
         )
         self.assertEqual(
-            constant_expression(self.terrain_config, "GPS_TX_PIN"), "9U"
+            constant_expression(self.config, "PRESSURE_LEFT_PIN"),
+            "A2",
         )
         self.assertEqual(
-            constant_expression(self.terrain_config, "GPS_BAUD"), "9600UL"
+            constant_expression(self.config, "PRESSURE_RIGHT_PIN"),
+            "A1",
         )
-        self.assertIn('constexpr bool ENABLE_GPS = true;', self.terrain_config)
-        self.assertIn('g_gps.poll()', self.terrain)
-        self.assertIn('TYPE_GPS_TELEMETRY', self.terrain)
+        self.assertEqual(
+            constant_expression(self.config, "PRESSURE_RIGHT_PRESENT_THRESHOLD"),
+            "80.0F",
+        )
+        self.assertEqual(
+            constant_expression(self.config, "PRESSURE_THRESHOLDS_CALIBRATED"),
+            "true",
+        )
 
 
 if __name__ == "__main__":

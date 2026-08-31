@@ -8,11 +8,25 @@ HardwareSerial Serial;
 TwoWire Wire;
 
 namespace {
-
 uint32_t g_now_ms = 0UL;
-uint16_t g_distance_mm = 500U;
+uint16_t g_distance_mm = 250U;
 uint8_t g_wire_byte_index = 0U;
 
+void sample(Tof10120Sensor& tof, uint16_t distance, int count = 1) {
+  g_distance_mm = distance;
+  for (int index = 0; index < count; ++index) {
+    g_now_ms += 50UL;
+    tof.update(g_now_ms);
+  }
+}
+
+void establishBaseline(Tof10120Sensor& tof) {
+  tof.begin(g_now_ms);
+  tof.update(g_now_ms);
+  sample(tof, 250U, 9);
+  assert(tof.valid());
+  assert(tof.alert() == TofAlert::NORMAL);
+}
 }  // namespace
 
 void pinMode(uint8_t, uint8_t) {}
@@ -32,9 +46,7 @@ void HardwareSerial::begin(uint32_t) {}
 int HardwareSerial::available() { return 0; }
 int HardwareSerial::read() { return -1; }
 size_t HardwareSerial::write(uint8_t) { return 1U; }
-size_t HardwareSerial::write(const uint8_t*, size_t length) {
-  return length;
-}
+size_t HardwareSerial::write(const uint8_t*, size_t length) { return length; }
 size_t HardwareSerial::print(const char*) { return 1U; }
 size_t HardwareSerial::println(const char*) { return 1U; }
 
@@ -55,31 +67,36 @@ int TwoWire::read() {
 }
 
 int main() {
-  Tof10120Sensor tof;
-  tof.begin(g_now_ms);
-  tof.update(g_now_ms);
-  assert(tof.valid());
-  assert(tof.distanceMm() == 500U);
-  assert(tof.alert() == TofAlert::NORMAL);
-
-  // A sustained larger distance must eventually satisfy both the filtered
-  // error and positive-change checks for four consecutive frames.
-  g_distance_mm = 900U;
-  for (int i = 0; i < 8; ++i) {
-    g_now_ms += 50UL;
-    tof.update(g_now_ms);
+  {
+    Tof10120Sensor tof;
+    establishBaseline(tof);
+    // One raw spike must decay without reaching the four-frame decision.
+    sample(tof, 650U);
+    sample(tof, 250U, 4);
+    assert(tof.alert() != TofAlert::DROP);
+    assert(tof.alert() != TofAlert::RAISED);
   }
-  assert(tof.alert() == TofAlert::STEP);
 
-  // The red state is retained for one second after the last confirmation.
-  g_distance_mm = 500U;
-  g_now_ms += 500UL;
-  tof.update(g_now_ms);
-  assert(tof.alert() == TofAlert::STEP);
-  g_now_ms += 1000UL;
-  tof.update(g_now_ms);
-  assert(tof.alert() != TofAlert::STEP);
+  {
+    Tof10120Sensor tof;
+    g_distance_mm = 250U;
+    establishBaseline(tof);
+    sample(tof, 650U, 6);
+    assert(tof.alert() == TofAlert::DROP);
+  }
 
-  printf("firmware TOF-10120 tests: OK\n");
+  {
+    Tof10120Sensor tof;
+    g_distance_mm = 250U;
+    establishBaseline(tof);
+    sample(tof, 120U, 8);
+    assert(tof.alert() == TofAlert::RAISED);
+    sample(tof, 250U, 10);
+    assert(tof.alert() == TofAlert::RAISED);
+    sample(tof, 250U, 25);
+    assert(tof.alert() == TofAlert::NORMAL);
+  }
+
+  printf("firmware TOF-10120 adaptive hazard tests: OK\n");
   return 0;
 }

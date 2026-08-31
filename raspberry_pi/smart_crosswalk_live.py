@@ -37,7 +37,6 @@ TIMING_URL = (
 GPS_PORT_CANDIDATES = (
     "/dev/serial0",
     "/dev/ttyAMA0",
-    "/dev/ttyS0",
     "/dev/ttyUSB0",
 )
 GPS_BAUD = 115200

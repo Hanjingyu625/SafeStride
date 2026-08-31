@@ -25,6 +25,10 @@ except ImportError:  # pragma: no cover - depends on target OS packaging
     serial = None
 
 from .protocol import (
+    BOARD_ROLE_DRIVE,
+    FIRMWARE_RELEASE_ID,
+    PROTOCOL_SCHEMA_ID,
+    PROTOCOL_VERSION,
     CommandPayload,
     Frame,
     FrameParser,
@@ -54,9 +58,8 @@ PRESSURE_LEFT_PRESENT = 1 << 0
 PRESSURE_RIGHT_PRESENT = 1 << 1
 PRESSURE_CALIBRATED = 1 << 2
 CAP_PRESSURE_TELEMETRY = 1 << 6
-CAP_TWO_HALL_SENSORS = 1 << 0
+CAP_SINGLE_LEFT_HALL = 1 << 0
 CAP_MAGNET_BENCH_MODE = 1 << 7
-CAP_SINGLE_HALL_SENSOR = 1 << 10
 
 # Firmware state values encoded in status_bits[10:8].
 FW_BOOT = 0
@@ -97,20 +100,20 @@ class SerialBridgeNode(Node):
         self._payload_error_count = 0
         self._session_error_count = 0
         self._sequence_error_count = 0
+        self._compatibility_error: Optional[str] = None
 
         self._session_id = 0
         self._boot_id = 0
         self._capabilities = 0
         self._session_started = False
         self._tx_sequence = 0
-        self._controller_capability_error: Optional[str] = None
 
-        self._enabled_requested = False
+        # Never allow pressure-level motion immediately after process start.
+        # An operator must explicitly call /walker/set_enabled true.
+        self._level_enable_blocked = True
         self._last_command_time: Optional[float] = None
         self._target_linear = 0.0
         self._command_timed_out = True
-        self._arm_confirmed = False
-        self._arm_confirmation_deadline: Optional[float] = None
 
         self._last_telemetry_time: Optional[float] = None
         self._last_telemetry: Optional[TelemetryPayload] = None
@@ -176,9 +179,15 @@ class SerialBridgeNode(Node):
             1.0 / self._diagnostic_rate_hz, self._diagnostic_tick
         )
 
+        mode_summary = (
+            'dead-man direct drive is active at '
+            f'{self._deadman_forward_velocity:.3f} m/s'
+            if self._deadman_direct_drive
+            else 'level-triggered enable is active'
+        )
         self.get_logger().info(
             f'configured serial bridge for {self._port} at '
-            f'{self._baudrate} baud; starts disarmed'
+            f'{self._baudrate} baud; {mode_summary}'
         )
 
     def _declare_parameters(self) -> None:
@@ -192,11 +201,11 @@ class SerialBridgeNode(Node):
             ('command.publish_rate_hz', 50.0),
             ('command.timeout_s', 0.20),
             ('command.ttl_ms', 200),
-            ('command.arm_max_wheel_speed_rad_s', 0.10),
+            ('command.deadman_direct_drive', False),
+            ('command.deadman_forward_velocity_m_s', 0.10),
             ('command.max_abs_angular_z_rad_s', 0.0),
-            ('command.require_hall_feedback', True),
             ('command.allow_magnet_bench_mode', False),
-            ('command.arm_confirmation_timeout_s', 1.0),
+            ('command.auto_arm_magnet_bench_mode', False),
             ('telemetry.timeout_s', 0.30),
             ('diagnostics.publish_rate_hz', 1.0),
             ('base.wheel_radius_m', 0.15),
@@ -208,6 +217,7 @@ class SerialBridgeNode(Node):
             ('range.field_of_view_rad', 0.35),
             ('battery.empty_voltage', 0.0),
             ('battery.full_voltage', 0.0),
+            ('battery.nominal_voltage', 12.0),
             ('frames.odom', 'odom'),
             ('frames.base', 'base_footprint'),
             ('frames.range_left', 'front_left_range_link'),
@@ -289,11 +299,15 @@ class SerialBridgeNode(Node):
             minimum=20,
             maximum=250,
         )
-        self._arm_max_wheel_speed = finite_float(
-            'command.arm_max_wheel_speed_rad_s',
-            self._value('command.arm_max_wheel_speed_rad_s'),
+        self._deadman_direct_drive = bool(
+            self._value('command.deadman_direct_drive')
+        )
+        self._deadman_forward_velocity = finite_float(
+            'command.deadman_forward_velocity_m_s',
+            self._value('command.deadman_forward_velocity_m_s'),
             minimum=0.0,
-            maximum=100.0,
+            maximum=10.0,
+            minimum_inclusive=False,
         )
         self._max_abs_angular_z = finite_float(
             'command.max_abs_angular_z_rad_s',
@@ -301,19 +315,20 @@ class SerialBridgeNode(Node):
             minimum=0.0,
             maximum=10.0,
         )
-        self._require_hall_feedback = bool(
-            self._value('command.require_hall_feedback')
-        )
         self._allow_magnet_bench_mode = bool(
             self._value('command.allow_magnet_bench_mode')
         )
-        self._arm_confirmation_timeout = finite_float(
-            'command.arm_confirmation_timeout_s',
-            self._value('command.arm_confirmation_timeout_s'),
-            minimum=0.0,
-            maximum=10.0,
-            minimum_inclusive=False,
+        self._auto_arm_magnet_bench_mode = bool(
+            self._value('command.auto_arm_magnet_bench_mode')
         )
+        if (
+            self._auto_arm_magnet_bench_mode
+            and not self._allow_magnet_bench_mode
+        ):
+            raise ValueError(
+                'auto-arm magnet bench mode requires '
+                'allow_magnet_bench_mode=true'
+            )
         self._telemetry_timeout = finite_float(
             'telemetry.timeout_s',
             self._value('telemetry.timeout_s'),
@@ -391,17 +406,19 @@ class SerialBridgeNode(Node):
             minimum=0.0,
             maximum=1000.0,
         )
+        self._battery_nominal = finite_float(
+            'battery.nominal_voltage',
+            self._value('battery.nominal_voltage'),
+            minimum=0.0,
+            maximum=1000.0,
+            minimum_inclusive=False,
+        )
         if (
             (self._battery_empty != 0.0 or self._battery_full != 0.0)
             and self._battery_full <= self._battery_empty
         ):
             raise ValueError(
                 'battery.full_voltage must exceed battery.empty_voltage'
-            )
-        if self._arm_max_wheel_speed > self._max_wheel_speed:
-            raise ValueError(
-                'command.arm_max_wheel_speed_rad_s must not exceed '
-                'base.max_wheel_speed_rad_s'
             )
         command_period = 1.0 / self._command_rate_hz
         if command_period >= self._command_timeout:
@@ -447,50 +464,26 @@ class SerialBridgeNode(Node):
     def _serial_connected(self) -> bool:
         return self._serial is not None and bool(self._serial.is_open)
 
-    def _link_failure_reason(
-        self, now: Optional[float] = None
-    ) -> Optional[str]:
-        if not self._serial_connected():
-            return 'controller serial port is disconnected'
-        if self._controller_capability_error is not None:
-            return self._controller_capability_error
-        if not self._session_started:
-            return 'controller session is inactive'
-        if self._last_telemetry_time is None or self._last_telemetry is None:
-            return 'controller telemetry has not been received'
-        if not (self._last_telemetry.status_bits & STATUS_SESSION):
-            return 'controller telemetry reports an inactive session'
+    def _link_ok(self, now: Optional[float] = None) -> bool:
+        if not self._serial_connected() or not self._session_started:
+            return False
+        if (
+            self._last_telemetry_time is None
+            or self._last_telemetry is None
+            or not (
+                self._last_telemetry.status_bits & STATUS_SESSION
+            )
+        ):
+            return False
         if now is None:
             now = self._now_monotonic()
-        age = max(0.0, now - self._last_telemetry_time)
-        if age > self._telemetry_timeout:
-            return (
-                f'controller telemetry is stale ({age:.3f}s; '
-                f'limit {self._telemetry_timeout:.3f}s)'
-            )
-        return None
-
-    def _link_ok(self, now: Optional[float] = None) -> bool:
-        return self._link_failure_reason(now) is None
+        return (now - self._last_telemetry_time) <= self._telemetry_timeout
 
     @staticmethod
     def _firmware_state(telemetry: TelemetryPayload) -> int:
         return (
             telemetry.status_bits >> STATUS_STATE_SHIFT
         ) & STATUS_STATE_MASK
-
-    @staticmethod
-    def _hall_feedback_available(capabilities: int) -> bool:
-        return bool(
-            capabilities
-            & (CAP_TWO_HALL_SENSORS | CAP_SINGLE_HALL_SENSOR)
-        )
-
-    @staticmethod
-    def _single_hall_active(capabilities: int) -> bool:
-        return bool(capabilities & CAP_SINGLE_HALL_SENSOR) and not bool(
-            capabilities & CAP_TWO_HALL_SENSORS
-        )
 
     def _firmware_status_consistent(
         self, telemetry: TelemetryPayload
@@ -532,23 +525,23 @@ class SerialBridgeNode(Node):
     def _remote_allows_enable(self, telemetry: TelemetryPayload) -> bool:
         firmware_state = self._firmware_state(telemetry)
         magnet_bench_mode = self._magnet_bench_mode_active(telemetry)
-        hall_feedback_ready = (
-            not self._require_hall_feedback
-            or (
-                bool(
-                    telemetry.status_bits & STATUS_HALL_CALIBRATED
-                )
-                and self._hall_feedback_available(self._capabilities)
-            )
+        if magnet_bench_mode and not self._auto_arm_magnet_bench_mode:
+            return False
+        bench_feedback_bypass = (
+            magnet_bench_mode and self._auto_arm_magnet_bench_mode
         )
         return (
             self._firmware_status_consistent(telemetry)
             and bool(telemetry.status_bits & STATUS_SESSION)
             and (
                 bool(telemetry.status_bits & STATUS_DEADMAN)
-                or magnet_bench_mode
+                or bench_feedback_bypass
             )
-            and (hall_feedback_ready or magnet_bench_mode)
+            and (
+                bool(telemetry.status_bits & STATUS_HALL_CALIBRATED)
+                or bench_feedback_bypass
+            )
+            and bool(self._capabilities & CAP_SINGLE_LEFT_HALL)
             and not bool(telemetry.status_bits & STATUS_ESTOP)
             and not bool(
                 telemetry.status_bits & STATUS_WATCHDOG_TIMEOUT
@@ -557,18 +550,15 @@ class SerialBridgeNode(Node):
             and firmware_state in (FW_DISARMED, FW_ARMED)
         )
 
-    def _clear_enable_request(self) -> None:
-        self._enabled_requested = False
-        self._arm_confirmed = False
-        self._arm_confirmation_deadline = None
-
     def _reset_link_state(self) -> None:
+        # A serial disconnect or controller reset invalidates prior operator
+        # authorization. Reconnection must not resume motion by itself.
+        self._level_enable_blocked = True
         self._session_id = 0
         self._boot_id = 0
         self._capabilities = 0
+        self._compatibility_error = None
         self._session_started = False
-        self._controller_capability_error = None
-        self._clear_enable_request()
         self._last_command_time = None
         self._command_timed_out = True
         self._last_telemetry_time = None
@@ -673,64 +663,37 @@ class SerialBridgeNode(Node):
         self._last_telemetry_sequence = frame.sequence
         self._last_telemetry_time = now
         self._last_telemetry = telemetry
-        firmware_state = self._firmware_state(telemetry)
-        controller_armed = bool(
-            telemetry.status_bits & STATUS_MOTOR_ENABLED
-        ) and firmware_state == FW_ARMED
-        if (
-            self._enabled_requested
-            and controller_armed
-            and not self._arm_confirmed
-        ):
-            if (
-                self._arm_confirmation_deadline is not None
-                and now >= self._arm_confirmation_deadline
-            ):
-                self._clear_enable_request()
-                self._send_command(0, False)
-                self.get_logger().warning(
-                    'ignored late ARMED confirmation; '
-                    'explicit re-enable required'
-                )
-            else:
-                self._arm_confirmed = True
-                self._arm_confirmation_deadline = None
-        elif self._arm_confirmed and not controller_armed:
-            self._clear_enable_request()
-            self.get_logger().warning(
-                'controller disarmed unexpectedly; explicit re-enable required'
-            )
         self._publish_telemetry(telemetry)
 
     def _handle_hello(
         self, hello: HelloPayload, hello_sequence: int
     ) -> None:
-        conflicting_hall_capabilities = bool(
-            hello.capabilities & CAP_TWO_HALL_SENSORS
-        ) and bool(hello.capabilities & CAP_SINGLE_HALL_SENSOR)
-        if conflicting_hall_capabilities or (
-            self._require_hall_feedback
-            and not self._hall_feedback_available(hello.capabilities)
-        ):
-            error = (
-                'device on the drive port is not Drive firmware '
-                '(valid Hall capability missing or conflicting)'
+        compatibility_errors = []
+        if hello.board_role != BOARD_ROLE_DRIVE:
+            compatibility_errors.append(
+                f'board role {hello.board_role} is not DRIVE'
             )
-            self._session_id = 0
-            self._boot_id = hello.boot_id
-            self._capabilities = hello.capabilities
+        if hello.protocol_version != PROTOCOL_VERSION:
+            compatibility_errors.append(
+                f'HELLO protocol {hello.protocol_version} != '
+                f'{PROTOCOL_VERSION}'
+            )
+        if hello.schema_id != PROTOCOL_SCHEMA_ID:
+            compatibility_errors.append(
+                f'schema 0x{hello.schema_id:04x} != '
+                f'0x{PROTOCOL_SCHEMA_ID:04x}'
+            )
+        if hello.firmware_release_id != FIRMWARE_RELEASE_ID:
+            compatibility_errors.append(
+                f'firmware release {hello.firmware_release_id} != '
+                f'{FIRMWARE_RELEASE_ID}'
+            )
+        if compatibility_errors:
+            self._compatibility_error = '; '.join(compatibility_errors)
             self._session_started = False
-            self._controller_capability_error = error
-            self._clear_enable_request()
-            self._last_telemetry_time = None
-            self._last_telemetry = None
-            self._last_telemetry_sequence = None
-            self.get_logger().error(
-                error,
-                throttle_duration_sec=5.0,
-            )
             return
-        self._controller_capability_error = None
+        self._compatibility_error = None
+        self._parser.last_unsupported_version = None
         if (
             hello.boot_id == self._boot_id
             and self._session_started
@@ -749,6 +712,7 @@ class SerialBridgeNode(Node):
             or self._last_telemetry_time is not None
         )
         if new_session:
+            self._level_enable_blocked = True
             session_id = secrets.randbits(32)
             if session_id == 0 or session_id == self._session_id:
                 session_id = (self._session_id + 1) & 0xFFFFFFFF
@@ -757,7 +721,6 @@ class SerialBridgeNode(Node):
             self._session_id = session_id
             self._boot_id = hello.boot_id
             self._capabilities = hello.capabilities
-            self._clear_enable_request()
             self._last_command_time = None
             self._command_timed_out = True
             self._last_telemetry_time = None
@@ -766,7 +729,10 @@ class SerialBridgeNode(Node):
             self._last_hall_left = None
             self._last_hall_right = None
 
-        payload = SessionStartPayload(hello.boot_id).pack()
+        payload = SessionStartPayload(
+            hello.boot_id,
+            BOARD_ROLE_DRIVE,
+        ).pack()
         frame = self._make_frame(
             PacketType.SESSION_START,
             payload,
@@ -831,7 +797,6 @@ class SerialBridgeNode(Node):
                 self._target_linear = 0.0
                 self._last_command_time = None
                 self._command_timed_out = True
-                self._clear_enable_request()
             self.get_logger().error(
                 'discarded angular command: one shared motor driver '
                 'supports straight motion only',
@@ -846,150 +811,30 @@ class SerialBridgeNode(Node):
             self._command_timed_out = False
 
     def _on_set_enabled(self, request, response):
-        now = self._now_monotonic()
         if not request.data:
             with self._lock:
-                self._clear_enable_request()
+                self._level_enable_blocked = True
             delivered = self._send_command(0, False)
             response.success = delivered
             if delivered:
                 response.message = (
-                    'local enable gate closed and disable command sent'
+                    'level enable blocked and disable command sent'
                 )
             else:
                 response.message = (
-                    'local enable gate closed, but the disable command could '
+                    'level enable blocked, but the disable command could '
                     'not be delivered; controller watchdog stop is expected'
                 )
             return response
 
-        link_failure = self._link_failure_reason(now)
-        if link_failure is not None:
-            response.success = False
-            response.message = f'cannot enable: {link_failure}'
-            return response
-        telemetry = self._last_telemetry
-        if telemetry is None:
-            response.success = False
-            response.message = 'cannot enable: no controller telemetry'
-            return response
-        if not self._firmware_status_consistent(telemetry):
-            response.success = False
-            response.message = (
-                'cannot enable: controller status fields are inconsistent'
-            )
-            return response
-        if telemetry.status_bits & STATUS_ESTOP:
-            response.success = False
-            response.message = 'cannot enable: emergency stop is active'
-            return response
-        if telemetry.status_bits & STATUS_WATCHDOG_TIMEOUT:
-            response.success = False
-            response.message = (
-                'cannot enable: controller watchdog reset is pending'
-            )
-            return response
-        firmware_state = self._firmware_state(telemetry)
-        if firmware_state == FW_ESTOP:
-            response.success = False
-            response.message = 'cannot enable: controller is in ESTOP state'
-            return response
-        if telemetry.fault_bits:
-            response.success = False
-            response.message = (
-                f'cannot enable: controller fault 0x'
-                f'{telemetry.fault_bits:04x}'
-            )
-            return response
-        if firmware_state == FW_FAULT:
-            response.success = False
-            response.message = 'cannot enable: controller is in FAULT state'
-            return response
-        if firmware_state == FW_SAFE_STOP:
-            response.success = False
-            response.message = (
-                'cannot enable: controller is in SAFE_STOP; '
-                'wait for the disabled reset command'
-            )
-            return response
-        if not (telemetry.status_bits & STATUS_SESSION):
-            response.success = False
-            response.message = 'cannot enable: controller session is inactive'
-            return response
-        if (
-            self._require_hall_feedback
-            and not self._hall_feedback_available(self._capabilities)
-        ):
-            response.success = False
-            response.message = 'cannot enable: Hall feedback is unavailable'
-            return response
-        firmware_magnet_bench_mode = bool(
-            telemetry.status_bits & STATUS_MAGNET_BENCH_MODE
-            and self._capabilities & CAP_MAGNET_BENCH_MODE
-        )
-        if firmware_magnet_bench_mode and not self._allow_magnet_bench_mode:
-            response.success = False
-            response.message = (
-                'cannot enable: firmware magnet bench mode is not allowed '
-                'by ROS configuration'
-            )
-            return response
-        magnet_bench_mode = self._magnet_bench_mode_active(telemetry)
-        if (
-            self._require_hall_feedback
-            and not magnet_bench_mode
-            and not (telemetry.status_bits & STATUS_HALL_CALIBRATED)
-        ):
-            response.success = False
-            response.message = (
-                'cannot enable: Hall pulses per revolution are not calibrated'
-            )
-            return response
-        if (
-            not magnet_bench_mode
-            and not (telemetry.status_bits & STATUS_DEADMAN)
-        ):
-            response.success = False
-            response.message = 'cannot enable: dead-man switch is not active'
-            return response
-        maximum_measured_speed_mrad_s = int(
-            round(self._arm_max_wheel_speed * 1000.0)
-        )
-        if (
-            self._require_hall_feedback
-            and not magnet_bench_mode
-            and (
-                abs(telemetry.velocity_left_mrad_s)
-                > maximum_measured_speed_mrad_s
-                or abs(telemetry.velocity_right_mrad_s)
-                > maximum_measured_speed_mrad_s
-            )
-        ):
-            response.success = False
-            response.message = (
-                'cannot enable: powered wheels are not stationary'
-            )
-            return response
-        if (
-            self._last_command_time is None
-            or now - self._last_command_time > self._command_timeout
-        ):
-            response.success = False
-            response.message = 'cannot enable: no fresh velocity command'
-            return response
-
         with self._lock:
-            self._enabled_requested = True
-            self._arm_confirmed = False
-            self._arm_confirmation_deadline = (
-                now + self._arm_confirmation_timeout
-            )
+            self._level_enable_blocked = False
         response.success = True
         response.message = (
-            'magnet bench armed; each Hall pulse opens a short motor window'
-            if magnet_bench_mode
-            else 'enable gate opened; motion still requires fresh velocity '
-            'commands'
+            'level enable allowed; motion follows the dead-man directly'
+            if self._deadman_direct_drive
+            else 'level enable allowed; motion follows dead-man and fresh '
+            'velocity commands'
         )
         return response
 
@@ -1004,47 +849,35 @@ class SerialBridgeNode(Node):
             and self._remote_allows_enable(telemetry)
         )
         if not link_ok or not remote_safe:
-            self._clear_enable_request()
             self._send_command(0, False)
             return
 
-        fresh = (
-            self._last_command_time is not None
-            and (now - self._last_command_time) <= self._command_timeout
-        )
-
-        if not fresh:
-            if not self._command_timed_out:
-                self.get_logger().warning(
-                    'velocity command timed out; commanding a disabled stop'
-                )
-            self._command_timed_out = True
-            self._clear_enable_request()
-            self._send_command(0, False)
-            return
-
-        if (
-            self._enabled_requested
-            and not self._arm_confirmed
-            and (
-                self._arm_confirmation_deadline is None
-                or now >= self._arm_confirmation_deadline
+        if self._deadman_direct_drive:
+            target_linear = self._deadman_forward_velocity
+            self._command_timed_out = False
+        else:
+            fresh = (
+                self._last_command_time is not None
+                and (now - self._last_command_time) <= self._command_timeout
             )
-        ):
-            self.get_logger().warning(
-                'controller did not confirm ARMED before the deadline; '
-                'explicit re-enable required'
-            )
-            self._clear_enable_request()
-            self._send_command(0, False)
-            return
 
-        enable = self._enabled_requested and link_ok and remote_safe
+            if not fresh:
+                if not self._command_timed_out:
+                    self.get_logger().warning(
+                        'velocity command timed out; commanding a disabled '
+                        'stop'
+                    )
+                self._command_timed_out = True
+                self._send_command(0, False)
+                return
+            target_linear = self._target_linear
+
+        enable = not self._level_enable_blocked and link_ok and remote_safe
         if not enable:
             self._send_command(0, False)
             return
 
-        target = self._target_linear / self._wheel_radius
+        target = target_linear / self._wheel_radius
         target = max(
             -self._max_wheel_speed,
             min(self._max_wheel_speed, target),
@@ -1110,12 +943,10 @@ class SerialBridgeNode(Node):
         hall.calibrated = bool(
             telemetry.status_bits & STATUS_HALL_CALIBRATED
         )
-        hall.left_sensor_present = self._hall_feedback_available(
-            self._capabilities
+        hall.left_sensor_present = bool(
+            self._capabilities & CAP_SINGLE_LEFT_HALL
         )
-        hall.right_sensor_present = bool(
-            self._capabilities & CAP_TWO_HALL_SENSORS
-        )
+        hall.right_sensor_present = False
         self._hall_pub.publish(hall)
 
         joints = JointState()
@@ -1396,9 +1227,18 @@ class SerialBridgeNode(Node):
         elif not self._serial_connected():
             status.level = DiagnosticStatus.ERROR
             status.message = 'serial port disconnected'
-        elif self._controller_capability_error is not None:
+        elif self._parser.last_unsupported_version is not None:
             status.level = DiagnosticStatus.ERROR
-            status.message = self._controller_capability_error
+            status.message = (
+                'protocol version mismatch: controller '
+                f'v{self._parser.last_unsupported_version}, '
+                f'bridge v{PROTOCOL_VERSION}; flash both MCUs'
+            )
+        elif self._compatibility_error is not None:
+            status.level = DiagnosticStatus.ERROR
+            status.message = (
+                f'incompatible controller: {self._compatibility_error}'
+            )
         elif not self._session_started:
             status.level = DiagnosticStatus.WARN
             status.message = 'waiting for controller HELLO'
@@ -1421,10 +1261,7 @@ class SerialBridgeNode(Node):
         ):
             status.level = DiagnosticStatus.ERROR
             status.message = 'emergency stop is active'
-        elif (
-            self._require_hall_feedback
-            and not self._hall_feedback_available(self._capabilities)
-        ):
+        elif not (self._capabilities & CAP_SINGLE_LEFT_HALL):
             status.level = DiagnosticStatus.ERROR
             status.message = 'drive firmware lacks Hall feedback'
         elif (
@@ -1445,23 +1282,11 @@ class SerialBridgeNode(Node):
             status.message = (
                 'magnet-trigger motor bench mode is active'
             )
-        elif (
-            self._require_hall_feedback
-            and self._last_telemetry
-            and not (
-                self._last_telemetry.status_bits & STATUS_HALL_CALIBRATED
-            )
+        elif self._last_telemetry and not (
+            self._last_telemetry.status_bits & STATUS_HALL_CALIBRATED
         ):
             status.level = DiagnosticStatus.WARN
             status.message = 'Hall pulses per revolution are not calibrated'
-        elif not self._hall_feedback_available(self._capabilities):
-            status.level = DiagnosticStatus.WARN
-            status.message = 'open-loop drive active; speed feedback disabled'
-        elif self._single_hall_active(self._capabilities):
-            status.level = DiagnosticStatus.WARN
-            status.message = (
-                'single left Hall feedback active; right wheel is unmonitored'
-            )
         elif not (self._capabilities & CAP_PRESSURE_TELEMETRY):
             status.level = DiagnosticStatus.WARN
             status.message = 'drive firmware lacks pressure telemetry'
@@ -1492,12 +1317,37 @@ class SerialBridgeNode(Node):
         status.values = [
             KeyValue(key='port', value=self._port),
             KeyValue(key='baudrate', value=str(self._baudrate)),
+            KeyValue(key='expected_board_role', value='DRIVE'),
+            KeyValue(key='protocol_version', value=str(PROTOCOL_VERSION)),
+            KeyValue(
+                key='protocol_schema_id',
+                value=f'0x{PROTOCOL_SCHEMA_ID:04x}',
+            ),
+            KeyValue(
+                key='firmware_release_id',
+                value=str(FIRMWARE_RELEASE_ID),
+            ),
+            KeyValue(
+                key='observed_protocol_version',
+                value=(
+                    str(self._parser.last_unsupported_version)
+                    if self._parser.last_unsupported_version is not None
+                    else (
+                        str(PROTOCOL_VERSION)
+                        if self._boot_id else 'unknown'
+                    )
+                ),
+            ),
             KeyValue(key='session_id', value=f'0x{self._session_id:08x}'),
             KeyValue(key='boot_id', value=f'0x{self._boot_id:08x}'),
             KeyValue(key='telemetry_age_s', value=f'{age:.3f}'),
             KeyValue(
                 key='crc_errors',
                 value=str(self._parser.crc_error_count),
+            ),
+            KeyValue(
+                key='version_errors',
+                value=str(self._parser.version_error_count),
             ),
             KeyValue(
                 key='frame_errors',
@@ -1517,22 +1367,28 @@ class SerialBridgeNode(Node):
                 ),
             ),
             KeyValue(
-                key='enabled_requested',
-                value=str(self._enabled_requested).lower(),
-            ),
-            KeyValue(
-                key='hall_feedback_required',
-                value=str(self._require_hall_feedback).lower(),
-            ),
-            KeyValue(
-                key='hall_sensor_layout',
+                key='enable_mode',
                 value=(
-                    'single_left'
-                    if self._single_hall_active(self._capabilities)
-                    else 'dual'
-                    if self._capabilities & CAP_TWO_HALL_SENSORS
-                    else 'none'
+                    'deadman_level_triggered'
+                    if self._deadman_direct_drive
+                    else 'command_level_triggered'
                 ),
+            ),
+            KeyValue(
+                key='level_enable_blocked',
+                value=str(self._level_enable_blocked).lower(),
+            ),
+            KeyValue(
+                key='deadman_direct_drive',
+                value=str(self._deadman_direct_drive).lower(),
+            ),
+            KeyValue(
+                key='deadman_forward_velocity_m_s',
+                value=f'{self._deadman_forward_velocity:.3f}',
+            ),
+            KeyValue(
+                key='magnet_bench_auto_arm',
+                value=str(self._auto_arm_magnet_bench_mode).lower(),
             ),
             KeyValue(
                 key='hall_left_pulses',
@@ -1549,6 +1405,14 @@ class SerialBridgeNode(Node):
                     if telemetry is not None
                     else 'unknown'
                 ),
+            ),
+            KeyValue(
+                key='hall_layout',
+                value='left_only_mirrored',
+            ),
+            KeyValue(
+                key='battery_nominal_voltage_v',
+                value=f'{self._battery_nominal:.1f}',
             ),
             KeyValue(
                 key='hall_calibrated',
@@ -1584,30 +1448,6 @@ class SerialBridgeNode(Node):
                 key='pressure_right_raw',
                 value=(
                     str(telemetry.pressure_right_raw)
-                    if telemetry is not None
-                    else 'unknown'
-                ),
-            ),
-            KeyValue(
-                key='pressure_left_filtered',
-                value=(
-                    str(telemetry.pressure_left_filtered)
-                    if telemetry is not None
-                    else 'unknown'
-                ),
-            ),
-            KeyValue(
-                key='pressure_right_filtered',
-                value=(
-                    str(telemetry.pressure_right_filtered)
-                    if telemetry is not None
-                    else 'unknown'
-                ),
-            ),
-            KeyValue(
-                key='pressure_alert',
-                value=(
-                    str(telemetry.pressure_alert)
                     if telemetry is not None
                     else 'unknown'
                 ),

@@ -33,15 +33,10 @@ unset ROS_LOCALHOST_ONLY
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
 export ROS_AUTOMATIC_DISCOVERY_RANGE="${ROS_AUTOMATIC_DISCOVERY_RANGE:-SUBNET}"
 
-publisher_pid=""
 cleanup() {
   set +e
   timeout 3s ros2 service call /walker/set_enabled std_srvs/srv/SetBool \
     "{data: false}" >/dev/null 2>&1
-  if [[ -n "${publisher_pid}" ]]; then
-    kill "${publisher_pid}" >/dev/null 2>&1
-    wait "${publisher_pid}" >/dev/null 2>&1
-  fi
 }
 trap cleanup EXIT INT TERM
 
@@ -56,32 +51,18 @@ if ! timeout 10s ros2 service type /walker/set_enabled \
   exit 1
 fi
 
-ros2 topic pub --rate 20 /cmd_vel geometry_msgs/msg/TwistStamped \
-  "{header: {frame_id: base_link}, twist: {linear: {x: 0.10}, angular: {z: 0.0}}}" \
-  >/tmp/safestride-cmd-vel.log 2>&1 &
-publisher_pid="$!"
-
-sleep 1
-safe_command="$(
-  timeout 15s ros2 topic echo /cmd_vel_safe \
-    geometry_msgs/msg/TwistStamped --once
-)" || {
-  echo "No fresh /cmd_vel_safe received" >&2
+status="$(timeout 5s ros2 topic echo /walker/status --once)" || {
+  echo "No fresh /walker/status received" >&2
   exit 1
 }
-safe_linear="$(
-  awk '
-    /^  linear:/ { in_linear = 1; next }
-    in_linear && /^    x:/ { print $2; exit }
-  ' <<<"${safe_command}"
-)"
-if [[ -z "${safe_linear}" ]]; then
-  echo "Could not parse /cmd_vel_safe linear.x" >&2
+if ! grep -q 'link_ok: true' <<<"${status}"; then
+  echo "Drive link is not ready:" >&2
+  echo "${status}" >&2
   exit 1
 fi
-if ! awk -v value="${safe_linear}" \
-    'BEGIN { exit !(value > 0.0) }'; then
-  echo "/cmd_vel_safe is not positive (${safe_linear})" >&2
+if grep -Eq 'fault_bits: [1-9][0-9]*' <<<"${status}"; then
+  echo "Drive reports a fault:" >&2
+  echo "${status}" >&2
   exit 1
 fi
 
@@ -91,11 +72,12 @@ response="$(
 )"
 echo "${response}"
 if ! grep -Eq 'success(=|: )[Tt]rue' <<<"${response}"; then
-  echo "Drive enable request was rejected" >&2
+  echo "Drive level-enable request was rejected" >&2
   exit 1
 fi
 
-echo "Drive armed for ${duration}s with a 0.10 m/s requested command."
-echo "The controller watchdog and EXIT cleanup remain active."
+echo "Dead-man direct drive allowed for ${duration}s at 0.10 m/s."
+echo "Hold the pressure dead-man; releasing it disables motor output."
+echo "The left D2 Hall sensor remains telemetry-only in this mode."
 sleep "${duration}"
 echo "Test complete; sending disable command."

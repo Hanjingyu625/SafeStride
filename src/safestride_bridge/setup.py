@@ -16,6 +16,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
     ],
     install_requires=['setuptools'],
+    tests_require=['pytest'],
     zip_safe=True,
     maintainer='SafeStride maintainers',
     maintainer_email='maintainer@example.com',

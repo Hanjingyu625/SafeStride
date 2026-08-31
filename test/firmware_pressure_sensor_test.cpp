@@ -67,11 +67,10 @@ int main() {
   assert(pressure.alert() == PressureAlert::WARNING);
 
   g_left_raw = 0;
-  for (int i = 0; i < 10; ++i) {
-    g_now_ms += cfg::PRESSURE_SAMPLE_PERIOD_MS;
-    pressure.update(g_now_ms);
-  }
-  // A released channel must stop motion within 200 ms in this bench preset.
+  g_now_ms += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  pressure.update(g_now_ms);
+  // Releasing a handle is safety-critical: the averaged raw sample drops the
+  // dead-man immediately, while reacquisition still uses the filtered value.
   assert(!pressure.bothHandsPresent());
   assert(pressure.alert() == PressureAlert::HANDS_OFF);
 
@@ -81,7 +80,7 @@ int main() {
   g_now_ms += cfg::PRESSURE_SAMPLE_PERIOD_MS;
   pressure.update(g_now_ms);
   assert(pressure.leftRaw() == 512U);
-  assert(pressure.leftFiltered() < 512.0F);
+  assert(pressure.leftFiltered() > 512.0F);
 
   printf("firmware pressure-sensor tests: OK\n");
   return 0;

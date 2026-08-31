@@ -74,11 +74,18 @@ class CrosswalkController(Node):
             self.declare_parameter(name, default)
 
         crosswalk_file = str(self.get_parameter('crosswalk_file').value)
-        if not crosswalk_file or 'CHANGE_ME' in crosswalk_file:
-            raise ValueError(
-                'crosswalk_file must point to generated standard_crosswalks.json'
-            )
-        self._crosswalks = load_crosswalks(crosswalk_file)
+        self._crosswalks = []
+        self._map_ready = False
+        self._map_error = 'crosswalk map file is not configured'
+        if crosswalk_file and 'CHANGE_ME' not in crosswalk_file:
+            try:
+                self._crosswalks = load_crosswalks(crosswalk_file)
+                self._map_ready = bool(self._crosswalks)
+                self._map_error = (
+                    '' if self._map_ready else 'crosswalk map is empty'
+                )
+            except (OSError, ValueError, TypeError) as error:
+                self._map_error = 'crosswalk map unavailable: %s' % error
         self._intersection_id = str(
             self.get_parameter('intersection_id').value
         ).strip()
@@ -86,6 +93,7 @@ class CrosswalkController(Node):
         self._api_key = self._load_api_key(
             str(self.get_parameter('api_key_file').value)
         )
+        self._api_ready = bool(self._api_key)
         self._gps_timeout = self._positive('gps_timeout_s')
         self._speed_timeout = self._positive('speed_timeout_s')
         self._signal_refresh = self._positive(
@@ -180,8 +188,10 @@ class CrosswalkController(Node):
         )
         if not self._api_key:
             self.get_logger().warning(
-                'No signal API key: curb entry remains fail-safe stopped'
+                'No signal API key: readiness monitor remains active'
             )
+        if not self._map_ready:
+            self.get_logger().warning(self._map_error)
 
     def _positive(self, name: str) -> float:
         value = float(self.get_parameter(name).value)
@@ -381,10 +391,19 @@ class CrosswalkController(Node):
         diagnostic = DiagnosticStatus()
         diagnostic.name = 'SafeStride/Crosswalk Controller'
         diagnostic.hardware_id = 'BE-220/V2X'
-        if not gps_valid:
+        if not self._map_ready:
+            diagnostic.level = DiagnosticStatus.WARN
+            diagnostic.message = self._map_error
+        elif not self._api_ready:
+            diagnostic.level = DiagnosticStatus.WARN
+            diagnostic.message = 'signal API key is not configured'
+        elif not gps_valid:
             diagnostic.level = DiagnosticStatus.ERROR
             diagnostic.message = 'GPS unavailable or stale'
-        elif self._controller.state in ('WAIT_AT_CURB', 'ENTRY_ALLOWED') and not signal_valid:
+        elif (
+            self._controller.state in ('WAIT_AT_CURB', 'ENTRY_ALLOWED')
+            and not signal_valid
+        ):
             diagnostic.level = DiagnosticStatus.WARN
             diagnostic.message = signal_reason
         elif not self._motion_output_enabled:
@@ -397,6 +416,11 @@ class CrosswalkController(Node):
             KeyValue(key='state', value=self._controller.state),
             KeyValue(key='intersection_id', value=intersection_id or 'unset'),
             KeyValue(key='gps_valid', value=str(gps_valid).lower()),
+            KeyValue(key='map_ready', value=str(self._map_ready).lower()),
+            KeyValue(key='api_ready', value=str(self._api_ready).lower()),
+            KeyValue(
+                key='crosswalk_count', value=str(len(self._crosswalks))
+            ),
             KeyValue(key='signal_valid', value=str(signal_valid).lower()),
             KeyValue(
                 key='motion_output_enabled',
@@ -488,7 +512,8 @@ class CrosswalkController(Node):
         effective_speed = (
             desired_speed if self._motion_output_enabled else 0.0
         )
-        self._publish_command(effective_speed)
+        if self._motion_output_enabled:
+            self._publish_command(effective_speed)
         self._publish_status(
             active=active,
             gps_valid=gps_valid,
@@ -510,7 +535,8 @@ class CrosswalkController(Node):
         )
 
     def destroy_node(self) -> bool:
-        self._publish_command(0.0)
+        if self._motion_output_enabled:
+            self._publish_command(0.0)
         try:
             self._profile.save()
         except OSError as error:

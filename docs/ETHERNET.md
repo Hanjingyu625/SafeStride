@@ -2,8 +2,9 @@
 
 SafeStride supports either a normal router/switch connection using DHCP or a
 direct Ethernet cable between a Windows PC and the Raspberry Pi. The ROS 2
-domain is `42`, and discovery is enabled on the local subnet. Motors remain
-disarmed after boot and must still be enabled explicitly.
+domain is `42`, and discovery is enabled on the local subnet. Motors follow
+the live safety inputs after boot; `/walker/set_enabled false` can still block
+drive output manually.
 
 ## One-time Raspberry Pi preparation
 

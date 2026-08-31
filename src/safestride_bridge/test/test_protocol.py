@@ -4,8 +4,8 @@ import struct
 import unittest
 
 from safestride_bridge.protocol import (
+    BOARD_ROLE_DRIVE,
     COMMAND_STRUCT,
-    GPS_TELEMETRY_STRUCT,
     HEADER_STRUCT,
     TELEMETRY_STRUCT,
     TERRAIN_TELEMETRY_STRUCT,
@@ -15,7 +15,6 @@ from safestride_bridge.protocol import (
     Frame,
     FrameDecodeError,
     FrameParser,
-    GpsTelemetryPayload,
     HelloPayload,
     PacketType,
     PayloadDecodeError,
@@ -114,7 +113,7 @@ class TestFrame(unittest.TestCase):
             sequence=1,
             session_id=0,
             timestamp_ms=10,
-            payload=HelloPayload(3, 7).pack(),
+            payload=HelloPayload(3, 7, BOARD_ROLE_DRIVE).pack(),
         )
         raw = bytearray(frame.raw_bytes())
         raw[2] = 1
@@ -129,7 +128,7 @@ class TestFrame(unittest.TestCase):
             sequence=1,
             session_id=0,
             timestamp_ms=10,
-            payload=HelloPayload(3, 7).pack(),
+            payload=HelloPayload(3, 7, BOARD_ROLE_DRIVE).pack(),
         )
         raw = bytearray(frame.raw_bytes())
         raw[HEADER_STRUCT.size] ^= 0x80
@@ -190,14 +189,16 @@ class TestFrame(unittest.TestCase):
 class TestPayloads(unittest.TestCase):
 
     def test_hello(self):
-        payload = HelloPayload(0xDEADBEEF, 0x01020304)
+        payload = HelloPayload(
+            0xDEADBEEF, 0x01020304, BOARD_ROLE_DRIVE
+        )
         self.assertEqual(HelloPayload.unpack(payload.pack()), payload)
-        self.assertEqual(len(payload.pack()), 8)
+        self.assertEqual(len(payload.pack()), 16)
 
     def test_session_start(self):
-        payload = SessionStartPayload(0xDEADBEEF)
+        payload = SessionStartPayload(0xDEADBEEF, BOARD_ROLE_DRIVE)
         self.assertEqual(SessionStartPayload.unpack(payload.pack()), payload)
-        self.assertEqual(len(payload.pack()), 4)
+        self.assertEqual(len(payload.pack()), 12)
 
     def test_command_exact_layout(self):
         payload = CommandPayload(-12345, 150, 1)
@@ -266,11 +267,24 @@ class TestPayloads(unittest.TestCase):
             tof_reference_mm=500,
             tof_error_mm=210,
             tof_change_mm=-15,
+            mpu_accel_x_mg=10,
+            mpu_accel_y_mg=-20,
+            mpu_accel_z_mg=1000,
+            mpu_gyro_x_mrad_s=31,
+            mpu_gyro_y_mrad_s=-42,
+            mpu_gyro_z_mrad_s=53,
+            mpu_roll_mrad=-120,
+            mpu_pitch_mrad=340,
+            mpu_valid=1,
             fault_bits=0,
         )
         self.assertEqual(
             payload.pack(),
-            struct.pack('<HBBHHhhH', 725, 1, 2, 710, 500, 210, -15, 0),
+            struct.pack(
+                '<HBBHHhhhhhhhhhhBH14x',
+                725, 1, 2, 710, 500, 210, -15,
+                10, -20, 1000, 31, -42, 53, -120, 340, 1, 0,
+            ),
         )
         self.assertEqual(
             len(payload.pack()), TERRAIN_TELEMETRY_STRUCT.size
@@ -278,21 +292,6 @@ class TestPayloads(unittest.TestCase):
         self.assertEqual(
             TerrainTelemetryPayload.unpack(payload.pack()), payload
         )
-
-    def test_gps_telemetry_exact_layout(self):
-        payload = GpsTelemetryPayload(
-            latitude_e7=375665000,
-            longitude_e7=1269780000,
-            speed_mm_s=1234,
-            flags=0x03,
-            satellites=9,
-        )
-        self.assertEqual(
-            payload.pack(),
-            struct.pack('<iiIBB', 375665000, 1269780000, 1234, 3, 9),
-        )
-        self.assertEqual(len(payload.pack()), GPS_TELEMETRY_STRUCT.size)
-        self.assertEqual(GpsTelemetryPayload.unpack(payload.pack()), payload)
 
     def test_wrong_payload_size_is_rejected(self):
         with self.assertRaises(PayloadDecodeError):
@@ -302,7 +301,7 @@ class TestPayloads(unittest.TestCase):
         with self.assertRaises(PayloadDecodeError):
             TelemetryPayload.unpack(b'')
         with self.assertRaises(PayloadDecodeError):
-            GpsTelemetryPayload.unpack(b'\x00' * 13)
+            TerrainTelemetryPayload.unpack(b'\x00' * 13)
 
     def test_command_rejects_invalid_enable_and_reserved(self):
         with self.assertRaises(ValueError):
@@ -331,8 +330,8 @@ class TestPayloads(unittest.TestCase):
             TelemetryPayload(*values).pack()
 
     def test_terrain_telemetry_rejects_invalid_alert_fields(self):
-        values = [0] * 8
-        values[2] = 4
+        values = [0] * 17
+        values[2] = 6
         with self.assertRaises(PayloadDecodeError):
             TerrainTelemetryPayload.unpack(
                 TERRAIN_TELEMETRY_STRUCT.pack(*values)
@@ -340,23 +339,11 @@ class TestPayloads(unittest.TestCase):
         with self.assertRaises(ValueError):
             TerrainTelemetryPayload(*values).pack()
 
-    def test_gps_telemetry_rejects_invalid_fields(self):
-        with self.assertRaises(ValueError):
-            GpsTelemetryPayload(0, 0, 0, 0x04, 0).pack()
-        with self.assertRaises(ValueError):
-            GpsTelemetryPayload(900000001, 0, 0, 1, 0).pack()
-        with self.assertRaises(PayloadDecodeError):
-            GpsTelemetryPayload.unpack(
-                GPS_TELEMETRY_STRUCT.pack(1, 1, 0, 0, 0)
-            )
-        with self.assertRaises(PayloadDecodeError):
-            GpsTelemetryPayload.unpack(
-                GPS_TELEMETRY_STRUCT.pack(0, 0, 1, 0, 0)
-            )
-        with self.assertRaises(PayloadDecodeError):
-            GpsTelemetryPayload.unpack(
-                GPS_TELEMETRY_STRUCT.pack(0, 0, 500001, 2, 0)
-            )
+    def test_terrain_telemetry_keeps_legacy_gps_bytes_zero(self):
+        values = [0] * 17
+        packed = TerrainTelemetryPayload(*values).pack()
+        self.assertEqual(len(packed), 45)
+        self.assertEqual(packed[31:], bytes(14))
 
 
 class TestFrameParser(unittest.TestCase):
@@ -410,6 +397,22 @@ class TestFrameParser(unittest.TestCase):
     def test_empty_delimiters_are_ignored(self):
         parser = FrameParser()
         self.assertEqual(parser.feed(b'\x00\x00\x00'), [])
+        self.assertEqual(parser.frame_error_count, 0)
+
+    def test_version_mismatch_is_reported_separately(self):
+        parser = FrameParser()
+        old_frame = Frame(
+            version=PROTOCOL_VERSION - 1,
+            packet_type=PacketType.HELLO,
+            sequence=1,
+            session_id=0,
+            timestamp_ms=0,
+        )
+        self.assertEqual(parser.feed(old_frame.encode()), [])
+        self.assertEqual(parser.version_error_count, 1)
+        self.assertEqual(
+            parser.last_unsupported_version, PROTOCOL_VERSION - 1
+        )
         self.assertEqual(parser.frame_error_count, 0)
 
 

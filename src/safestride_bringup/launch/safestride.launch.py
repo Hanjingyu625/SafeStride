@@ -28,6 +28,7 @@ def generate_launch_description() -> LaunchDescription:
     wheel_separation = LaunchConfiguration('wheel_separation')
     enable_gps = LaunchConfiguration('enable_gps')
     enable_crosswalk = LaunchConfiguration('enable_crosswalk')
+    enable_foxglove = LaunchConfiguration('enable_foxglove')
     enable_cruise = LaunchConfiguration('enable_cruise')
     enable_terrain = LaunchConfiguration('enable_terrain')
     enable_perception = LaunchConfiguration('enable_perception')
@@ -109,22 +110,24 @@ def generate_launch_description() -> LaunchDescription:
                 'enable_cruise',
                 default_value='true',
                 description=(
-                    'Publish the default straight-line request; explicit '
-                    'motor enable remains required.'
+                    'Publish the default straight-line request; drive enable '
+                    'follows live safety inputs.'
                 ),
             ),
             DeclareLaunchArgument(
                 'enable_gps',
-                default_value='false',
-                description=(
-                    'Start the optional direct-to-Pi BE-220 adapter; keep '
-                    'false when GPS is connected to Terrain Uno.'
-                ),
+                default_value='true',
+                description='Start the Raspberry Pi BE-220 serial adapter.',
             ),
             DeclareLaunchArgument(
                 'enable_crosswalk',
+                default_value='true',
+                description='Start safe crosswalk readiness monitor.',
+            ),
+            DeclareLaunchArgument(
+                'enable_foxglove',
                 default_value='false',
-                description='Start GPS/V2X crosswalk assistance.',
+                description='Expose read-only SafeStride topics on port 8765.',
             ),
             Node(
                 package='robot_state_publisher',
@@ -216,6 +219,14 @@ def generate_launch_description() -> LaunchDescription:
                 name='crosswalk_controller',
                 output='screen',
                 condition=IfCondition(enable_crosswalk),
+                parameters=[config_file],
+            ),
+            Node(
+                package='foxglove_bridge',
+                executable='foxglove_bridge',
+                name='foxglove_bridge',
+                output='screen',
+                condition=IfCondition(enable_foxglove),
                 parameters=[config_file],
             ),
         ]

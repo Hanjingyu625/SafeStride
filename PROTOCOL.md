@@ -1,158 +1,50 @@
-# SafeStride 직렬 통신 프로토콜 v2
+# SafeStride 직렬 통신 프로토콜 v4
 
-Raspberry Pi의 `safestride_bridge`와 Drive/Terrain Uno가 공통으로 사용하는
-USB 직렬 프로토콜이다. v2부터 Drive Uno는 단일 모터드라이버의 공통 속도
-목표와 왼쪽 바퀴 홀센서 펄스를 사용한다. v1 펌웨어와 v2 브리지는 호환되지
-않으므로 두 Uno와 Raspberry Pi 소프트웨어를 함께 갱신해야 한다.
+Drive/Terrain Uno와 Raspberry Pi가 사용하는 115200 baud, little-endian,
+COBS+CRC16-CCITT-FALSE 프로토콜이다. 호환성 값은 version `4`, schema
+`0x0401`, release `20260826`이다.
 
-## 프레임
-
-- 115200 baud, 8-N-1
-- little-endian
-- `COBS(header || payload || crc16_le) || 0x00`
-- CRC-16/CCITT-FALSE: polynomial `0x1021`, initial value `0xffff`
-- 디코딩된 최대 프레임 크기: 128 bytes
-
-공통 헤더 형식은 `<BBBBHHII>`로 16 bytes이다.
-
-| 오프셋 | 자료형 | 내용 |
-|---:|---|---|
-| 0 | `uint8` | 프로토콜 버전, `2` |
-| 1 | `uint8` | 메시지 타입 |
-| 2 | `uint8` | flags, 반드시 `0` |
-| 3 | `uint8` | reserved, 반드시 `0` |
-| 4 | `uint16` | sequence |
-| 6 | `uint16` | payload 길이 |
-| 8 | `uint32` | session ID |
-| 12 | `uint32` | 송신 MCU의 `millis()` |
-
-CRC 오류, 크기 오류, 잘못된 세션이나 중복·과거 sequence는 명령 watchdog을
-갱신하지 않는다.
+공통 16-byte 헤더는 `<BBBBHHII>`이며 version, type, flags, reserved,
+sequence, payload length, session ID, MCU timestamp 순서다. flags와 reserved는
+0이어야 한다. CRC/길이/session/sequence 검사를 통과하지 못한 프레임은 버린다.
 
 ## 메시지
 
-### `HELLO` (`0x01`, MCU → Pi)
+| type | 방향 | payload |
+|---:|---|---|
+| `0x01 HELLO` | MCU→Pi | `<IIBBHI>` boot, capabilities, role, version, schema, release |
+| `0x02 SESSION_START` | Pi→MCU | `<IBBHI>` 기대 boot/role/version/schema/release |
+| `0x10 COMMAND` | Pi→Drive | `<iHBB>` 공통 목표 mrad/s, TTL, enable, reserved |
+| `0x20 TELEMETRY` | Drive→Pi | `<iiiiHHHhhHHHHHHHBB>`, 42 bytes |
+| `0x21 TERRAIN_TELEMETRY` | Terrain→Pi | 45 bytes, 아래 표 |
 
-Payload `<II>`: `boot_id`, `capabilities`.
+Capability bit 0은 왼쪽 단일 홀센서, 4는 dead-man, 6은 압력, 8은 TOF,
+9는 MPU6050이다. E-stop bit 5는 현재 광고하지 않는다.
 
-| capability bit | 의미 |
-|---:|---|
-| 0 | 좌우 단일출력 홀센서 2개 |
-| 1 | 전방 거리센서 2개 |
-| 2 | 배터리 전압 |
-| 3 | 전류 측정 2개(예약) |
-| 4 | dead-man 입력 |
-| 5 | E-stop 입력(현재 미구현이므로 Drive Uno가 광고하지 않음) |
-| 6 | 좌우 압력센서 텔레메트리 |
-| 7 | legacy 자석 펄스 벤치 모드(현재 Drive 펌웨어는 광고하지 않음) |
-| 8 | Terrain TOF 텔레메트리 |
-| 9 | Terrain Uno의 NMEA GPS 위치·지면속도 텔레메트리 |
-| 10 | 왼쪽 바퀴의 단일출력 홀센서 1개(오른쪽 값은 공통 추정치) |
+Drive telemetry의 왼쪽/오른쪽 pulse와 velocity 필드는 wire 호환을 위해 유지한다.
+실제 입력은 왼쪽 D2 하나이며 오른쪽 필드는 같은 값을 복제한다. 배터리 분압과
+전류센서가 비활성이면 각각 `0xffff`, `INT16_MIN` sentinel을 보낸다.
 
-### `SESSION_START` (`0x02`, Pi → MCU)
+## Terrain telemetry
 
-Payload `<I>`: MCU가 보낸 `boot_id`. Pi가 0이 아닌 새 session ID를 헤더에
-넣는다. 재부팅 또는 watchdog 만료 후에는 이전 세션 명령을 재사용할 수 없다.
+활성 필드 형식은 `<HBBHHhhhhhhhhhhBH>`이고, protocol v4의 45-byte wire
+호환성을 위해 뒤의 14 bytes는 0으로 채운 예약 영역이다. GPS는 Raspberry Pi가
+직접 수신하므로 Terrain telemetry에 포함하지 않는다.
 
-### `COMMAND` (`0x10`, Pi → Drive Uno)
+| offset | type | 내용 |
+|---:|---|---|
+| 0 | `uint16` | TOF raw mm |
+| 2 | `uint8` | TOF valid |
+| 3 | `uint8` | 0 normal, 1 raised candidate, 2 drop candidate, 3 raised, 4 drop, 5 invalid |
+| 4, 6 | `uint16` | EMA filtered mm, adaptive reference mm |
+| 8, 10 | `int16` | reference error mm, per-frame change mm |
+| 12..16 | `int16` ×3 | MPU6050 acceleration, mg |
+| 18..22 | `int16` ×3 | MPU6050 angular velocity, mrad/s |
+| 24, 26 | `int16` | roll, pitch mrad |
+| 28 | `uint8` | MPU valid |
+| 29 | `uint16` | fault bits: bit0 TOF, bit1 MPU |
+| 31..44 | `uint8` ×14 | 예약 영역, 항상 0 |
 
-Payload `<iHBB>`, 8 bytes이다.
-
-| 자료형 | 내용 |
-|---|---|
-| `int32` | 두 모터 공통 목표 속도, mrad/s |
-| `uint16` | TTL, ms |
-| `uint8` | enable (`0` 또는 `1`) |
-| `uint8` | reserved, 반드시 `0` |
-
-Drive Uno는 홀센서 보정, dead-man, fault, session, 정지 대기 조건을 모두
-만족할 때만 enable 명령을 수락한다. E-stop은 현재 미구현이며 입력을 읽지 않고
-정상 상태로 보고한다. 단일 드라이버 구조이므로 회전
-목표는 존재하지 않는다. ROS 브리지는 허용치를 넘는 `angular.z` 명령을
-거부하고 명시적으로 다시 활성화하기 전까지 정지 상태를 유지한다.
-
-현재 Drive 펌웨어는 capability/status bit 7을 설정하지 않으며, 홀 보정과 정지
-대기를 우회하지 않는다. ROS bridge에는 예전 시험 펌웨어를 잘못 연결했을 때
-차단하기 위한 `allow_magnet_bench_mode=false` 호환 설정만 남아 있다.
-
-### `TELEMETRY` (`0x20`, Drive Uno → Pi)
-
-Payload `<iiiiHHHhhHHHHHHHBB>`, 42 bytes이다.
-
-| 자료형 | 내용 |
-|---|---|
-| `int32` | 왼쪽 홀센서 누적 signed 펄스 |
-| `int32` | 오른쪽 홀센서 누적 signed 펄스 |
-| `int32` | 왼쪽 측정 속도, mrad/s |
-| `int32` | 오른쪽 측정 속도, mrad/s |
-| `uint16` ×2 | 전방 거리, mm (`0xffff`=무효) |
-| `uint16` | 배터리, mV (`0xffff`=무효) |
-| `int16` ×2 | 전류, mA (`INT16_MIN`=무효) |
-| `uint16` | status bitmap |
-| `uint16` | fault bitmap |
-| `uint16` | 마지막 수락 command sequence |
-| `uint16` ×2 | 좌우 압력 원시 ADC 값(4회 평균) |
-| `uint16` ×2 | 좌우 압력 저역통과 필터 ADC 값 |
-| `uint8` | pressure flags |
-| `uint8` | pressure alert (`0` 정상, `1` 경고, `2` 손 이탈) |
-
-단일출력 홀센서는 자체적으로 회전 방향을 알 수 없다. 펄스 위치와 속도의
-부호는 공통 드라이버 명령 방향에서 얻는다. 외력으로 역방향 이동하는 경우의
-부호는 보장되지 않는다.
-
-현재 단일-Hall 구성에서는 실제 센서가 있는 왼쪽 측정치를 공통 구동계 속도로
-사용하며 텔레메트리의 오른쪽 펄스·속도 필드에도 같은 추정치를 넣는다. ROS의
-`WheelHall.left_sensor_present/right_sensor_present`로 실제 장착 여부를 구분한다.
-
-Status bitmap:
-
-| bit | 의미 |
-|---:|---|
-| 0 | session active |
-| 1 | motor armed |
-| 2 | dead-man active |
-| 3 | E-stop active(현재 구현에서는 항상 `0`) |
-| 4 | command watchdog timeout |
-| 5 | 현재 session에서 유효 명령 수신 |
-| 6 | 휠 1회전당 홀 펄스 수 보정 완료 |
-| 7 | legacy 자석 펄스 벤치 모드(현재 펌웨어에서는 항상 `0`) |
-| 8..10 | firmware state (`BOOT=0`, `DISARMED=1`, `ARMED=2`, `SAFE_STOP=3`, `ESTOP=4`, `FAULT=5`) |
-| 11 | left Hall input is at its configured active level |
-| 12 | right Hall input is at its configured active level |
-
-Fault bitmap의 공통 값은 `WalkerStatus.msg`와 같다. `0x0002`는 단일
-모터드라이버 fault, `0x0008`과 `0x0010`은 각각 왼쪽·오른쪽 홀센서 fault다.
-
-### `TERRAIN_TELEMETRY` (`0x21`, Terrain Uno → Pi)
-
-Payload `<HBBHHhhH>`, 14 bytes이다.
-
-| 자료형 | 내용 |
-|---|---|
-| `uint16` | TOF 거리, mm (`0xffff`=무효) |
-| `uint8` | TOF valid |
-| `uint8` | alert (`0` 정상, `1` 후보, `2` 단차, `3` 무효) |
-| `uint16` | 필터 거리, mm |
-| `uint16` | 기준 거리, mm |
-| `int16` | 기준 대비 오차, mm |
-| `int16` | 직전 필터값 대비 변화, mm |
-| `uint16` | Terrain fault bitmap |
-
-Terrain MCU는 현재 TOF와 GPS 텔레메트리를 ROS로 보낸다. MPU-9250/AK8963과
-BNO055는 아직 운영 펌웨어와 프로토콜에 구현되지 않았다.
-
-### `GPS_TELEMETRY` (`0x22`, Terrain Uno → Pi)
-
-Payload `<iiIBB>`, 14 bytes이다.
-
-| 자료형 | 내용 |
-|---|---|
-| `int32` | 위도 × `10^7` degrees; fix 무효 시 `0` |
-| `int32` | 경도 × `10^7` degrees; fix 무효 시 `0` |
-| `uint32` | GPS 지면속도, mm/s; 속도 무효 시 `0` |
-| `uint8` | flags: bit 0 fix valid, bit 1 speed valid |
-| `uint8` | 수신 위성 수 |
-
-Terrain Uno는 이 프레임을 5 Hz로 보내고 ROS bridge는 `/gps/fix`와
-`/gps/speed`로 변환한다. flags가 무효이면 해당 ROS 값은 `NaN`이며 실제 0과
-구분된다.
+Drive Uno는 session, 최신 command TTL, Hall 보정, 양손 압력, fault 및 명시적
+enable을 모두 만족할 때만 PWM을 허용한다. 단차 확정 시 ROS가 한 번 0 명령을
+발행한 뒤 명령 송신을 중단하므로 Drive command watchdog도 안전 정지한다.

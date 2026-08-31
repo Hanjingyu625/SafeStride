@@ -1,26 +1,15 @@
-# Motor bench sketch
+# 간단 단일 드라이버 벤치
 
-This sketch preserves the `M,<signed PWM>` command used during the two-motor
-bench test. It is intentionally separate from `safestride_mcu`, whose binary
-serial session, watchdog, E-stop, pressure dead-man and encoder checks must not
-be bypassed in normal operation.
+기존 `M,<signed PWM>` 명령을 유지하는 최소 시험 스케치이다. 하나의
+SZH-GNP521이 두 모터를 함께 구동하며 핀은 PWM=D5, IN1=D6, IN2=D8이다.
 
-## Pin map
+```text
+M,20
+M,-20
+M,0
+```
 
-| Driver input | Uno pin |
-|---|---:|
-| Left PWM | D5 |
-| Left IN1 | D6 |
-| Left IN2 | D8 |
-| Right PWM | D9 |
-| Right IN1 | D10 |
-| Right IN2 | D12 |
-
-Connect Arduino GND to both driver control grounds. Do not power either motor
-or driver from the Uno 5 V pin. For each SZH-GNP521, connect Uno PWM to the
-driver `PWM`, the two direction pins to `IN1` and `IN2`, and Arduino GND to
-driver `COM`. Leave the driver's `5VO` output unconnected. Confirm the terminal
-labels against the exact driver revision before applying power.
-
-Use a current-limited supply or a correctly sized fuse, keep both wheels off the
-ground and begin with `M,20`. `MAX_PWM` is capped at 100 for first testing.
+안전한 시간 제한·CONFIRM·watchdog 시험에는
+`firmware/motor_driver_bench_test`를 우선 사용한다. 운영에서는 이 스케치를
+사용하지 말고 홀센서, E-stop, 압력 dead-man과 세션 watchdog이 적용된
+`safestride_mcu`를 사용한다.

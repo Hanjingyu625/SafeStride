@@ -4,7 +4,11 @@
 
 namespace safestride_protocol {
 
-constexpr uint8_t VERSION = 2U;
+constexpr uint8_t VERSION = 4U;
+constexpr uint16_t SCHEMA_ID = 0x0401U;
+constexpr uint32_t FIRMWARE_RELEASE_ID = 20260826UL;
+constexpr uint8_t BOARD_ROLE_DRIVE = 1U;
+constexpr uint8_t BOARD_ROLE_TERRAIN = 2U;
 constexpr uint8_t TYPE_HELLO = 0x01U;
 constexpr uint8_t TYPE_SESSION_START = 0x02U;
 constexpr uint8_t TYPE_COMMAND = 0x10U;
@@ -16,11 +20,11 @@ constexpr size_t CRC_SIZE = 2U;
 constexpr size_t MAX_RAW_FRAME_SIZE = 128U;
 constexpr size_t MAX_ENCODED_FRAME_SIZE = 160U;
 
-constexpr size_t HELLO_PAYLOAD_SIZE = 8U;
-constexpr size_t SESSION_START_PAYLOAD_SIZE = 4U;
+constexpr size_t HELLO_PAYLOAD_SIZE = 16U;
+constexpr size_t SESSION_START_PAYLOAD_SIZE = 12U;
 constexpr size_t COMMAND_PAYLOAD_SIZE = 8U;
 constexpr size_t TELEMETRY_PAYLOAD_SIZE = 42U;
-constexpr size_t TERRAIN_TELEMETRY_PAYLOAD_SIZE = 14U;
+constexpr size_t TERRAIN_TELEMETRY_PAYLOAD_SIZE = 45U;
 
 enum class ReceiveResult : uint8_t {
   NONE = 0,

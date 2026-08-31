@@ -4,14 +4,10 @@ set -euo pipefail
 workspace="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 config="${SAFESTRIDE_CONFIG:-${workspace}/config/raspberry_pi.yaml}"
 enable_terrain="${SAFESTRIDE_ENABLE_TERRAIN:-true}"
-enable_perception="${SAFESTRIDE_ENABLE_PERCEPTION:-true}"
+enable_perception="${SAFESTRIDE_ENABLE_PERCEPTION:-false}"
 enable_cruise="${SAFESTRIDE_ENABLE_CRUISE:-true}"
-enable_crosswalk="${SAFESTRIDE_ENABLE_CROSSWALK:-false}"
-
-if [[ "${enable_crosswalk}" == "true" && "${enable_cruise}" == "true" ]]; then
-  echo "Crosswalk control selected; disabling the separate cruise publisher."
-  enable_cruise=false
-fi
+enable_crosswalk="${SAFESTRIDE_ENABLE_CROSSWALK:-true}"
+enable_gps="${SAFESTRIDE_ENABLE_GPS:-true}"
 
 check_serial_role() {
   local port="$1"
@@ -47,6 +43,21 @@ check_serial_role() {
   echo "${role} port: ${port} -> ${resolved} (${actual_serial:-serial unknown})"
 }
 
+check_serial_device() {
+  local port="$1"
+  local role="$2"
+  if [[ ! -e "${port}" ]]; then
+    echo "${role} port is missing: ${port}" >&2
+    echo "Enable the Raspberry Pi GPIO UART or disable GPS explicitly." >&2
+    exit 1
+  fi
+  if [[ ! -r "${port}" || ! -w "${port}" ]]; then
+    echo "${role} port is not readable/writable: ${port}" >&2
+    echo "Add the current user to dialout, then log in again." >&2
+    exit 1
+  fi
+}
+
 if [[ "${config}" == "${workspace}/config/raspberry_pi.yaml" &&
       "${SAFESTRIDE_SKIP_PORT_CHECK:-false}" != "true" ]]; then
   check_serial_role \
@@ -54,6 +65,9 @@ if [[ "${config}" == "${workspace}/config/raspberry_pi.yaml" &&
   if [[ "${enable_terrain}" == "true" ]]; then
     check_serial_role \
       /dev/safestride-terrain 8583030333935131E120 Terrain
+  fi
+  if [[ "${enable_gps}" == "true" ]]; then
+    check_serial_device /dev/serial0 GPS
   fi
 fi
 
@@ -91,7 +105,8 @@ unset ROS_LOCALHOST_ONLY
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
 export ROS_AUTOMATIC_DISCOVERY_RANGE="${ROS_AUTOMATIC_DISCOVERY_RANGE:-SUBNET}"
 
-# Startup never calls /walker/set_enabled. Arming remains an explicit action.
+# The deployed config drives forward while the pressure dead-man is held.
+# /walker/set_enabled false remains a manual stop until true clears the block.
 exec ros2 launch safestride_bringup safestride.launch.py \
   config_file:="${config}" \
   wheel_radius:="${SAFESTRIDE_WHEEL_RADIUS_M:-0.15}" \
@@ -103,5 +118,6 @@ exec ros2 launch safestride_bringup safestride.launch.py \
   perception_classes_path:="${SAFESTRIDE_PERCEPTION_CLASSES:-${workspace}/raspberry_pi/road_surface_inference/target_classes.json}" \
   perception_camera_index:="${SAFESTRIDE_PERCEPTION_CAMERA_INDEX:-0}" \
   perception_camera_backend:="${SAFESTRIDE_PERCEPTION_CAMERA_BACKEND:-v4l2}" \
-  enable_gps:="${SAFESTRIDE_ENABLE_GPS:-false}" \
-  enable_crosswalk:="${enable_crosswalk}"
+  enable_gps:="${enable_gps}" \
+  enable_crosswalk:="${enable_crosswalk}" \
+  enable_foxglove:="${SAFESTRIDE_ENABLE_FOXGLOVE:-false}"

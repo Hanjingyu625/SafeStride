@@ -1,4 +1,4 @@
-PORT = "/dev/ttyS0"
+PORT = "/dev/serial0"
 SAMPLE_COUNT = 10
 
 

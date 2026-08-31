@@ -1,35 +1,21 @@
-# Terrain MCU 펌웨어
+# Terrain Uno firmware
 
-Arduino Uno가 TOF-10120과 BE-220 GPS를 읽고 프로토콜 v2 텔레메트리로
-Raspberry Pi에 전송한다. 결과는 `/terrain/tof`, `/terrain/status`,
-`/gps/fix`, `/gps/speed`, `/diagnostics`에서 확인한다.
+TOF-10120과 GY-521 MPU6050을 읽어 protocol v4 텔레메트리로 보낸다. BE-220
+GPS는 Raspberry Pi의 `gps_node`가 별도 serial 장치로 직접 수신한다.
 
-## 핀맵
+- A4/A5: TOF `0x52`, MPU6050 `0x68` 또는 `0x69`
+- 주기: TOF/MPU 50 ms
 
-| 기능 | Uno 핀 |
-|---|---:|
-| I2C SDA | A4 |
-| I2C SCL | A5 |
-| BE-220 TX → Uno RX | D8 |
-| BE-220 RX ← Uno TX | D9, 설정할 때만 필요 |
-| 센서 공통 GND | GND |
+TOF는 10샘플 기준면을 만든 뒤 EMA alpha 0.3, adaptive reference alpha 0.02,
+error 60 mm, change 10 mm, 같은 방향 4회로 raised/drop을 확정한다. 후보·확정
+중에는 기준값 갱신을 멈추고 확정 결과는 최소 1초 유지한다.
 
-Uno에서 AltSoftSerial을 안정적으로 사용하기 위해 BE-220은 먼저 USB-TTL
-어댑터와 제조사 설정 도구로 `9600 baud`에 맞춘다. 정상 수신만 할 때는
-BE-220의 TX, 전원, GND만 연결하면 되며 D9는 연결하지 않아도 된다. 전원과
-UART 논리레벨은 사용 중인 BE-220 보드 리비전 사양을 확인한다.
-
-TOF 유효 범위는 100~2000 mm이다. 필터 거리와 느린 기준 거리의 차이가
-60 mm를 넘으면 후보가 되고, 10 mm 이상의 상승이 4회 연속되면 단차로
-판정한다. LED 대신 모든 상태를 직렬 텔레메트리와 ROS 토픽으로만 보낸다.
+MPU6050은 ±2 g, ±250 deg/s, 20 Hz 출력으로 설정한다. roll/pitch는 가속도
+중력 방향으로 계산해 EMA로 평활하며 yaw는 제공하지 않는다. 3회 연속 I2C 읽기
+실패 시 센서를 다시 검색하고, 재연결 뒤 첫 샘플로 자세 필터를 초기화한다.
 
 ```bash
-bash scripts/install_arduino_libraries.sh
 arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
 arduino-cli upload --fqbn arduino:avr:uno -p /dev/safestride-terrain \
   firmware/terrain_mcu
 ```
-
-현재 운영 펌웨어의 ROS 텔레메트리는 TOF와 GPS를 포함한다. MPU-9250/AK8963과
-BNO055는 아직 운영 프로토콜과 이 펌웨어에 구현하지 않았다. 다리
-액추에이터와 limit 입력도 핀·극성이 확정되지 않아 동작시키지 않는다.

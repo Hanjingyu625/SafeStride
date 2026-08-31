@@ -14,6 +14,18 @@ int g_motor_pwm = 0;
 uint8_t g_motor_in1_level = LOW;
 uint8_t g_motor_in2_level = LOW;
 
+HallSample sample(uint32_t pulses, uint32_t period_us = 6283185UL) {
+  HallSample value = {pulses, period_us, 0UL};
+  return value;
+}
+
+void primeFeedback(DriveController& drive) {
+  const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
+  drive.update(5000UL, stopped, stopped, 0L, false);
+  drive.update(5000UL, stopped, stopped, 0L, false);
+  assert(drive.feedbackReady());
+}
+
 }  // namespace
 
 void pinMode(uint8_t, uint8_t) {}
@@ -53,81 +65,81 @@ size_t HardwareSerial::print(const char*) { return 1U; }
 size_t HardwareSerial::println(const char*) { return 1U; }
 
 int main() {
-  static_assert(cfg::ENABLE_HALL_FEEDBACK, "test expects Hall feedback");
-  static_assert(
-      cfg::USE_SINGLE_HALL_SENSOR,
-      "test expects one left-wheel Hall channel");
-  HallSample hall = {0UL, 1000000UL, 100000UL};
-  DriveController drive;
-  drive.begin();
-
-  drive.update(5000UL, hall, hall, 1500L, false);
-  assert(g_motor_pwm == 0);
-  assert(g_motor_in1_level == LOW);
-  assert(g_motor_in2_level == LOW);
-
-  // A one-second period at six pulses/revolution is about 1.047 rad/s.
-  // Two disabled updates establish feedback without ever energizing the motor.
-  ++hall.pulse_count;
-  drive.update(5000UL, hall, hall, 0L, false);
-  assert(drive.feedbackReady());
-  assert(drive.leftHallPulsePosition() == 1L);
-  assert(drive.rightHallPulsePosition() == 1L);
-  assert(drive.leftVelocityMradS() > 500L);
-  assert(drive.leftVelocityMradS() < 800L);
-
-  // With no measured overspeed, the closed-loop request ramps up and applies
-  // the configured low bench PWM after the controller crosses its dead zone.
-  hall.age_us = cfg::HALL_ZERO_TIMEOUT_US;
-  for (uint16_t i = 0U; i < 200U; ++i) {
-    drive.update(5000UL, hall, hall, 1500L, true);
-  }
-  assert(drive.appliedTargetMradS() == 1200L);
-  assert(g_motor_pwm == cfg::MOTOR_MIN_ACTIVE_PWM);
-  assert(g_motor_in1_level == HIGH);
-  assert(g_motor_in2_level == LOW);
-  assert(drive.hallFaultMask() == 0U);
-
-  for (uint16_t i = 0U; i < 100U; ++i) {
-    drive.update(5000UL, hall, hall, 0L, true);
-  }
-  assert(drive.appliedTargetMradS() == 0L);
-  assert(g_motor_pwm == 0);
-  assert(g_motor_in1_level == LOW);
-  assert(g_motor_in2_level == LOW);
-  assert(drive.leftVelocityMradS() == 0L);
-  assert(drive.rightVelocityMradS() == 0L);
-  assert(drive.feedbackReady());
-
-  // Pulses arriving well inside the four-second window keep the installed
-  // left Hall monitor healthy during a sustained command.
-  DriveController healthy_drive;
-  healthy_drive.begin();
-  HallSample healthy = {0UL, 1500000UL, 0UL};
-  healthy_drive.update(
-      5000UL, healthy, healthy, 0L, false);
-  for (uint16_t i = 0U; i < 1200U; ++i) {
-    healthy.age_us += 5000UL;
-    if (i % 300U == 0U) {
-      ++healthy.pulse_count;
-      healthy.age_us = 0UL;
+  {
+    DriveController drive;
+    drive.begin();
+    primeFeedback(drive);
+    for (uint32_t count = 1UL; count <= 220UL; ++count) {
+      const HallSample moving = sample(count);
+      drive.update(5000UL, moving, moving, 1000L, true);
     }
-    healthy_drive.update(
-        5000UL, healthy, healthy, 1500L, true);
+    assert(drive.hallFaultMask() == 0U);
+    assert(g_motor_pwm >= cfg::MOTOR_MIN_ACTIVE_PWM);
+    assert(g_motor_in1_level == HIGH);
+    assert(g_motor_in2_level == LOW);
+    assert(drive.leftHallPulsePosition() == 220L);
+    assert(drive.rightHallPulsePosition() == 220L);
   }
-  assert(healthy_drive.hallFaultMask() == 0U);
 
-  // A commanded wheel with no pulse latches the installed left channel fault.
-  DriveController stalled_drive;
-  stalled_drive.begin();
-  HallSample stalled = {0UL, 0UL, 0xFFFFFFFFUL};
-  stalled_drive.update(5000UL, stalled, stalled, 0L, false);
-  for (uint16_t i = 0U; i < 1000U; ++i) {
-    stalled_drive.update(5000UL, stalled, stalled, 1500L, true);
+  {
+    DriveController drive;
+    drive.begin();
+    primeFeedback(drive);
+    const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
+    for (int i = 0; i < 720; ++i) {
+      drive.update(5000UL, stopped, stopped, 3000L, true);
+    }
+    assert(drive.hallFaultMask() == DriveController::HALL_FAULT_LEFT);
+    assert(g_motor_pwm == 0);
+    assert(g_motor_in1_level == LOW);
+    assert(g_motor_in2_level == LOW);
   }
-  assert(
-      stalled_drive.hallFaultMask() == DriveController::HALL_FAULT_LEFT);
 
-  printf("firmware single-Hall single-driver tests: OK\n");
+  {
+    DriveController drive;
+    drive.begin();
+    primeFeedback(drive);
+    const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
+    for (int i = 0; i < 720; ++i) {
+      drive.update(5000UL, stopped, stopped, 667L, true, false);
+    }
+    assert(drive.hallFaultMask() == 0U);
+    const int expected_open_loop_pwm =
+        static_cast<int>(cfg::MOTOR_MIN_ACTIVE_PWM) +
+        (667 * static_cast<int>(
+                   cfg::MAX_PWM - cfg::MOTOR_MIN_ACTIVE_PWM) +
+         cfg::MAX_WHEEL_TARGET_MRAD_S / 2) /
+            cfg::MAX_WHEEL_TARGET_MRAD_S;
+    assert(g_motor_pwm == expected_open_loop_pwm);
+    assert(g_motor_in1_level == HIGH);
+    assert(g_motor_in2_level == LOW);
+  }
+
+  {
+    DriveController drive;
+    drive.begin();
+    primeFeedback(drive);
+    uint32_t right_count = 0UL;
+    const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
+    for (int i = 0; i < 720; ++i) {
+      const HallSample right = sample(++right_count);
+      drive.update(5000UL, stopped, right, 3000L, true);
+    }
+    assert(
+        drive.hallFaultMask() == DriveController::HALL_FAULT_LEFT);
+  }
+
+  {
+    DriveController drive;
+    drive.begin();
+    primeFeedback(drive);
+    for (uint32_t count = 1UL; count <= 40UL; ++count) {
+      const HallSample too_fast = sample(count, 1000UL);
+      drive.update(5000UL, too_fast, too_fast, 0L, true);
+    }
+    assert(drive.hallFaultMask() == DriveController::HALL_FAULT_LEFT);
+  }
+
+  printf("firmware Hall feedback and single-driver tests: OK\n");
   return 0;
 }

@@ -11,12 +11,18 @@ struct HallSample {
 class DriveController {
  public:
   static const uint8_t HALL_FAULT_LEFT = 1U << 0U;
-  static const uint8_t HALL_FAULT_RIGHT = 1U << 1U;
 
   DriveController();
 
   void begin();
   void update(
+      uint32_t elapsed_us,
+      const HallSample& left_hall,
+      const HallSample& right_hall,
+      int32_t requested_mrad_s,
+      bool output_allowed,
+      bool enforce_hall_faults = true);
+  void updateMagnetBench(
       uint32_t elapsed_us,
       const HallSample& left_hall,
       const HallSample& right_hall,
@@ -74,7 +80,10 @@ class DriveController {
       float target_mrad_s);
   static float openLoopPwm(float target_mrad_s);
   static void writeMotor(float pwm);
-  static float hallSpeedMagnitude(const HallSample& sample);
+  static float hallSpeedMagnitude(
+      const HallSample& sample,
+      uint32_t pulse_delta,
+      uint32_t elapsed_us);
   static bool updateHallMonitor(
       HallMonitorState& state,
       uint32_t pulse_count,
@@ -83,6 +92,7 @@ class DriveController {
       uint32_t elapsed_us,
       bool output_allowed);
   void updateHallFeedback(
+      uint32_t elapsed_us,
       const HallSample& left_hall,
       const HallSample& right_hall);
   void updateHallPlausibility(

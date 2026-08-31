@@ -6,6 +6,7 @@
 namespace {
 
 uint32_t g_test_millis = 0UL;
+int g_pressure_adc = 200;
 
 }  // namespace
 
@@ -15,7 +16,7 @@ void pinMode(uint8_t, uint8_t) {}
 void digitalWrite(uint8_t, uint8_t) {}
 int digitalRead(uint8_t) { return LOW; }
 void analogWrite(uint8_t, int) {}
-int analogRead(uint8_t) { return 200; }
+int analogRead(uint8_t) { return g_pressure_adc; }
 int digitalPinToInterrupt(uint8_t) { return 0; }
 void attachInterrupt(int, void (*)(), int) {}
 void noInterrupts() {}
@@ -73,6 +74,11 @@ int main() {
 
   uint8_t session_payload[proto::SESSION_START_PAYLOAD_SIZE] = {};
   proto::writeU32(session_payload, g_boot_id);
+  session_payload[4U] = proto::BOARD_ROLE_DRIVE;
+  session_payload[5U] = proto::VERSION;
+  proto::writeU16(session_payload + 6U, proto::SCHEMA_ID);
+  proto::writeU32(
+      session_payload + 8U, proto::FIRMWARE_RELEASE_ID);
   proto::FrameView session_start = {
       proto::TYPE_SESSION_START,
       0U,
@@ -137,6 +143,30 @@ int main() {
   assert(handleCommand(motion_enable_command));
   assert(g_state == ControllerState::ARMED);
   assert(g_requested_mrad_s == 500L);
+
+  // Direct dead-man mode must re-arm after a complete release/press cycle
+  // without waiting for Hall stationary dwell.
+  g_pressure_adc = 0;
+  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  g_pressure.update(g_test_millis);
+  refreshPhysicalSafety();
+  assert(!deadmanActive());
+  assert(g_state == ControllerState::SAFE_STOP);
+
+  command_payload[6U] = 0U;
+  disable_command.sequence = 16U;
+  assert(handleCommand(disable_command));
+  assert(g_state == ControllerState::DISARMED);
+
+  g_pressure_adc = 200;
+  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  g_pressure.update(g_test_millis);
+  assert(deadmanActive());
+  g_stationary_tracking = false;
+  command_payload[6U] = 1U;
+  motion_enable_command.sequence = 17U;
+  assert(handleCommand(motion_enable_command));
+  assert(g_state == ControllerState::ARMED);
 
   printf("firmware watchdog/session state-machine tests: OK\n");
   return 0;

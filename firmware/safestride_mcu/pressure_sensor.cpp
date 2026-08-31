@@ -9,21 +9,22 @@ namespace cfg = safestride_config;
 namespace {
 
 bool channelPresent(
-    float value,
+    float filtered_value,
+    float raw_value,
     bool was_present,
     bool active_high,
     float threshold) {
   const float hysteresis = cfg::PRESSURE_PRESENT_HYSTERESIS;
   if (active_high) {
-    const float decision_level = was_present
-        ? threshold - hysteresis
-        : threshold;
-    return value >= decision_level;
+    if (was_present) {
+      return raw_value >= threshold - hysteresis;
+    }
+    return filtered_value >= threshold;
   }
-  const float decision_level = was_present
-      ? threshold + hysteresis
-      : threshold;
-  return value <= decision_level;
+  if (was_present) {
+    return raw_value <= threshold + hysteresis;
+  }
+  return filtered_value <= threshold;
 }
 
 }  // namespace
@@ -124,11 +125,13 @@ void PressureSensorPair::sample() {
 void PressureSensorPair::updatePresence() {
   left_present_ = channelPresent(
       left_,
+      static_cast<float>(left_raw_),
       left_present_,
       cfg::PRESSURE_LEFT_ACTIVE_HIGH,
       cfg::PRESSURE_LEFT_PRESENT_THRESHOLD);
   right_present_ = channelPresent(
       right_,
+      static_cast<float>(right_raw_),
       right_present_,
       cfg::PRESSURE_RIGHT_ACTIVE_HIGH,
       cfg::PRESSURE_RIGHT_PRESENT_THRESHOLD);

@@ -31,22 +31,29 @@ colcon test
 colcon test-result --verbose
 ```
 
-Flash one Uno at a time with wheel/leg motor power isolated. Use stable paths
+Flash one Uno at a time with motor-driver 12 V power isolated. Use stable paths
 under `/dev/serial/by-id/`; never assume `ttyACM0` ordering.
 
 Copy and edit `deploy/udev/99-safestride.rules.example`, then install it only
 after checking the unique serial attribute of each device. The runtime config
-expects `/dev/safestride-drive` and `/dev/safestride-terrain`. The default GPS
-path is BE-220 -> Terrain Uno D8 -> `/dev/safestride-terrain`; the separate
-Pi GPS serial node is only a fallback and must not run at the same time.
+expects `/dev/safestride-drive`, `/dev/safestride-terrain` and
+`/dev/serial0`. The GPS path is BE-220 -> Raspberry Pi GPIO serial ->
+`gps_node`; Terrain Uno does not receive or relay GPS data.
 
 Both Arduino sketches must be flashed after a wire-protocol change. Protocol
-v2 is intentionally incompatible with the old dual-wheel command payload, so
+v4 is intentionally incompatible with older firmware, so
 the Drive MCU, Terrain MCU and ROS bridge must be updated together.
 
 For unattended startup, first review `config/raspberry_pi.yaml`, install the
 udev rules, build successfully, and then run `bash scripts/install_service.sh`.
-The service starts disarmed and never calls the enable service automatically.
+The deployed config uses dead-man direct drive. While both pressure channels
+are active and the Drive link has no MCU fault, the bridge streams a fixed
+0.10 m/s forward target without waiting for `/cmd_vel_safe`. Releasing either
+pressure input immediately sends a disabled stop. Set
+`command.deadman_direct_drive` to `false` to restore supervised velocity input.
+Drive firmware also keeps Hall feedback telemetry-only while
+`DEADMAN_DIRECT_DRIVE=true`; it does not delay re-arming or latch a Hall fault.
+Keep the wheels lifted during initial tests.
 
 Put the supplied shapefile in `data/external/crosswalk_shp/` and converted JSON
 in `data/generated/`. Store YOLO weights in GitHub Releases or an artifact store
@@ -62,12 +69,12 @@ controller alongside ROS. See `docs/CROSSWALK.md` for data conversion,
 Ubuntu Server has no desktop requirement. Runtime perception must not call GUI
 functions such as `cv2.imshow`. The current prototype uses a CPU TorchScript
 model and a USB camera through Linux V4L2. Install its isolated Python
-environment. `scripts/run.sh` starts perception and the 0.08 m/s cruise request
-by default:
+environment. Perception is disabled by default. Enable it explicitly only after
+the sensor-only and lifted-wheel tests:
 
 ```bash
 bash scripts/install_perception.sh
-bash scripts/run.sh
+SAFESTRIDE_ENABLE_PERCEPTION=true bash scripts/run.sh
 ```
 
 Set `SAFESTRIDE_PERCEPTION_CAMERA_INDEX` if the camera is not `/dev/video0`.

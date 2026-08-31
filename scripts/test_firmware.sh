@@ -47,8 +47,14 @@ common=(
 
 "${cxx}" "${common[@]}" \
   -I"${workspace}/firmware/terrain_mcu" \
+  "${workspace}/test/firmware_mpu6050_test.cpp" \
+  "${workspace}/firmware/terrain_mcu/mpu6050_sensor.cpp" \
+  -o "${build_dir}/mpu_test"
+
+"${cxx}" "${common[@]}" \
+  -I"${workspace}/firmware/terrain_mcu" \
   "${workspace}/test/firmware_terrain_state_test.cpp" \
-  "${workspace}/firmware/terrain_mcu/gps_receiver.cpp" \
+  "${workspace}/firmware/terrain_mcu/mpu6050_sensor.cpp" \
   "${workspace}/firmware/terrain_mcu/tof10120_sensor.cpp" \
   "${workspace}/firmware/terrain_mcu/protocol.cpp" \
   -o "${build_dir}/terrain_state_test"
@@ -58,4 +64,5 @@ common=(
 "${build_dir}/motor_test"
 "${build_dir}/state_machine_test"
 "${build_dir}/tof_test"
+"${build_dir}/mpu_test"
 "${build_dir}/terrain_state_test"

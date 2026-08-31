@@ -26,34 +26,28 @@ constexpr uint16_t STATUS_ESTOP_ACTIVE = 1U << 3U;
 constexpr uint16_t STATUS_WATCHDOG_TIMEOUT = 1U << 4U;
 constexpr uint16_t STATUS_VALID_COMMAND_SEEN = 1U << 5U;
 constexpr uint16_t STATUS_HALL_CALIBRATED = 1U << 6U;
+constexpr uint16_t STATUS_MAGNET_BENCH_MODE = 1U << 7U;
 constexpr uint8_t STATUS_STATE_SHIFT = 8U;
-constexpr uint16_t STATUS_LEFT_HALL_ACTIVE = 1U << 11U;
-constexpr uint16_t STATUS_RIGHT_HALL_ACTIVE = 1U << 12U;
 
 // Fault values match safestride_interfaces/msg/WalkerStatus.msg.
 constexpr uint16_t FAULT_MOTOR_DRIVER = 1U << 1U;
 constexpr uint16_t FAULT_LEFT_HALL = 1U << 3U;
-constexpr uint16_t FAULT_RIGHT_HALL = 1U << 4U;
-
-constexpr uint32_t CAP_TWO_HALL_SENSORS = 1UL << 0U;
+constexpr uint32_t CAP_SINGLE_LEFT_HALL = 1UL << 0U;
 constexpr uint32_t CAP_TWO_RANGES = 1UL << 1U;
 constexpr uint32_t CAP_BATTERY = 1UL << 2U;
 constexpr uint32_t CAP_TWO_CURRENTS = 1UL << 3U;
 constexpr uint32_t CAP_DEADMAN = 1UL << 4U;
 constexpr uint32_t CAP_ESTOP = 1UL << 5U;
 constexpr uint32_t CAP_PRESSURE_TELEMETRY = 1UL << 6U;
-constexpr uint32_t CAP_SINGLE_HALL_SENSOR = 1UL << 10U;
+constexpr uint32_t CAP_MAGNET_BENCH_MODE = 1UL << 7U;
 
 constexpr uint8_t PRESSURE_FLAG_LEFT_PRESENT = 1U << 0U;
 constexpr uint8_t PRESSURE_FLAG_RIGHT_PRESENT = 1U << 1U;
 constexpr uint8_t PRESSURE_FLAG_CALIBRATED = 1U << 2U;
 
 volatile uint32_t g_left_hall_pulse_count = 0UL;
-volatile uint32_t g_right_hall_pulse_count = 0UL;
 volatile uint32_t g_left_hall_last_pulse_us = 0UL;
-volatile uint32_t g_right_hall_last_pulse_us = 0UL;
 volatile uint32_t g_left_hall_period_us = 0UL;
-volatile uint32_t g_right_hall_period_us = 0UL;
 
 proto::FrameReceiver g_receiver;
 DriveController g_drive;
@@ -94,10 +88,12 @@ bool estopActive() {
 }
 
 bool deadmanActive() {
-  if (!cfg::REQUIRE_DEADMAN) {
-    return true;
-  }
   return g_pressure.bothHandsPresent();
+}
+
+bool motionDeadmanSatisfied() {
+  return cfg::MAGNET_BENCH_MODE || !cfg::REQUIRE_DEADMAN ||
+         deadmanActive();
 }
 
 bool driverFaultActive() {
@@ -130,39 +126,22 @@ void leftHallIsr() {
       g_left_hall_period_us);
 }
 
-void rightHallIsr() {
-  recordHallPulse(
-      g_right_hall_pulse_count,
-      g_right_hall_last_pulse_us,
-      g_right_hall_period_us);
-}
-
 void readHallSamples(
     uint32_t now_us,
     HallSample& left,
     HallSample& right) {
   uint32_t left_last_us = 0UL;
-  uint32_t right_last_us = 0UL;
   noInterrupts();
   left.pulse_count = g_left_hall_pulse_count;
   left.period_us = g_left_hall_period_us;
   left_last_us = g_left_hall_last_pulse_us;
-  if (cfg::USE_SINGLE_HALL_SENSOR) {
-    right.pulse_count = left.pulse_count;
-    right.period_us = left.period_us;
-    right_last_us = left_last_us;
-  } else {
-    right.pulse_count = g_right_hall_pulse_count;
-    right.period_us = g_right_hall_period_us;
-    right_last_us = g_right_hall_last_pulse_us;
-  }
   interrupts();
   left.age_us = left_last_us == 0UL
       ? 0xFFFFFFFFUL
       : now_us - left_last_us;
-  right.age_us = right_last_us == 0UL
-      ? 0xFFFFFFFFUL
-      : now_us - right_last_us;
+  // The shared drive has one physical Hall input. Keep the legacy two-wheel
+  // telemetry layout by mirroring the left measurement into the right field.
+  right = left;
 }
 
 uint32_t makeBootId() {
@@ -244,7 +223,7 @@ void refreshPhysicalSafety() {
     return;
   }
 
-  if (g_state == ControllerState::ARMED && !deadmanActive()) {
+  if (g_state == ControllerState::ARMED && !motionDeadmanSatisfied()) {
     immediateStop(ControllerState::SAFE_STOP, false);
   }
 }
@@ -269,19 +248,13 @@ uint16_t currentStatusBits() {
   if (g_valid_command_seen) {
     status |= STATUS_VALID_COMMAND_SEEN;
   }
-  if (cfg::ENABLE_HALL_FEEDBACK && cfg::HALL_CALIBRATED) {
+  if (cfg::HALL_CALIBRATED) {
     status |= STATUS_HALL_CALIBRATED;
   }
-  status |= static_cast<uint16_t>(g_state) << STATUS_STATE_SHIFT;
-  if (cfg::ENABLE_HALL_FEEDBACK) {
-    if (digitalRead(cfg::LEFT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL) {
-      status |= STATUS_LEFT_HALL_ACTIVE;
-    }
-    if (!cfg::USE_SINGLE_HALL_SENSOR &&
-        digitalRead(cfg::RIGHT_HALL_PIN) == cfg::HALL_ACTIVE_LEVEL) {
-      status |= STATUS_RIGHT_HALL_ACTIVE;
-    }
+  if (cfg::MAGNET_BENCH_MODE) {
+    status |= STATUS_MAGNET_BENCH_MODE;
   }
+  status |= static_cast<uint16_t>(g_state) << STATUS_STATE_SHIFT;
   return status;
 }
 
@@ -331,12 +304,8 @@ int16_t readCurrentMa(uint8_t pin) {
 
 void sendHello() {
   uint8_t payload[proto::HELLO_PAYLOAD_SIZE];
-  uint32_t capabilities = CAP_DEADMAN | CAP_PRESSURE_TELEMETRY;
-  if (cfg::ENABLE_HALL_FEEDBACK) {
-    capabilities |= cfg::USE_SINGLE_HALL_SENSOR
-        ? CAP_SINGLE_HALL_SENSOR
-        : CAP_TWO_HALL_SENSORS;
-  }
+  uint32_t capabilities = CAP_SINGLE_LEFT_HALL | CAP_DEADMAN |
+                          CAP_PRESSURE_TELEMETRY;
   if (cfg::ENABLE_ESTOP) {
     capabilities |= CAP_ESTOP;
   }
@@ -349,8 +318,15 @@ void sendHello() {
   if (cfg::ENABLE_CURRENT_SENSE) {
     capabilities |= CAP_TWO_CURRENTS;
   }
+  if (cfg::MAGNET_BENCH_MODE) {
+    capabilities |= CAP_MAGNET_BENCH_MODE;
+  }
   proto::writeU32(payload, g_boot_id);
   proto::writeU32(payload + 4U, capabilities);
+  payload[8U] = proto::BOARD_ROLE_DRIVE;
+  payload[9U] = proto::VERSION;
+  proto::writeU16(payload + 10U, proto::SCHEMA_ID);
+  proto::writeU32(payload + 12U, proto::FIRMWARE_RELEASE_ID);
   if (proto::sendFrame(
       Serial,
       proto::TYPE_HELLO,
@@ -443,7 +419,12 @@ bool handleSessionStart(
     return false;
   }
   const uint32_t expected_boot_id = proto::readU32(frame.payload);
-  if (expected_boot_id != g_boot_id) {
+  if (expected_boot_id != g_boot_id ||
+      frame.payload[4U] != proto::BOARD_ROLE_DRIVE ||
+      frame.payload[5U] != proto::VERSION ||
+      proto::readU16(frame.payload + 6U) != proto::SCHEMA_ID ||
+      proto::readU32(frame.payload + 8U) !=
+          proto::FIRMWARE_RELEASE_ID) {
     return false;
   }
 
@@ -511,8 +492,8 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   // An enable command is not accepted while a hardware interlock or a latched
   // stop state is active. Releasing the input alone never restarts motion; the
   // host must first send a disabled command and explicitly arm again.
-  if ((cfg::ENABLE_HALL_FEEDBACK && !cfg::HALL_CALIBRATED) ||
-      estopActive() || !deadmanActive() || g_watchdog_timed_out ||
+  if ((!cfg::MAGNET_BENCH_MODE && !cfg::HALL_CALIBRATED) ||
+      estopActive() || !motionDeadmanSatisfied() || g_watchdog_timed_out ||
       g_fault_bits != 0U ||
       g_state == ControllerState::ESTOP ||
       g_state == ControllerState::SAFE_STOP ||
@@ -521,7 +502,8 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   }
 
   if (g_state == ControllerState::DISARMED) {
-    if (!stationaryDwellMet()) {
+    if (!cfg::MAGNET_BENCH_MODE && !cfg::DEADMAN_DIRECT_DRIVE &&
+        !stationaryDwellMet()) {
       return false;
     }
     markAcceptedCommand(frame, ttl_ms);
@@ -584,36 +566,36 @@ void runControlLoop(uint32_t now_us) {
 
   HallSample left_hall = {0UL, 0UL, 0xFFFFFFFFUL};
   HallSample right_hall = {0UL, 0UL, 0xFFFFFFFFUL};
-  if (cfg::ENABLE_HALL_FEEDBACK) {
-    readHallSamples(now_us, left_hall, right_hall);
-  }
+  readHallSamples(now_us, left_hall, right_hall);
   const bool output_allowed =
       g_session_active &&
       g_state == ControllerState::ARMED &&
       !estopActive() &&
-      deadmanActive() &&
+      motionDeadmanSatisfied() &&
       g_fault_bits == 0U;
-  g_drive.update(
-      elapsed_us,
-      left_hall,
-      right_hall,
-      g_requested_mrad_s,
-      output_allowed);
-  if (!cfg::ENABLE_HALL_FEEDBACK) {
-    if (!g_stationary_tracking) {
-      g_stationary_tracking = true;
-      g_stationary_since_ms = millis();
-    }
-    return;
+  if (cfg::MAGNET_BENCH_MODE) {
+    const uint32_t pulse_hold_us =
+        static_cast<uint32_t>(cfg::MAGNET_BENCH_PULSE_HOLD_MS) * 1000UL;
+    const bool magnet_pulse_recent = left_hall.age_us <= pulse_hold_us;
+    g_drive.updateMagnetBench(
+        elapsed_us,
+        left_hall,
+        right_hall,
+        g_requested_mrad_s,
+        output_allowed && magnet_pulse_recent);
+  } else {
+    g_drive.update(
+        elapsed_us,
+        left_hall,
+        right_hall,
+        g_requested_mrad_s,
+        output_allowed,
+        !cfg::DEADMAN_DIRECT_DRIVE);
   }
-
   const uint8_t hall_faults = g_drive.hallFaultMask();
   if (hall_faults != 0U) {
     if ((hall_faults & DriveController::HALL_FAULT_LEFT) != 0U) {
       g_fault_bits |= FAULT_LEFT_HALL;
-    }
-    if ((hall_faults & DriveController::HALL_FAULT_RIGHT) != 0U) {
-      g_fault_bits |= FAULT_RIGHT_HALL;
     }
     immediateStop(ControllerState::FAULT, false);
     g_stationary_tracking = false;
@@ -654,34 +636,17 @@ void setup() {
   if (cfg::USE_DRIVER_FAULT_PIN) {
     pinMode(cfg::DRIVER_FAULT_PIN, INPUT_PULLUP);
   }
-  if (cfg::ENABLE_HALL_FEEDBACK) {
-    pinMode(cfg::LEFT_HALL_PIN, INPUT_PULLUP);
-    if (!cfg::USE_SINGLE_HALL_SENSOR) {
-      pinMode(cfg::RIGHT_HALL_PIN, INPUT_PULLUP);
-    }
+  pinMode(cfg::LEFT_HALL_PIN, INPUT_PULLUP);
 
-    const int left_interrupt =
-        digitalPinToInterrupt(cfg::LEFT_HALL_PIN);
-    if (left_interrupt == NOT_AN_INTERRUPT) {
-      g_fault_bits |= FAULT_LEFT_HALL;
-    } else {
-      attachInterrupt(
-          left_interrupt,
-          leftHallIsr,
-          cfg::HALL_ACTIVE_LEVEL == LOW ? FALLING : RISING);
-    }
-    if (!cfg::USE_SINGLE_HALL_SENSOR) {
-      const int right_interrupt =
-          digitalPinToInterrupt(cfg::RIGHT_HALL_PIN);
-      if (right_interrupt == NOT_AN_INTERRUPT) {
-        g_fault_bits |= FAULT_RIGHT_HALL;
-      } else {
-        attachInterrupt(
-            right_interrupt,
-            rightHallIsr,
-            cfg::HALL_ACTIVE_LEVEL == LOW ? FALLING : RISING);
-      }
-    }
+  const int left_interrupt =
+      digitalPinToInterrupt(cfg::LEFT_HALL_PIN);
+  if (left_interrupt == NOT_AN_INTERRUPT) {
+    g_fault_bits |= FAULT_LEFT_HALL;
+  } else {
+    attachInterrupt(
+        left_interrupt,
+        leftHallIsr,
+        cfg::HALL_ACTIVE_LEVEL == LOW ? FALLING : RISING);
   }
 
   Serial.begin(cfg::SERIAL_BAUD);
