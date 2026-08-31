@@ -27,7 +27,6 @@ jobs:
         run: |
           bash -n scripts/*.sh
           python3 test/test_hardware_integrity.py
-          python3 test/test_bench_config_sync.py
           python3 tools/serial_probe.py --help >/dev/null
           bash scripts/test_firmware.sh
           source /opt/ros/jazzy/setup.bash

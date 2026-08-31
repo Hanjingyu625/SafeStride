@@ -247,6 +247,9 @@ class TestHardwareIntegrity(unittest.TestCase):
             constant_expression(self.config, "HALL_PULSES_PER_WHEEL_REV"),
             "6UL",
         )
+        for path in ROS_CONFIGS:
+            text = path.read_text(encoding="utf-8")
+            self.assertRegex(text, r"hall_pulses_per_revolution:\s*6\b")
         self.assertEqual(constant_expression(self.config, "HALL_CALIBRATED"), "true")
         self.assertEqual(
             constant_expression(self.config, "PRESSURE_LEFT_PRESENT_THRESHOLD"),
