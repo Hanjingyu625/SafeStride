@@ -64,7 +64,7 @@ arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
 | `/terrain/tof` | `sensor_msgs/Range` | TOF 원거리 |
 | `/terrain/status` | `TerrainStatus` | 필터·기준·오차·변화량·raised/drop 상태 |
 | `/terrain/imu` | `sensor_msgs/Imu` | MPU6050 가속도·자이로·roll/pitch |
-| `/gps/fix`, `/gps/speed` | 표준 GPS 토픽 | BE-220 위치·속도 |
+| `/gps/fix`, `/gps/speed`, `/gps/course` | 표준 GPS 토픽 | BE-220 위치·속도·이동방향 |
 | `/crosswalk/status` | `CrosswalkStatus` | 지도/API/GPS 기반 모니터 결과 |
 | `/walker/status` | `WalkerStatus` | Drive MCU 링크·arm·fault 상태 |
 | `/diagnostics` | `DiagnosticArray` | 시스템 준비 상태와 오류 원인 |

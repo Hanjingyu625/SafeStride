@@ -241,8 +241,12 @@ class TestHardwareIntegrity(unittest.TestCase):
         )
 
     def test_calibrated_single_left_hall_and_pressure(self):
-        self.assertEqual(constant_expression(self.config, "LEFT_HALL_PIN"), "2U")
-        self.assertEqual(constant_expression(self.config, "HALL_ACTIVE_LEVEL"), "LOW")
+        self.assertEqual(
+            constant_expression(self.config, "LEFT_HALL_PIN"), "2U"
+        )
+        self.assertEqual(
+            constant_expression(self.config, "HALL_ACTIVE_LEVEL"), "LOW"
+        )
         self.assertEqual(
             constant_expression(self.config, "HALL_PULSES_PER_WHEEL_REV"),
             "6UL",
@@ -250,9 +254,13 @@ class TestHardwareIntegrity(unittest.TestCase):
         for path in ROS_CONFIGS:
             text = path.read_text(encoding="utf-8")
             self.assertRegex(text, r"hall_pulses_per_revolution:\s*6\b")
-        self.assertEqual(constant_expression(self.config, "HALL_CALIBRATED"), "true")
         self.assertEqual(
-            constant_expression(self.config, "PRESSURE_LEFT_PRESENT_THRESHOLD"),
+            constant_expression(self.config, "HALL_CALIBRATED"), "true"
+        )
+        self.assertEqual(
+            constant_expression(
+                self.config, "PRESSURE_LEFT_PRESENT_THRESHOLD"
+            ),
             "80.0F",
         )
         self.assertEqual(
@@ -264,7 +272,9 @@ class TestHardwareIntegrity(unittest.TestCase):
             "A1",
         )
         self.assertEqual(
-            constant_expression(self.config, "PRESSURE_RIGHT_PRESENT_THRESHOLD"),
+            constant_expression(
+                self.config, "PRESSURE_RIGHT_PRESENT_THRESHOLD"
+            ),
             "80.0F",
         )
         self.assertEqual(

@@ -10,7 +10,7 @@ computers:
     device: /dev/serial0
     baudrate: 115200
 crosswalk:
-  data_file: data/generated/standard_crosswalks.json
+  data_file: raspberry_pi/standard_crosswalks.json
   api_key_file: /etc/safestride/signal_api_key.txt
   intersection_id: CHANGE_ME_ITST_ID
   motion_output_enabled: false

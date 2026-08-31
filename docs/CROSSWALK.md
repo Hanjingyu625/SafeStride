@@ -1,11 +1,10 @@
 # GPS crosswalk assistance
 
 The standalone `smart_crosswalk_controller_v6.py` logic has been split into
-testable ROS 2 components. By default Terrain Uno publishes BE-220 fixes and
-speed through `terrain_bridge`, while `crosswalk_controller` publishes a
-high-level `/cmd_vel`. Every command still
-passes through `safety_supervisor`, the Drive serial bridge and the Drive Uno's
-dead-man, E-stop, watchdog and fault checks.
+testable ROS 2 components. The Raspberry Pi `gps_node` reads the BE-220 directly
+from `/dev/ttyS0` and publishes `/gps/fix`, `/gps/speed` and `/gps/course`.
+Terrain Uno does not relay GPS data. The crosswalk controller is monitor-only by
+default and therefore does not publish `/cmd_vel` unless explicitly enabled.
 
 ## Prepare crosswalk data
 
@@ -20,20 +19,35 @@ python3 tools/convert_crosswalk_shp.py \
   --output data/generated/standard_crosswalks.json
 ```
 
-Set `crosswalk_controller.ros__parameters.crosswalk_file` in the deployment
-YAML to the resulting absolute path.
+`scripts/run.sh` uses the tracked
+`raspberry_pi/standard_crosswalks.json` by default. Override it with
+`SAFESTRIDE_CROSSWALK_FILE=/absolute/path/crosswalks.json`. The controller
+builds a spatial index once, then searches only nearby records rather than
+scanning the complete map at 5 Hz.
+
+When RMC course is fresh, or the GPS position has moved at least 2 m, candidates
+more than 60 degrees away from the travel direction are rejected. Before a
+heading is available, the nearest polygon is used. GPS course is direction of
+travel, not a compass heading, so it is intentionally unavailable while the
+walker is stationary.
 
 ## Configure signal timing
 
 Do not commit the Seoul V2X API key. Store only the key in a user-readable file
-such as `/etc/safestride/signal_api_key.txt`, and set `api_key_file` in the
-deployment YAML.
+such as `/etc/safestride/signal_api_key.txt`:
 
-The supplied v6 folder refers to `nearest_map.py`, but that file is not in the
-folder. Until an intersection-map source is added, set `intersection_id` to the
-tested `itstId` for the trial location. Alternatively, enrich each converted
-crosswalk record with an `itstId`, `itst_id` or `intersection_id` field. With no
-valid ID, API key or fresh signal value, the policy fails closed at the curb.
+```bash
+sudo install -d -m 750 /etc/safestride
+sudo install -m 600 /path/to/new-key.txt \
+  /etc/safestride/signal_api_key.txt
+```
+
+With a key present, the ROS node asynchronously downloads the V2X intersection
+map, matches the selected crosswalk to an intersection within 120 m, and then
+requests its pedestrian signal timing. A tested fixed ID can override matching
+with `SAFESTRIDE_INTERSECTION_ID=1678`. With no valid ID, API key, network, or
+fresh signal value, the policy fails closed at the curb and reports the reason
+in `/diagnostics`.
 
 ## Start in monitor-only mode
 
@@ -43,13 +57,17 @@ Keep `motion_output_enabled: false` for GPS walks and inspect:
 export SAFESTRIDE_ENABLE_CROSSWALK=true
 bash scripts/run.sh
 ros2 topic echo /crosswalk/status
-ros2 topic echo /diagnostics
+ros2 topic echo /gps/fix
+ros2 topic echo /gps/course
+ros2 topic echo /diagnostics --field status
 ```
 
-Monitor-only mode publishes zero velocity while reporting the command the v6
-state machine selected. Verify the crosswalk axis, signal direction, `itstId`,
-GPS accuracy and every state transition from recorded logs before enabling
-motion. A human trial must not be the first powered test.
+Monitor-only mode publishes status without becoming a `/cmd_vel` publisher.
+Diagnostics include coordinates, heading source, candidate bearing, crossing
+direction, matched `itstId`, and distance to the intersection. Verify every
+state transition from recorded logs before enabling motion. If crosswalk motion
+output is enabled, disable `cruise_command` so two nodes do not publish competing
+commands. A human trial must not be the first powered test.
 
 The automatic sequence is:
 

@@ -8,6 +8,9 @@ enable_perception="${SAFESTRIDE_ENABLE_PERCEPTION:-false}"
 enable_cruise="${SAFESTRIDE_ENABLE_CRUISE:-true}"
 enable_crosswalk="${SAFESTRIDE_ENABLE_CROSSWALK:-true}"
 enable_gps="${SAFESTRIDE_ENABLE_GPS:-true}"
+crosswalk_file="${SAFESTRIDE_CROSSWALK_FILE:-${workspace}/raspberry_pi/standard_crosswalks.json}"
+signal_api_key_file="${SAFESTRIDE_SIGNAL_API_KEY_FILE:-/etc/safestride/signal_api_key.txt}"
+intersection_id="${SAFESTRIDE_INTERSECTION_ID:-}"
 
 check_serial_role() {
   local port="$1"
@@ -71,6 +74,12 @@ if [[ "${config}" == "${workspace}/config/raspberry_pi.yaml" &&
   fi
 fi
 
+if [[ "${enable_crosswalk}" == "true" && ! -r "${crosswalk_file}" ]]; then
+  echo "Crosswalk map is missing or unreadable: ${crosswalk_file}" >&2
+  echo "Set SAFESTRIDE_CROSSWALK_FILE or disable crosswalk monitoring." >&2
+  exit 1
+fi
+
 set +u
 source /opt/ros/jazzy/setup.bash
 source "${workspace}/install/setup.bash"
@@ -120,4 +129,7 @@ exec ros2 launch safestride_bringup safestride.launch.py \
   perception_camera_backend:="${SAFESTRIDE_PERCEPTION_CAMERA_BACKEND:-v4l2}" \
   enable_gps:="${enable_gps}" \
   enable_crosswalk:="${enable_crosswalk}" \
+  crosswalk_file:="${crosswalk_file}" \
+  signal_api_key_file:="${signal_api_key_file}" \
+  intersection_id:="${intersection_id}" \
   enable_foxglove:="${SAFESTRIDE_ENABLE_FOXGLOVE:-false}"

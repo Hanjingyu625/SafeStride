@@ -10,6 +10,7 @@ class GpsFix:
     longitude: float
     speed_mps: Optional[float]
     valid: bool
+    course_deg: Optional[float] = None
 
 
 def _coordinate(raw: str, hemisphere: str) -> float:
@@ -45,13 +46,27 @@ def parse_fix(sentence: str) -> Optional[GpsFix]:
             return None
         fields = body.split(',')
         kind = fields[0][-3:]
-        if kind == 'RMC' and len(fields) >= 8:
+        if kind == 'RMC' and len(fields) >= 9:
             valid = fields[2] == 'A'
             if not valid:
                 return GpsFix(math.nan, math.nan, None, False)
-            return GpsFix(_coordinate(fields[3], fields[4]),
-                          _coordinate(fields[5], fields[6]),
-                          float(fields[7] or 0.0) * 0.514444, valid)
+            speed_mps = (
+                float(fields[7]) * 0.514444 if fields[7] else None
+            )
+            if speed_mps is not None and (
+                not math.isfinite(speed_mps) or speed_mps < 0.0
+            ):
+                raise ValueError('invalid NMEA speed')
+            course_deg = float(fields[8]) % 360.0 if fields[8] else None
+            if course_deg is not None and not math.isfinite(course_deg):
+                raise ValueError('invalid NMEA course')
+            return GpsFix(
+                _coordinate(fields[3], fields[4]),
+                _coordinate(fields[5], fields[6]),
+                speed_mps,
+                valid,
+                course_deg,
+            )
         if kind == 'GGA' and len(fields) >= 7:
             valid = int(fields[6] or 0) > 0
             if not valid:

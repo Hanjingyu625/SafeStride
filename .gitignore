@@ -24,6 +24,9 @@ firmware/**/build/
 
 # Runtime data and large model artifacts
 .env
+raspberry_pi/api_key.txt
+raspberry_pi/public_api_key.txt
+raspberry_pi/seoul_api_key.txt
 *.bag
 *.db3
 models/*.pt

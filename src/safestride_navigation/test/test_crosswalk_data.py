@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from safestride_navigation.crosswalk_data import (
+    CrosswalkSpatialIndex,
     crosswalk_axis_position,
     load_crosswalks,
     nearest_crosswalk,
@@ -62,6 +63,58 @@ class TestCrosswalkData(unittest.TestCase):
         self.assertTrue(
             math.isclose(position['progress_m'], 0.0, abs_tol=0.05)
         )
+
+    def test_heading_selects_crosswalk_ahead(self):
+        north = {
+            'index': 1,
+            'latitude': 20.0 / 111_320.0,
+            'longitude': 0.0,
+            'length_m': 5.0,
+            'width_m': 3.0,
+            'axis_bearing_deg': 0.0,
+            'intersection_id': '',
+        }
+        south = {
+            'index': 2,
+            'latitude': -10.0 / 111_320.0,
+            'longitude': 0.0,
+            'length_m': 5.0,
+            'width_m': 3.0,
+            'axis_bearing_deg': 0.0,
+            'intersection_id': '',
+        }
+        nearest = nearest_crosswalk([north, south], 0.0, 0.0)
+        ahead = nearest_crosswalk(
+            [north, south],
+            0.0,
+            0.0,
+            heading_deg=0.0,
+            maximum_heading_error_deg=75.0,
+        )
+        self.assertEqual(nearest['index'], 2)
+        self.assertEqual(ahead['index'], 1)
+        self.assertEqual(ahead['crossing_bearing_deg'], 0.0)
+        self.assertLess(ahead['heading_error_deg'], 0.1)
+
+    def test_spatial_index_keeps_long_crosswalk_whose_edge_is_nearby(self):
+        crosswalk = {
+            'index': 7,
+            'latitude': 90.0 / 111_320.0,
+            'longitude': 0.0,
+            'length_m': 100.0,
+            'width_m': 4.0,
+            'axis_bearing_deg': 0.0,
+            'intersection_id': '',
+        }
+        index = CrosswalkSpatialIndex([crosswalk])
+        selected = index.nearest(
+            0.0,
+            0.0,
+            maximum_distance_m=50.0,
+        )
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected['index'], 7)
+        self.assertLess(selected['edge_distance_m'], 41.0)
 
 
 if __name__ == '__main__':

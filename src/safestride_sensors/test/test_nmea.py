@@ -11,10 +11,24 @@ def sentence(body):
 
 
 def test_valid_rmc():
-    fix = parse_fix('$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A')
+    fix = parse_fix(
+        '$GPRMC,123519,A,4807.038,N,01131.000,E,'
+        '022.4,084.4,230394,003.1,W*6A'
+    )
     assert fix and fix.valid
     assert round(fix.latitude, 6) == 48.1173
     assert round(fix.longitude, 6) == 11.516667
+    assert round(fix.speed_mps, 3) == 11.524
+    assert fix.course_deg == 84.4
+
+
+def test_valid_rmc_allows_missing_speed_and_course():
+    fix = parse_fix(
+        sentence('GNRMC,123519,A,3723.2475,N,12158.3416,E,,,230394,,,A')
+    )
+    assert fix and fix.valid
+    assert fix.speed_mps is None
+    assert fix.course_deg is None
 
 
 def test_bad_checksum_is_rejected():

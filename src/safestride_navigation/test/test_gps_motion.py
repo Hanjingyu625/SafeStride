@@ -1,0 +1,56 @@
+import unittest
+
+from safestride_navigation.gps_motion import GpsMotionTracker
+
+
+class TestGpsMotionTracker(unittest.TestCase):
+    def setUp(self):
+        self.tracker = GpsMotionTracker(
+            change_threshold_m=0.5,
+            heading_min_move_m=2.0,
+            heading_max_step_m=30.0,
+        )
+
+    def test_derives_heading_after_real_movement(self):
+        self.tracker.update(0.0, 0.0, 0.0)
+        self.tracker.update(3.0 / 111_320.0, 0.0, 2.0)
+        self.assertAlmostEqual(self.tracker.heading(2.0, 5.0), 0.0, places=2)
+        self.assertEqual(self.tracker.heading_source, 'position_delta')
+
+    def test_rmc_course_overrides_position_heading(self):
+        self.tracker.update(0.0, 0.0, 0.0)
+        self.tracker.set_course(91.0, 1.0)
+        self.assertEqual(self.tracker.heading(1.0, 5.0), 91.0)
+        self.assertEqual(self.tracker.heading_source, 'rmc_course')
+
+    def test_reports_stuck_only_when_motion_is_reported(self):
+        self.tracker.update(0.0, 0.0, 0.0)
+        self.assertFalse(
+            self.tracker.coordinates_stuck(
+                10.0,
+                0.0,
+                timeout_s=5.0,
+                minimum_speed_mps=0.15,
+            )
+        )
+        self.assertTrue(
+            self.tracker.coordinates_stuck(
+                10.0,
+                0.4,
+                timeout_s=5.0,
+                minimum_speed_mps=0.15,
+            )
+        )
+        self.tracker.update(1.0 / 111_320.0, 0.0, 10.1)
+        self.assertFalse(
+            self.tracker.coordinates_stuck(
+                10.1,
+                0.4,
+                timeout_s=5.0,
+                minimum_speed_mps=0.15,
+            )
+        )
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -28,6 +28,9 @@ def generate_launch_description() -> LaunchDescription:
     wheel_separation = LaunchConfiguration('wheel_separation')
     enable_gps = LaunchConfiguration('enable_gps')
     enable_crosswalk = LaunchConfiguration('enable_crosswalk')
+    crosswalk_file = LaunchConfiguration('crosswalk_file')
+    signal_api_key_file = LaunchConfiguration('signal_api_key_file')
+    intersection_id = LaunchConfiguration('intersection_id')
     enable_foxglove = LaunchConfiguration('enable_foxglove')
     enable_cruise = LaunchConfiguration('enable_cruise')
     enable_terrain = LaunchConfiguration('enable_terrain')
@@ -125,6 +128,21 @@ def generate_launch_description() -> LaunchDescription:
                 description='Start safe crosswalk readiness monitor.',
             ),
             DeclareLaunchArgument(
+                'crosswalk_file',
+                default_value='',
+                description='Absolute path to normalized crosswalk JSON.',
+            ),
+            DeclareLaunchArgument(
+                'signal_api_key_file',
+                default_value='',
+                description='Path to the untracked Seoul V2X API key file.',
+            ),
+            DeclareLaunchArgument(
+                'intersection_id',
+                default_value='',
+                description='Optional tested V2X intersection identifier.',
+            ),
+            DeclareLaunchArgument(
                 'enable_foxglove',
                 default_value='false',
                 description='Expose read-only SafeStride topics on port 8765.',
@@ -219,7 +237,23 @@ def generate_launch_description() -> LaunchDescription:
                 name='crosswalk_controller',
                 output='screen',
                 condition=IfCondition(enable_crosswalk),
-                parameters=[config_file],
+                parameters=[
+                    config_file,
+                    {
+                        'crosswalk_file': ParameterValue(
+                            crosswalk_file,
+                            value_type=str,
+                        ),
+                        'api_key_file': ParameterValue(
+                            signal_api_key_file,
+                            value_type=str,
+                        ),
+                        'intersection_id': ParameterValue(
+                            intersection_id,
+                            value_type=str,
+                        ),
+                    },
+                ],
             ),
             Node(
                 package='foxglove_bridge',

@@ -1,9 +1,20 @@
-"""Crosswalk data loading and local geometry from the standalone v6 prototype."""
+"""Crosswalk data loading and geometry from the standalone v6 prototype."""
 
 import json
 import math
+from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import (
+    Any,
+    DefaultDict,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
 
 Crosswalk = Dict[str, Any]
@@ -191,16 +202,58 @@ def nearest_crosswalk(
     crosswalks: Iterable[Mapping[str, Any]],
     latitude: float,
     longitude: float,
+    *,
+    heading_deg: Optional[float] = None,
+    maximum_heading_error_deg: float = 60.0,
+    maximum_distance_m: Optional[float] = None,
 ) -> Optional[Crosswalk]:
-    """Return the nearest polygon plus the safest crossing orientation."""
+    """Return the nearest eligible polygon and its crossing orientation."""
+
+    heading = number(heading_deg)
+    if heading is not None:
+        heading %= 360.0
+    if not 0.0 < maximum_heading_error_deg <= 180.0:
+        raise ValueError('maximum_heading_error_deg must be in (0, 180]')
+    if maximum_distance_m is not None and (
+        not math.isfinite(maximum_distance_m) or maximum_distance_m <= 0.0
+    ):
+        raise ValueError('maximum_distance_m must be finite and positive')
 
     best: Optional[Mapping[str, Any]] = None
     best_edge_distance = math.inf
+    best_target_bearing = math.nan
+    best_heading_error = math.nan
     for item in crosswalks:
         edge_distance = crosswalk_edge_distance_m(item, latitude, longitude)
+        if (
+            maximum_distance_m is not None
+            and edge_distance > maximum_distance_m
+        ):
+            continue
+        target_bearing = bearing_deg(
+            latitude,
+            longitude,
+            float(item['latitude']),
+            float(item['longitude']),
+        )
+        heading_error = (
+            angular_difference_deg(heading, target_bearing)
+            if heading is not None
+            else math.nan
+        )
+        # Once the user is on the polygon, keep it selected even though the
+        # bearing to its centre may point behind them.
+        if (
+            heading is not None
+            and edge_distance > 1.0
+            and heading_error > maximum_heading_error_deg
+        ):
+            continue
         if edge_distance < best_edge_distance:
             best = item
             best_edge_distance = edge_distance
+            best_target_bearing = target_bearing
+            best_heading_error = heading_error
     if best is None:
         return None
 
@@ -212,35 +265,141 @@ def nearest_crosswalk(
         float(best['latitude']),
         float(best['longitude']),
     )
-    target_bearing = bearing_deg(
-        latitude,
-        longitude,
-        float(best['latitude']),
-        float(best['longitude']),
-    )
     axis_a = float(best['axis_bearing_deg']) % 360.0
     axis_b = (axis_a + 180.0) % 360.0
+    orientation_reference = (
+        heading if heading is not None else best_target_bearing
+    )
     crossing_bearing = (
         axis_a
-        if angular_difference_deg(target_bearing, axis_a)
-        <= angular_difference_deg(target_bearing, axis_b)
+        if angular_difference_deg(orientation_reference, axis_a)
+        <= angular_difference_deg(orientation_reference, axis_b)
         else axis_b
     )
     signal_bearing = (crossing_bearing + 90.0) % 360.0
     output.update(
         {
-            'target_bearing_deg': target_bearing,
+            'target_bearing_deg': best_target_bearing,
+            'heading_deg': heading if heading is not None else math.nan,
+            'heading_error_deg': best_heading_error,
             'crossing_bearing_deg': crossing_bearing,
             'crossing_direction': bearing_to_direction(crossing_bearing),
             'signal_bearing_deg': signal_bearing,
             'signal_direction': bearing_to_direction(signal_bearing),
             'axis_alignment_error_deg': undirected_axis_difference_deg(
-                target_bearing,
+                orientation_reference,
                 axis_a,
             ),
         }
     )
     return output
+
+
+class CrosswalkSpatialIndex:
+    """Bucket crosswalk centres so the Pi only evaluates nearby polygons."""
+
+    def __init__(
+        self,
+        crosswalks: Iterable[Mapping[str, Any]],
+        *,
+        cell_size_deg: float = 0.002,
+    ) -> None:
+        if not math.isfinite(cell_size_deg) or cell_size_deg <= 0.0:
+            raise ValueError('cell_size_deg must be finite and positive')
+        self._cell_size = cell_size_deg
+        self._records: Tuple[Mapping[str, Any], ...] = tuple(crosswalks)
+        self._buckets: DefaultDict[
+            Tuple[int, int], List[Mapping[str, Any]]
+        ] = defaultdict(list)
+        self._maximum_half_diagonal_m = 0.0
+        for item in self._records:
+            cell = self._cell(item['latitude'], item['longitude'])
+            self._buckets[cell].append(item)
+            half_diagonal = 0.5 * math.hypot(
+                float(item['length_m']),
+                float(item.get('width_m') or 0.0),
+            )
+            self._maximum_half_diagonal_m = max(
+                self._maximum_half_diagonal_m,
+                half_diagonal,
+            )
+
+    def __len__(self) -> int:
+        return len(self._records)
+
+    def _cell(self, latitude: Any, longitude: Any) -> Tuple[int, int]:
+        return (
+            math.floor(float(latitude) / self._cell_size),
+            math.floor(float(longitude) / self._cell_size),
+        )
+
+    def _nearby(
+        self,
+        latitude: float,
+        longitude: float,
+        maximum_distance_m: float,
+    ) -> Sequence[Mapping[str, Any]]:
+        search_radius_m = (
+            maximum_distance_m + self._maximum_half_diagonal_m
+        )
+        latitude_span = math.ceil(
+            search_radius_m / 111_320.0 / self._cell_size
+        )
+        longitude_metres_per_degree = max(
+            111_320.0 * abs(math.cos(math.radians(latitude))),
+            1.0,
+        )
+        longitude_span = math.ceil(
+            search_radius_m
+            / longitude_metres_per_degree
+            / self._cell_size
+        )
+        centre_latitude, centre_longitude = self._cell(latitude, longitude)
+        result: List[Mapping[str, Any]] = []
+        for latitude_cell in range(
+            centre_latitude - latitude_span,
+            centre_latitude + latitude_span + 1,
+        ):
+            for longitude_cell in range(
+                centre_longitude - longitude_span,
+                centre_longitude + longitude_span + 1,
+            ):
+                result.extend(
+                    self._buckets.get(
+                        (latitude_cell, longitude_cell),
+                        (),
+                    )
+                )
+        return result
+
+    def nearest(
+        self,
+        latitude: float,
+        longitude: float,
+        *,
+        maximum_distance_m: float,
+        heading_deg: Optional[float] = None,
+        maximum_heading_error_deg: float = 60.0,
+    ) -> Optional[Crosswalk]:
+        if (
+            not math.isfinite(maximum_distance_m)
+            or maximum_distance_m <= 0.0
+        ):
+            raise ValueError(
+                'maximum_distance_m must be finite and positive'
+            )
+        nearby = self._nearby(latitude, longitude, maximum_distance_m)
+        selected = nearest_crosswalk(
+            nearby,
+            latitude,
+            longitude,
+            heading_deg=heading_deg,
+            maximum_heading_error_deg=maximum_heading_error_deg,
+            maximum_distance_m=maximum_distance_m,
+        )
+        if selected is not None:
+            selected['search_candidate_count'] = len(nearby)
+        return selected
 
 
 def crosswalk_axis_position(
@@ -309,7 +468,9 @@ __all__ = [
     'bearing_to_direction',
     'crosswalk_axis_position',
     'crosswalk_edge_distance_m',
+    'CrosswalkSpatialIndex',
     'evaluate_locked_crosswalk',
+    'bearing_deg',
     'haversine_m',
     'load_crosswalks',
     'nearest_crosswalk',

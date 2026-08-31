@@ -131,17 +131,34 @@ gps_node:
     frame_id: gps_link
     fix_topic: /gps/fix
     speed_topic: /gps/speed
+    course_topic: /gps/course
+    diagnostics_topic: /diagnostics
+    nmea_timeout_s: 2.0
+    fix_timeout_s: 2.0
+    diagnostic_rate_hz: 1.0
+    course_min_speed_mps: 0.20
 
 crosswalk_controller:
   ros__parameters:
     # Empty files keep the node in readiness-monitor mode without crashing.
     crosswalk_file: ''
     api_key_file: ''
-    # Set this manually unless each crosswalk JSON record contains itstId.
+    # Optional tested override; otherwise the V2X map API supplies itstId.
     intersection_id: ''
+    intersection_map_page_size: 100
+    intersection_map_max_pages: 30
+    intersection_map_retry_s: 60.0
+    maximum_intersection_distance_m: 120.0
     update_rate_hz: 5.0
     gps_timeout_s: 2.0
     speed_timeout_s: 1.0
+    heading_timeout_s: 5.0
+    heading_min_move_m: 2.0
+    heading_max_step_m: 30.0
+    candidate_heading_tolerance_deg: 60.0
+    gps_change_threshold_m: 0.5
+    gps_stuck_timeout_s: 5.0
+    gps_stuck_speed_mps: 0.15
     signal_refresh_interval_s: 3.0
     signal_cache_max_age_s: 12.0
     signal_request_timeout_s: 3.0
@@ -152,6 +169,7 @@ crosswalk_controller:
     motion_output_enabled: false
     fix_topic: /gps/fix
     gps_speed_topic: /gps/speed
+    gps_course_topic: /gps/course
     odom_topic: /odom
     command_topic: /cmd_vel
     status_topic: /crosswalk/status
@@ -165,7 +183,7 @@ foxglove_bridge:
     topic_whitelist:
       - ^/(diagnostics|walker/status|wheel/hall|handle/pressure|battery_state)$
       - ^/terrain/(tof|imu|status)$
-      - ^/(gps/fix|gps/speed|crosswalk/status|odom|tf|tf_static|robot_description)$
+      - ^/(gps/fix|gps/speed|gps/course|crosswalk/status|odom|tf|tf_static|robot_description)$
     service_whitelist: ['(?!)']
     param_whitelist: ['(?!)']
     client_topic_whitelist: ['(?!)']

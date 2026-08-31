@@ -3,20 +3,30 @@
 import math
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Tuple
+from typing import Any, Mapping, Optional, Tuple
 
 import rclpy
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 from geometry_msgs.msg import TwistStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import NavSatFix, NavSatStatus
 from std_msgs.msg import Float32
 
 from safestride_interfaces.msg import CrosswalkStatus
 
 from .crossing_policy import CrossingParameters, CrossingStateMachine
-from .crosswalk_data import load_crosswalks, nearest_crosswalk
+from .crosswalk_data import (
+    CrosswalkSpatialIndex,
+    load_crosswalks,
+)
+from .gps_motion import GpsMotionTracker
+from .intersection_map import (
+    DEFAULT_INTERSECTION_MAP_URL,
+    nearest_intersection,
+    request_intersection_map,
+)
 from .signal_logic import (
     DEFAULT_TIMING_URL,
     request_signal_data,
@@ -52,9 +62,21 @@ class CrosswalkController(Node):
             'api_key_file': '',
             'intersection_id': '',
             'signal_url': DEFAULT_TIMING_URL,
+            'intersection_map_url': DEFAULT_INTERSECTION_MAP_URL,
+            'intersection_map_page_size': 100,
+            'intersection_map_max_pages': 30,
+            'intersection_map_retry_s': 60.0,
+            'maximum_intersection_distance_m': 120.0,
             'update_rate_hz': 5.0,
             'gps_timeout_s': 2.0,
             'speed_timeout_s': 1.0,
+            'heading_timeout_s': 5.0,
+            'heading_min_move_m': 2.0,
+            'heading_max_step_m': 30.0,
+            'candidate_heading_tolerance_deg': 60.0,
+            'gps_change_threshold_m': 0.5,
+            'gps_stuck_timeout_s': 5.0,
+            'gps_stuck_speed_mps': 0.15,
             'signal_refresh_interval_s': 3.0,
             'signal_cache_max_age_s': 12.0,
             'signal_request_timeout_s': 3.0,
@@ -64,6 +86,7 @@ class CrosswalkController(Node):
             'motion_output_enabled': False,
             'fix_topic': '/gps/fix',
             'gps_speed_topic': '/gps/speed',
+            'gps_course_topic': '/gps/course',
             'odom_topic': '/odom',
             'command_topic': '/cmd_vel',
             'status_topic': '/crosswalk/status',
@@ -75,12 +98,17 @@ class CrosswalkController(Node):
 
         crosswalk_file = str(self.get_parameter('crosswalk_file').value)
         self._crosswalks = []
+        self._crosswalk_index: Optional[CrosswalkSpatialIndex] = None
         self._map_ready = False
         self._map_error = 'crosswalk map file is not configured'
         if crosswalk_file and 'CHANGE_ME' not in crosswalk_file:
             try:
                 self._crosswalks = load_crosswalks(crosswalk_file)
                 self._map_ready = bool(self._crosswalks)
+                if self._map_ready:
+                    self._crosswalk_index = CrosswalkSpatialIndex(
+                        self._crosswalks
+                    )
                 self._map_error = (
                     '' if self._map_ready else 'crosswalk map is empty'
                 )
@@ -90,12 +118,41 @@ class CrosswalkController(Node):
             self.get_parameter('intersection_id').value
         ).strip()
         self._signal_url = str(self.get_parameter('signal_url').value)
+        self._intersection_map_url = str(
+            self.get_parameter('intersection_map_url').value
+        )
+        self._intersection_map_page_size = int(
+            self.get_parameter('intersection_map_page_size').value
+        )
+        self._intersection_map_max_pages = int(
+            self.get_parameter('intersection_map_max_pages').value
+        )
+        if (
+            self._intersection_map_page_size <= 0
+            or self._intersection_map_max_pages <= 0
+        ):
+            raise ValueError('intersection map pagination must be positive')
         self._api_key = self._load_api_key(
             str(self.get_parameter('api_key_file').value)
         )
         self._api_ready = bool(self._api_key)
         self._gps_timeout = self._positive('gps_timeout_s')
         self._speed_timeout = self._positive('speed_timeout_s')
+        self._heading_timeout = self._positive('heading_timeout_s')
+        self._heading_min_move = self._positive('heading_min_move_m')
+        self._heading_max_step = self._positive('heading_max_step_m')
+        self._heading_tolerance = self._positive(
+            'candidate_heading_tolerance_deg'
+        )
+        if self._heading_tolerance > 180.0:
+            raise ValueError(
+                'candidate_heading_tolerance_deg must not exceed 180'
+            )
+        self._gps_change_threshold = self._positive(
+            'gps_change_threshold_m'
+        )
+        self._gps_stuck_timeout = self._positive('gps_stuck_timeout_s')
+        self._gps_stuck_speed = self._nonnegative('gps_stuck_speed_mps')
         self._signal_refresh = self._positive(
             'signal_refresh_interval_s'
         )
@@ -107,6 +164,12 @@ class CrosswalkController(Node):
         )
         self._maximum_crosswalk_distance = self._positive(
             'maximum_crosswalk_distance_m'
+        )
+        self._maximum_intersection_distance = self._positive(
+            'maximum_intersection_distance_m'
+        )
+        self._intersection_map_retry = self._positive(
+            'intersection_map_retry_s'
         )
         update_rate = self._positive('update_rate_hz')
         default_safe_speed = self._positive('default_safe_speed_mps')
@@ -124,6 +187,11 @@ class CrosswalkController(Node):
         )
         self._fix: Optional[Tuple[float, float]] = None
         self._fix_time: Optional[float] = None
+        self._gps_motion = GpsMotionTracker(
+            change_threshold_m=self._gps_change_threshold,
+            heading_min_move_m=self._heading_min_move,
+            heading_max_step_m=self._heading_max_step,
+        )
         self._gps_speed: Optional[float] = None
         self._gps_speed_time: Optional[float] = None
         self._odom_speed: Optional[float] = None
@@ -149,13 +217,25 @@ class CrosswalkController(Node):
             NavSatFix,
             str(self.get_parameter('fix_topic').value),
             self._fix_callback,
-            10,
+            qos_profile_sensor_data,
         )
         self.create_subscription(
             Float32,
             str(self.get_parameter('gps_speed_topic').value),
             self._gps_speed_callback,
-            10,
+            qos_profile_sensor_data,
+        )
+        self._intersections = []
+        self._intersection_map_future: Optional[Future] = None
+        self._intersection_map_error = ''
+        self._nearest_intersection: Optional[Mapping[str, Any]] = None
+        self._intersection_match_cache = {}
+        self._last_intersection_map_request = -math.inf
+        self.create_subscription(
+            Float32,
+            str(self.get_parameter('gps_course_topic').value),
+            self._gps_course_callback,
+            qos_profile_sensor_data,
         )
         self.create_subscription(
             Odometry,
@@ -199,6 +279,12 @@ class CrosswalkController(Node):
             raise ValueError(name + ' must be finite and positive')
         return value
 
+    def _nonnegative(self, name: str) -> float:
+        value = float(self.get_parameter(name).value)
+        if not math.isfinite(value) or value < 0.0:
+            raise ValueError(name + ' must be finite and nonnegative')
+        return value
+
     @staticmethod
     def _load_api_key(path: str) -> str:
         if not path or 'CHANGE_ME' in path:
@@ -213,7 +299,11 @@ class CrosswalkController(Node):
         return self.get_clock().now().nanoseconds * 1.0e-9
 
     @staticmethod
-    def _fresh(now: float, received_at: Optional[float], timeout: float) -> bool:
+    def _fresh(
+        now: float,
+        received_at: Optional[float],
+        timeout: float,
+    ) -> bool:
         return (
             received_at is not None
             and now >= received_at
@@ -231,14 +321,22 @@ class CrosswalkController(Node):
             and -180.0 <= longitude <= 180.0
         )
         if valid:
-            self._fix = (latitude, longitude)
-            self._fix_time = self._now()
+            now = self._now()
+            current = (latitude, longitude)
+            self._gps_motion.update(latitude, longitude, now)
+            self._fix = current
+            self._fix_time = now
 
     def _gps_speed_callback(self, message: Float32) -> None:
         speed = float(message.data)
         if math.isfinite(speed) and 0.0 <= speed <= 3.0:
             self._gps_speed = speed
             self._gps_speed_time = self._now()
+
+    def _gps_course_callback(self, message: Float32) -> None:
+        course = float(message.data)
+        if math.isfinite(course) and 0.0 <= course <= 360.0:
+            self._gps_motion.set_course(course, self._now())
 
     def _odom_callback(self, message: Odometry) -> None:
         now = self._now()
@@ -268,6 +366,9 @@ class CrosswalkController(Node):
             return self._gps_speed
         return None
 
+    def _heading(self, now: float) -> Optional[float]:
+        return self._gps_motion.heading(now, self._heading_timeout)
+
     def _consume_signal_future(self, now: float) -> None:
         future = self._signal_future
         if future is None or not future.done():
@@ -282,6 +383,44 @@ class CrosswalkController(Node):
             self._signal_error = ''
         except Exception as error:
             self._signal_error = str(error)
+
+    def _consume_intersection_map_future(self) -> None:
+        future = self._intersection_map_future
+        if future is None or not future.done():
+            return
+        self._intersection_map_future = None
+        try:
+            self._intersections = future.result()
+            self._intersection_match_cache.clear()
+            self._intersection_map_error = ''
+            self.get_logger().info(
+                'Loaded %d V2X intersections' % len(self._intersections)
+            )
+        except Exception as error:
+            self._intersection_map_error = str(error)
+            self.get_logger().warning(
+                'V2X intersection map unavailable: %s' % error
+            )
+
+    def _request_intersection_map_if_due(self, now: float) -> None:
+        if (
+            not self._api_key
+            or self._intersection_id
+            or self._intersections
+            or self._intersection_map_future is not None
+            or now - self._last_intersection_map_request
+            < self._intersection_map_retry
+        ):
+            return
+        self._last_intersection_map_request = now
+        self._intersection_map_future = self._executor.submit(
+            request_intersection_map,
+            self._api_key,
+            url=self._intersection_map_url,
+            page_size=self._intersection_map_page_size,
+            max_pages=self._intersection_map_max_pages,
+            timeout_s=self._signal_request_timeout,
+        )
 
     def _request_signal_if_due(self, intersection_id: str, now: float) -> None:
         if (
@@ -345,7 +484,7 @@ class CrosswalkController(Node):
         required_entry_s: Optional[float],
         crossing_eta_s: Optional[float],
         command: Mapping[str, Any],
-        effective_speed_mps: float,
+        target_speed_mps: float,
         intersection_id: str,
     ) -> None:
         status = CrosswalkStatus()
@@ -368,7 +507,7 @@ class CrosswalkController(Node):
         status.signal_remaining_s = _finite_or_nan(signal_remaining_s)
         status.required_entry_s = _finite_or_nan(required_entry_s)
         status.crossing_eta_s = _finite_or_nan(crossing_eta_s)
-        status.target_speed_mps = effective_speed_mps
+        status.target_speed_mps = target_speed_mps
         status.command_mode = str(command['mode'])
         status.reason = self._controller.reason
         status.intersection_id = intersection_id
@@ -384,6 +523,9 @@ class CrosswalkController(Node):
         signal_reason: str,
         intersection_id: str,
         effective_speed_mps: float,
+        active: Optional[Mapping[str, Any]],
+        heading: Optional[float],
+        gps_stuck: bool,
     ) -> None:
         if now - self._last_diagnostic < 1.0:
             return
@@ -394,12 +536,27 @@ class CrosswalkController(Node):
         if not self._map_ready:
             diagnostic.level = DiagnosticStatus.WARN
             diagnostic.message = self._map_error
+        elif not gps_valid:
+            diagnostic.level = DiagnosticStatus.ERROR
+            diagnostic.message = (
+                'GPS coordinates are not changing while motion is reported'
+                if gps_stuck
+                else 'GPS unavailable or stale'
+            )
         elif not self._api_ready:
             diagnostic.level = DiagnosticStatus.WARN
             diagnostic.message = 'signal API key is not configured'
-        elif not gps_valid:
-            diagnostic.level = DiagnosticStatus.ERROR
-            diagnostic.message = 'GPS unavailable or stale'
+        elif active is not None and not intersection_id:
+            diagnostic.level = DiagnosticStatus.WARN
+            diagnostic.message = (
+                self._intersection_map_error
+                or (
+                    'V2X intersection map is loading'
+                    if self._intersection_map_future is not None
+                    else ''
+                )
+                or 'no V2X intersection matched the selected crosswalk'
+            )
         elif (
             self._controller.state in ('WAIT_AT_CURB', 'ENTRY_ALLOWED')
             and not signal_valid
@@ -416,8 +573,91 @@ class CrosswalkController(Node):
             KeyValue(key='state', value=self._controller.state),
             KeyValue(key='intersection_id', value=intersection_id or 'unset'),
             KeyValue(key='gps_valid', value=str(gps_valid).lower()),
+            KeyValue(key='gps_stuck', value=str(gps_stuck).lower()),
+            KeyValue(
+                key='latitude',
+                value=(
+                    '%.8f' % self._fix[0]
+                    if self._fix is not None
+                    else 'nan'
+                ),
+            ),
+            KeyValue(
+                key='longitude',
+                value=(
+                    '%.8f' % self._fix[1]
+                    if self._fix is not None
+                    else 'nan'
+                ),
+            ),
+            KeyValue(
+                key='heading_deg',
+                value='%.1f' % heading if heading is not None else 'nan',
+            ),
+            KeyValue(
+                key='heading_source', value=self._gps_motion.heading_source
+            ),
+            KeyValue(
+                key='crosswalk_index',
+                value=str(active.get('index')) if active else 'none',
+            ),
+            KeyValue(
+                key='crosswalk_edge_distance_m',
+                value=(
+                    '%.2f' % float(active['edge_distance_m'])
+                    if active is not None
+                    else 'nan'
+                ),
+            ),
+            KeyValue(
+                key='candidate_heading_error_deg',
+                value=(
+                    '%.1f' % float(active['heading_error_deg'])
+                    if active is not None
+                    and math.isfinite(float(active['heading_error_deg']))
+                    else 'nan'
+                ),
+            ),
+            KeyValue(
+                key='target_bearing_deg',
+                value=(
+                    '%.1f' % float(active['target_bearing_deg'])
+                    if active is not None
+                    else 'nan'
+                ),
+            ),
+            KeyValue(
+                key='crossing_direction',
+                value=str(active.get('crossing_direction', 'none'))
+                if active
+                else 'none',
+            ),
+            KeyValue(
+                key='signal_direction',
+                value=str(active.get('signal_direction', 'none'))
+                if active
+                else 'none',
+            ),
+            KeyValue(
+                key='search_candidate_count',
+                value=str(active.get('search_candidate_count', 0))
+                if active
+                else '0',
+            ),
             KeyValue(key='map_ready', value=str(self._map_ready).lower()),
             KeyValue(key='api_ready', value=str(self._api_ready).lower()),
+            KeyValue(
+                key='intersection_map_count',
+                value=str(len(self._intersections)),
+            ),
+            KeyValue(
+                key='intersection_distance_m',
+                value=(
+                    '%.1f' % float(self._nearest_intersection['distance_m'])
+                    if self._nearest_intersection is not None
+                    else 'nan'
+                ),
+            ),
             KeyValue(
                 key='crosswalk_count', value=str(len(self._crosswalks))
             ),
@@ -438,6 +678,8 @@ class CrosswalkController(Node):
 
     def _tick(self) -> None:
         now = self._now()
+        self._consume_intersection_map_future()
+        self._request_intersection_map_if_due(now)
         self._consume_signal_future(now)
         gps_valid = self._fix is not None and self._fresh(
             now,
@@ -452,31 +694,62 @@ class CrosswalkController(Node):
         signal_reason = ''
         intersection_id = self._controller.locked_intersection_id
         measured_speed = self._measured_speed(now)
+        heading = self._heading(now)
+        self._nearest_intersection = None
+        gps_stuck = gps_valid and self._gps_motion.coordinates_stuck(
+            now,
+            measured_speed,
+            timeout_s=self._gps_stuck_timeout,
+            minimum_speed_mps=self._gps_stuck_speed,
+        )
+        if gps_stuck:
+            gps_valid = False
 
         if gps_valid:
             assert self._fix is not None
             latitude, longitude = self._fix
-            candidate = nearest_crosswalk(
-                self._crosswalks,
-                latitude,
-                longitude,
+            candidate = (
+                self._crosswalk_index.nearest(
+                    latitude,
+                    longitude,
+                    maximum_distance_m=self._maximum_crosswalk_distance,
+                    heading_deg=heading,
+                    maximum_heading_error_deg=self._heading_tolerance,
+                )
+                if self._crosswalk_index is not None
+                else None
             )
-            if (
-                candidate is not None
-                and candidate['edge_distance_m']
-                > self._maximum_crosswalk_distance
-                and self._controller.locked_crosswalk is None
-            ):
-                candidate = None
             preview = self._controller.current_crosswalk(
                 candidate,
                 latitude,
                 longitude,
             )
+            if preview is not None and self._intersections:
+                crosswalk_index = int(preview['index'])
+                if crosswalk_index not in self._intersection_match_cache:
+                    self._intersection_match_cache[crosswalk_index] = (
+                        nearest_intersection(
+                            self._intersections,
+                            float(preview['latitude']),
+                            float(preview['longitude']),
+                            maximum_distance_m=(
+                                self._maximum_intersection_distance
+                            ),
+                        )
+                    )
+                self._nearest_intersection = (
+                    self._intersection_match_cache[crosswalk_index]
+                )
             intersection_id = (
                 self._controller.locked_intersection_id
                 or str((preview or {}).get('intersection_id') or '')
                 or self._intersection_id
+                or str(
+                    (self._nearest_intersection or {}).get(
+                        'intersection_id',
+                        '',
+                    )
+                )
             )
             if preview is not None:
                 signal_remaining_s, signal_valid, signal_reason = (
@@ -508,7 +781,9 @@ class CrosswalkController(Node):
             safe_speed = self._profile.safe_speed()
 
         command = self._controller.command(safe_speed, measured_speed)
-        desired_speed = float(command['target_speed_mps']) if gps_valid else 0.0
+        desired_speed = (
+            float(command['target_speed_mps']) if gps_valid else 0.0
+        )
         effective_speed = (
             desired_speed if self._motion_output_enabled else 0.0
         )
@@ -522,7 +797,7 @@ class CrosswalkController(Node):
             required_entry_s=required_entry_s,
             crossing_eta_s=crossing_eta_s,
             command=command,
-            effective_speed_mps=effective_speed,
+            target_speed_mps=desired_speed,
             intersection_id=intersection_id,
         )
         self._publish_diagnostic(
@@ -532,6 +807,9 @@ class CrosswalkController(Node):
             signal_reason=signal_reason,
             intersection_id=intersection_id,
             effective_speed_mps=effective_speed,
+            active=active,
+            heading=heading,
+            gps_stuck=gps_stuck,
         )
 
     def destroy_node(self) -> bool:
@@ -540,9 +818,13 @@ class CrosswalkController(Node):
         try:
             self._profile.save()
         except OSError as error:
-            self.get_logger().warning('Could not save speed profile: %s' % error)
+            self.get_logger().warning(
+                'Could not save speed profile: %s' % error
+            )
         if self._signal_future is not None:
             self._signal_future.cancel()
+        if self._intersection_map_future is not None:
+            self._intersection_map_future.cancel()
         self._executor.shutdown(wait=False, cancel_futures=True)
         return super().destroy_node()
 

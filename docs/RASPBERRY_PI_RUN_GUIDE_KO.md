@@ -241,6 +241,7 @@ ros2 topic echo /terrain/status --once
 ros2 topic echo /terrain/tof --once
 ros2 topic echo /terrain/imu --once
 ros2 topic echo /gps/fix --once
+ros2 topic echo /gps/course --once
 ros2 topic echo /crosswalk/status --once
 ros2 topic echo /diagnostics --once
 ```
