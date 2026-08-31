@@ -19,7 +19,8 @@ arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
 - TOF 정지 기준면은 약 0.25 m이며 초기 10샘플 후 valid가 true가 된다.
 - GY-521을 기울이면 `/terrain/imu`와 status roll/pitch가 변한다. MPU가 아직
   연결되지 않은 경우 진단은 WARN이지만 TOF 단차 정지 시험은 계속할 수 있다.
-- GPS fix가 없어도 `/gps/fix`는 NO_FIX로 계속 발행된다.
+- BE-220은 Terrain Uno가 아니라 Raspberry Pi의 `/dev/ttyS0`에 직접
+  연결한다. 유효한 NMEA no-fix 문장은 `/gps/fix`의 NO_FIX로 발행된다.
 
 ```bash
 ros2 topic echo /wheel/hall --once

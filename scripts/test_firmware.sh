@@ -54,7 +54,6 @@ common=(
 "${cxx}" "${common[@]}" \
   -I"${workspace}/firmware/terrain_mcu" \
   "${workspace}/test/firmware_terrain_state_test.cpp" \
-  "${workspace}/firmware/terrain_mcu/gps_receiver.cpp" \
   "${workspace}/firmware/terrain_mcu/mpu6050_sensor.cpp" \
   "${workspace}/firmware/terrain_mcu/tof10120_sensor.cpp" \
   "${workspace}/firmware/terrain_mcu/protocol.cpp" \

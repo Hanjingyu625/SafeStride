@@ -108,7 +108,9 @@ class SerialBridgeNode(Node):
         self._session_started = False
         self._tx_sequence = 0
 
-        self._level_enable_blocked = False
+        # Never allow pressure-level motion immediately after process start.
+        # An operator must explicitly call /walker/set_enabled true.
+        self._level_enable_blocked = True
         self._last_command_time: Optional[float] = None
         self._target_linear = 0.0
         self._command_timed_out = True
@@ -549,6 +551,9 @@ class SerialBridgeNode(Node):
         )
 
     def _reset_link_state(self) -> None:
+        # A serial disconnect or controller reset invalidates prior operator
+        # authorization. Reconnection must not resume motion by itself.
+        self._level_enable_blocked = True
         self._session_id = 0
         self._boot_id = 0
         self._capabilities = 0
@@ -707,6 +712,7 @@ class SerialBridgeNode(Node):
             or self._last_telemetry_time is not None
         )
         if new_session:
+            self._level_enable_blocked = True
             session_id = secrets.randbits(32)
             if session_id == 0 or session_id == self._session_id:
                 session_id = (self._session_id + 1) & 0xFFFFFFFF

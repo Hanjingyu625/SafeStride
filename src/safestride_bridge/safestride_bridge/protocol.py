@@ -30,8 +30,10 @@ HELLO_STRUCT = struct.Struct('<IIBBHI')
 SESSION_START_STRUCT = struct.Struct('<IBBHI')
 COMMAND_STRUCT = struct.Struct('<iHBB')
 TELEMETRY_STRUCT = struct.Struct('<iiiiHHHhhHHHHHHHBB')
+# Protocol v4 keeps the original 45-byte payload for compatibility. The final
+# 14 bytes were GPS data and are now reserved because GPS is owned by the Pi.
 TERRAIN_TELEMETRY_STRUCT = struct.Struct(
-    '<HBBHHhhhhhhhhhhBHiiIBB'
+    '<HBBHHhhhhhhhhhhBH14x'
 )
 
 
@@ -541,11 +543,6 @@ class TerrainTelemetryPayload:
     mpu_pitch_mrad: int
     mpu_valid: int
     fault_bits: int
-    gps_latitude_e7: int
-    gps_longitude_e7: int
-    gps_speed_mm_s: int
-    gps_flags: int
-    gps_satellites: int
     TYPE: ClassVar[PacketType] = PacketType.TERRAIN_TELEMETRY
 
     def pack(self) -> bytes:
@@ -555,8 +552,6 @@ class TerrainTelemetryPayload:
             raise ValueError('tof_alert must be in [0, 5]')
         if self.mpu_valid not in (0, 1):
             raise ValueError('mpu_valid must be 0 or 1')
-        if self.gps_flags & ~0x03:
-            raise ValueError('gps_flags contains reserved bits')
         return TERRAIN_TELEMETRY_STRUCT.pack(
             _u16('tof_distance_mm', self.tof_distance_mm),
             _u8('tof_valid', self.tof_valid),
@@ -575,11 +570,6 @@ class TerrainTelemetryPayload:
             int(self.mpu_pitch_mrad),
             _u8('mpu_valid', self.mpu_valid),
             _u16('fault_bits', self.fault_bits),
-            int(self.gps_latitude_e7),
-            int(self.gps_longitude_e7),
-            _u32('gps_speed_mm_s', self.gps_speed_mm_s),
-            _u8('gps_flags', self.gps_flags),
-            _u8('gps_satellites', self.gps_satellites),
         )
 
     @classmethod
@@ -594,6 +584,4 @@ class TerrainTelemetryPayload:
             raise PayloadDecodeError('tof_alert must be in [0, 5]')
         if payload.mpu_valid not in (0, 1):
             raise PayloadDecodeError('mpu_valid must be 0 or 1')
-        if payload.gps_flags & ~0x03:
-            raise PayloadDecodeError('gps_flags contains reserved bits')
         return payload

@@ -19,7 +19,7 @@ sequence, payload length, session ID, MCU timestamp 순서다. flags와 reserved
 | `0x21 TERRAIN_TELEMETRY` | Terrain→Pi | 45 bytes, 아래 표 |
 
 Capability bit 0은 왼쪽 단일 홀센서, 4는 dead-man, 6은 압력, 8은 TOF,
-9는 MPU6050, 10은 GPS다. E-stop bit 5는 현재 광고하지 않는다.
+9는 MPU6050이다. E-stop bit 5는 현재 광고하지 않는다.
 
 Drive telemetry의 왼쪽/오른쪽 pulse와 velocity 필드는 wire 호환을 위해 유지한다.
 실제 입력은 왼쪽 D2 하나이며 오른쪽 필드는 같은 값을 복제한다. 배터리 분압과
@@ -27,7 +27,9 @@ Drive telemetry의 왼쪽/오른쪽 pulse와 velocity 필드는 wire 호환을 �
 
 ## Terrain telemetry
 
-형식은 `<HBBHHhhhhhhhhhhBHiiIBB>`다.
+활성 필드 형식은 `<HBBHHhhhhhhhhhhBH>`이고, protocol v4의 45-byte wire
+호환성을 위해 뒤의 14 bytes는 0으로 채운 예약 영역이다. GPS는 Raspberry Pi가
+직접 수신하므로 Terrain telemetry에 포함하지 않는다.
 
 | offset | type | 내용 |
 |---:|---|---|
@@ -41,10 +43,7 @@ Drive telemetry의 왼쪽/오른쪽 pulse와 velocity 필드는 wire 호환을 �
 | 24, 26 | `int16` | roll, pitch mrad |
 | 28 | `uint8` | MPU valid |
 | 29 | `uint16` | fault bits: bit0 TOF, bit1 MPU |
-| 31, 35 | `int32` | latitude/longitude ×1e7 |
-| 39 | `uint32` | GPS speed mm/s |
-| 43 | `uint8` | GPS flags: bit0 fix, bit1 speed |
-| 44 | `uint8` | satellites |
+| 31..44 | `uint8` ×14 | 예약 영역, 항상 0 |
 
 Drive Uno는 session, 최신 command TTL, Hall 보정, 양손 압력, fault 및 명시적
 enable을 모두 만족할 때만 PWM을 허용한다. 단차 확정 시 ROS가 한 번 0 명령을

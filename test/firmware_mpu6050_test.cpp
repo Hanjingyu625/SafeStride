@@ -1,11 +1,13 @@
 #include <assert.h>
 #include <stdio.h>
 
+#include "config.h"
 #include "mpu6050_sensor.h"
 #include <Wire.h>
 
 HardwareSerial Serial;
 TwoWire Wire;
+namespace cfg = safestride_terrain_config;
 
 namespace {
 uint8_t g_address = 0U;
@@ -14,8 +16,10 @@ uint8_t g_index = 0U;
 uint8_t g_quantity = 0U;
 uint8_t g_write_count = 0U;
 uint32_t g_now_ms = 0UL;
+bool g_request_ok = true;
+uint8_t g_register_values[256] = {0U};
 
-const uint8_t SAMPLE[14U] = {
+uint8_t g_sample[14U] = {
     0x00U, 0x00U, 0x00U, 0x00U, 0x40U, 0x00U, 0x00U,
     0x00U, 0x00U, 0x83U, 0xFEU, 0xFAU, 0x00U, 0x00U};
 }
@@ -47,9 +51,12 @@ void TwoWire::beginTransmission(uint8_t address) {
   g_write_count = 0U;
 }
 size_t TwoWire::write(uint8_t value) {
-  if (g_write_count++ == 0U) {
+  if (g_write_count == 0U) {
     g_register = value;
+  } else {
+    g_register_values[g_register] = value;
   }
+  ++g_write_count;
   return 1U;
 }
 uint8_t TwoWire::endTransmission() { return 0U; }
@@ -57,7 +64,7 @@ uint8_t TwoWire::requestFrom(uint8_t address, uint8_t quantity) {
   g_address = address;
   g_quantity = quantity;
   g_index = 0U;
-  return address == 0x68U ? quantity : 0U;
+  return g_request_ok && address == 0x68U ? quantity : 0U;
 }
 int TwoWire::available() { return g_quantity - g_index; }
 int TwoWire::read() {
@@ -65,8 +72,8 @@ int TwoWire::read() {
   if (g_register == 0x75U) {
     return 0x68;
   }
-  if (g_register == 0x3BU && index < sizeof(SAMPLE)) {
-    return SAMPLE[index];
+  if (g_register == 0x3BU && index < sizeof(g_sample)) {
+    return g_sample[index];
   }
   return 0;
 }
@@ -84,6 +91,32 @@ int main() {
   assert(mpu.gyroYMradS() <= -34 && mpu.gyroYMradS() >= -36);
   assert(mpu.rollMrad() == 0);
   assert(mpu.pitchMrad() == 0);
+  assert(g_register_values[0x19U] ==
+         cfg::MPU6050_SAMPLE_RATE_DIVIDER);
+
+  // Three failed reads force a reconnect. The first sample after reconnect
+  // must initialize attitude from the new pose instead of blending stale
+  // pre-disconnect state.
+  g_request_ok = false;
+  for (uint8_t index = 0U;
+       index < cfg::MPU6050_MAX_CONSECUTIVE_ERRORS;
+       ++index) {
+    g_now_ms += cfg::MPU6050_SAMPLE_PERIOD_MS;
+    mpu.update(g_now_ms);
+    assert(!mpu.valid());
+  }
+  g_sample[2U] = 0x40U;
+  g_sample[3U] = 0x00U;
+  g_sample[4U] = 0x00U;
+  g_sample[5U] = 0x00U;
+  g_request_ok = true;
+  g_now_ms += cfg::MPU6050_RECONNECT_PERIOD_MS;
+  mpu.update(g_now_ms);
+  assert(!mpu.valid());
+  g_now_ms += cfg::MPU6050_SAMPLE_PERIOD_MS;
+  mpu.update(g_now_ms);
+  assert(mpu.valid());
+  assert(mpu.rollMrad() >= 1569 && mpu.rollMrad() <= 1572);
   printf("firmware MPU6050 tests: OK\n");
   return 0;
 }

@@ -89,10 +89,11 @@ constexpr uint8_t ESTOP_PIN = 12U;
 constexpr uint8_t ESTOP_ACTIVE_LEVEL = HIGH;
 
 // The two FSR channels replace the single digital dead-man switch. Each FSR
-// must be wired as a voltage divider that reads near zero when released.
+// must be wired as a voltage divider that reads near zero when released. The
+// installed harness routes the physical left sensor to A2 and right to A1.
 constexpr bool REQUIRE_DEADMAN = true;
-constexpr uint8_t PRESSURE_LEFT_PIN = A1;
-constexpr uint8_t PRESSURE_RIGHT_PIN = A2;
+constexpr uint8_t PRESSURE_LEFT_PIN = A2;
+constexpr uint8_t PRESSURE_RIGHT_PIN = A1;
 constexpr uint16_t PRESSURE_SAMPLE_PERIOD_MS = 100U;
 constexpr float PRESSURE_FILTER_ALPHA = 0.2F;
 constexpr uint8_t PRESSURE_ADC_SAMPLES = 8U;
@@ -101,8 +102,8 @@ constexpr float PRESSURE_PRESENT_HYSTERESIS = 3.0F;
 // polarity and threshold halfway between its released and held readings.
 constexpr bool PRESSURE_LEFT_ACTIVE_HIGH = true;
 constexpr bool PRESSURE_RIGHT_ACTIVE_HIGH = true;
-constexpr float PRESSURE_LEFT_PRESENT_THRESHOLD = 25.0F;
-constexpr float PRESSURE_RIGHT_PRESENT_THRESHOLD = 25.0F;
+constexpr float PRESSURE_LEFT_PRESENT_THRESHOLD = 80.0F;
+constexpr float PRESSURE_RIGHT_PRESENT_THRESHOLD = 80.0F;
 constexpr bool PRESSURE_THRESHOLDS_CALIBRATED = true;
 constexpr float PRESSURE_IMBALANCE_THRESHOLD = 300.0F;
 constexpr float PRESSURE_SUDDEN_CHANGE_THRESHOLD = 150.0F;
@@ -220,8 +221,8 @@ static_assert(
             PRESSURE_RIGHT_PRESENT_THRESHOLD,
     "pressure hysteresis must be below both thresholds");
 static_assert(
-    PRESSURE_LEFT_PIN == A1 && PRESSURE_RIGHT_PIN == A2,
-    "Drive pressure channels must use A1/A2 because A0 is unavailable");
+    PRESSURE_LEFT_PIN == A2 && PRESSURE_RIGHT_PIN == A1,
+    "Drive pressure channels must match the installed A2/A1 harness");
 static_assert(
     PRESSURE_LEFT_PIN != PRESSURE_RIGHT_PIN &&
         PRESSURE_LEFT_PIN != ESTOP_PIN &&

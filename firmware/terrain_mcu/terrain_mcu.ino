@@ -7,7 +7,6 @@
 #endif
 
 #include "config.h"
-#include "gps_receiver.h"
 #include "mpu6050_sensor.h"
 #include "protocol.h"
 #include "tof10120_sensor.h"
@@ -21,14 +20,12 @@ namespace proto = safestride_protocol;
 
 constexpr uint32_t CAP_TOF10120 = 1UL << 8U;
 constexpr uint32_t CAP_MPU6050 = 1UL << 9U;
-constexpr uint32_t CAP_GPS = 1UL << 10U;
 constexpr uint16_t FAULT_TOF_INVALID = 1U << 0U;
 constexpr uint16_t FAULT_MPU_INVALID = 1U << 1U;
 
 proto::FrameReceiver g_receiver;
 Tof10120Sensor g_tof;
 Mpu6050Sensor g_mpu;
-GpsReceiver g_gps;
 uint32_t g_boot_id = 0UL;
 uint32_t g_session_id = 0UL;
 bool g_session_active = false;
@@ -88,9 +85,6 @@ void sendHello() {
   if (cfg::ENABLE_MPU6050) {
     capabilities |= CAP_MPU6050;
   }
-  if (cfg::ENABLE_GPS) {
-    capabilities |= CAP_GPS;
-  }
   proto::writeU32(payload + 4U, capabilities);
   payload[8U] = proto::BOARD_ROLE_TERRAIN;
   payload[9U] = proto::VERSION;
@@ -110,7 +104,9 @@ void sendTelemetry() {
   if (!g_session_active) {
     return;
   }
-  uint8_t payload[proto::TERRAIN_TELEMETRY_PAYLOAD_SIZE];
+  // Keep the protocol-v4 payload size stable while the former GPS fields at
+  // offsets 31..44 become reserved. GPS is acquired directly by the Pi.
+  uint8_t payload[proto::TERRAIN_TELEMETRY_PAYLOAD_SIZE] = {0U};
   proto::writeU16(payload + 0U, g_tof.distanceMm());
   payload[2U] = g_tof.valid() ? 1U : 0U;
   payload[3U] = static_cast<uint8_t>(g_tof.alert());
@@ -134,12 +130,6 @@ void sendTelemetry() {
     faults |= FAULT_MPU_INVALID;
   }
   proto::writeU16(payload + 29U, faults);
-  const GpsSample gps = g_gps.sample(millis());
-  proto::writeI32(payload + 31U, gps.latitude_e7);
-  proto::writeI32(payload + 35U, gps.longitude_e7);
-  proto::writeU32(payload + 39U, gps.speed_mm_s);
-  payload[43U] = gps.flags;
-  payload[44U] = gps.satellites;
   proto::sendFrame(
       Serial,
       proto::TYPE_TERRAIN_TELEMETRY,
@@ -188,7 +178,6 @@ void setup() {
   const uint32_t now_ms = millis();
   g_tof.begin(now_ms);
   g_mpu.begin(now_ms);
-  g_gps.begin();
   g_boot_id = makeBootId();
   g_last_hello_ms = now_ms - cfg::HELLO_PERIOD_MS;
   g_last_telemetry_ms = now_ms;
@@ -203,7 +192,6 @@ void loop() {
 #endif
   processHostProtocol();
   const uint32_t now_ms = millis();
-  g_gps.poll();
   g_tof.update(now_ms);
   g_mpu.update(now_ms);
   if (now_ms - g_last_hello_ms >= cfg::HELLO_PERIOD_MS) {

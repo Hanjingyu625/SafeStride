@@ -16,7 +16,9 @@ Ubuntu PC -- SSH/Ethernet or Wi-Fi --> Raspberry Pi 4
                                          |           D2 left Hall, A1/A2 pressure
                                          |
                                          +-- USB --> Terrain Uno
-                                                     TOF10120, MPU6050, GPS
+                                         |           TOF10120, MPU6050
+                                         |
+                                         +-- serial --> BE-220 GPS
 ```
 
 초기 확인은 다음 순서로 진행한다.
@@ -128,13 +130,15 @@ bash scripts/build.sh
 bash scripts/test.sh
 ```
 
-## 4. 두 Arduino Uno와 고정 장치 이름 확인
+## 4. 두 Arduino Uno, GPS와 고정 장치 이름 확인
 
-모터드라이버의 12 V 전원을 분리한 상태에서 두 Uno를 USB로 연결한다.
+모터드라이버의 12 V 전원을 분리한 상태에서 두 Uno와 BE-220 serial 장치를
+Raspberry Pi에 연결한다.
 
 ```bash
-ls -l /dev/ttyACM* /dev/serial/by-id/ 2>/dev/null
-for port in /dev/ttyACM*; do
+ls -l /dev/ttyACM* /dev/ttyUSB* /dev/serial/by-id/ 2>/dev/null
+for port in /dev/ttyACM* /dev/ttyUSB*; do
+  [[ -e "${port}" ]] || continue
   echo "== ${port} =="
   udevadm info --query=property --name="${port}" |
     grep -E 'ID_VENDOR_ID|ID_MODEL_ID|ID_SERIAL_SHORT'
@@ -143,7 +147,8 @@ done
 
 출력된 `ID_SERIAL_SHORT`가
 `deploy/udev/99-safestride.rules`의 Drive/Terrain 값과 일치하는지 확인한다.
-다르면 실제 Uno serial 값으로 규칙을 수정한 후 설치한다.
+GPS는 `deploy/udev/99-safestride.rules.example`의 GPS 행을 실제 USB-UART
+VID/PID/serial 값으로 채워 운영 규칙에 추가한다.
 
 ```bash
 sudo install -m 0644 deploy/udev/99-safestride.rules \
@@ -152,19 +157,20 @@ sudo udevadm control --reload-rules
 sudo udevadm trigger
 ```
 
-Uno를 다시 연결하고 두 링크가 만들어졌는지 확인한다.
+장치를 다시 연결하고 두 Uno 링크와 Pi GPIO UART가 준비됐는지 확인한다.
 
 ```bash
-ls -l /dev/safestride-drive /dev/safestride-terrain
+ls -l /dev/safestride-drive /dev/safestride-terrain /dev/ttyS0
 test -r /dev/safestride-drive && test -w /dev/safestride-drive
 test -r /dev/safestride-terrain && test -w /dev/safestride-terrain
+test -r /dev/ttyS0 && test -w /dev/ttyS0
 ```
 
 펌웨어 protocol v4가 두 Uno에 모두 올라가 있어야 한다. `arduino-cli`를 사용하는
-경우 Terrain Uno 라이브러리를 설치하고 각각 컴파일·업로드한다.
+경우 각각 컴파일·업로드한다. 현재 MCU 펌웨어에는 외부 Arduino 라이브러리가
+필요하지 않는다.
 
 ```bash
-bash scripts/install_arduino_libraries.sh
 arduino-cli compile --fqbn arduino:avr:uno firmware/safestride_mcu
 arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
 
@@ -198,9 +204,10 @@ SAFESTRIDE_ENABLE_PERCEPTION=false \
 bash scripts/run.sh
 ```
 
-`run.sh`는 `/dev/safestride-drive`와 `/dev/safestride-terrain`의 존재 및 Uno serial
-역할을 확인한다. 이 실행은 `/walker/set_enabled`를 자동 호출하지 않으므로 Drive
-MCU는 disarmed 상태여야 한다.
+`run.sh`는 `/dev/safestride-drive`, `/dev/safestride-terrain`, `/dev/ttyS0`의
+존재를 확인하고 두 Uno의 serial 역할도 검증한다. 이
+실행은 `/walker/set_enabled`를 자동 호출하지 않으므로 Drive MCU는 disarmed
+상태여야 한다.
 
 ## 6. 두 번째 SSH 터미널에서 topic 확인
 
@@ -256,7 +263,8 @@ ros2 topic hz /terrain/imu
 - 물체를 가까이 유지: raised 후보 후 `tof_alert: 3`
 - 바닥을 멀리 이동: drop 후보 후 `tof_alert: 4`
 - MPU6050 미연결은 진단 WARN이지만 TOF 시험 자체는 가능함
-- GPS fix가 없어도 `/gps/fix`는 NO_FIX 상태로 발행됨
+- GPS 노드가 `/dev/ttyS0`를 직접 열며, 유효한 NMEA no-fix 문장은
+  `/gps/fix`의 NO_FIX 상태로 발행됨
 - 지도·API 미설정 횡단보도 노드는 readiness WARN만 발행하며 모터 명령을 내지 않음
 
 `require_range_sensors=true`이므로 Terrain TOF가 없거나 무효이면 모터 활성은

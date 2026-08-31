@@ -1,4 +1,13 @@
+import math
+
 from safestride_sensors.nmea import parse_fix
+
+
+def sentence(body):
+    checksum = 0
+    for character in body:
+        checksum ^= ord(character)
+    return f'${body}*{checksum:02X}'
 
 
 def test_valid_rmc():
@@ -9,4 +18,17 @@ def test_valid_rmc():
 
 
 def test_bad_checksum_is_rejected():
-    assert parse_fix('$GPRMC,1,V,,,,,,,,,*00') is None
+    assert parse_fix('$GPRMC,1,V,,,,,,,,,*01') is None
+
+
+def test_valid_no_fix_sentence_is_published_as_invalid():
+    fix = parse_fix(sentence('GPRMC,123519,V,,,,,,,230394,,,N'))
+    assert fix and not fix.valid
+    assert math.isnan(fix.latitude)
+    assert math.isnan(fix.longitude)
+
+
+def test_out_of_range_coordinate_is_rejected():
+    assert parse_fix(
+        sentence('GPRMC,123519,A,9160.000,N,01131.000,E,0.0')
+    ) is None

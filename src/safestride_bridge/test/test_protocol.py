@@ -277,19 +277,13 @@ class TestPayloads(unittest.TestCase):
             mpu_pitch_mrad=340,
             mpu_valid=1,
             fault_bits=0,
-            gps_latitude_e7=375665000,
-            gps_longitude_e7=1269780000,
-            gps_speed_mm_s=1234,
-            gps_flags=3,
-            gps_satellites=9,
         )
         self.assertEqual(
             payload.pack(),
             struct.pack(
-                '<HBBHHhhhhhhhhhhBHiiIBB',
+                '<HBBHHhhhhhhhhhhBH14x',
                 725, 1, 2, 710, 500, 210, -15,
                 10, -20, 1000, 31, -42, 53, -120, 340, 1, 0,
-                375665000, 1269780000, 1234, 3, 9,
             ),
         )
         self.assertEqual(
@@ -336,7 +330,7 @@ class TestPayloads(unittest.TestCase):
             TelemetryPayload(*values).pack()
 
     def test_terrain_telemetry_rejects_invalid_alert_fields(self):
-        values = [0] * 22
+        values = [0] * 17
         values[2] = 6
         with self.assertRaises(PayloadDecodeError):
             TerrainTelemetryPayload.unpack(
@@ -345,15 +339,11 @@ class TestPayloads(unittest.TestCase):
         with self.assertRaises(ValueError):
             TerrainTelemetryPayload(*values).pack()
 
-    def test_terrain_telemetry_rejects_reserved_gps_flags(self):
-        values = [0] * 22
-        values[20] = 0x04
-        with self.assertRaises(ValueError):
-            TerrainTelemetryPayload(*values).pack()
-        with self.assertRaises(PayloadDecodeError):
-            TerrainTelemetryPayload.unpack(
-                TERRAIN_TELEMETRY_STRUCT.pack(*values)
-            )
+    def test_terrain_telemetry_keeps_legacy_gps_bytes_zero(self):
+        values = [0] * 17
+        packed = TerrainTelemetryPayload(*values).pack()
+        self.assertEqual(len(packed), 45)
+        self.assertEqual(packed[31:], bytes(14))
 
 
 class TestFrameParser(unittest.TestCase):

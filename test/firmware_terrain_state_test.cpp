@@ -166,7 +166,9 @@ int main() {
   assert(proto::readI16(frame.payload + 16U) == 1000);
   assert(frame.payload[28U] == 1U);
   assert(proto::readU16(frame.payload + 29U) == 0U);
-  assert(frame.payload[43U] == 0U);
+  for (size_t index = 31U; index < frame.payload_length; ++index) {
+    assert(frame.payload[index] == 0U);
+  }
 
   printf("firmware terrain session/telemetry tests: OK\n");
   return 0;

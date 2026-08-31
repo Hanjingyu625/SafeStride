@@ -39,7 +39,9 @@ ROLES = {
     'terrain': BOARD_ROLE_TERRAIN,
 }
 REQUIRED_CAPABILITIES = {
-    BOARD_ROLE_DRIVE: (1 << 0) | (1 << 4) | (1 << 6) | (1 << 7),
+    # Magnet bench mode (bit 7) is intentionally optional and disabled in
+    # production, so it must not be required for a healthy Drive link.
+    BOARD_ROLE_DRIVE: (1 << 0) | (1 << 4) | (1 << 6),
     BOARD_ROLE_TERRAIN: (1 << 8) | (1 << 9),
 }
 

@@ -12,15 +12,18 @@ Raspberry Pi 4, Ubuntu Server 24.04, ROS 2 Jazzy와 Arduino Uno 2대로 구성�
 12 V battery ---------------------------> motor driver
       +-> LM2596 5 V -> Raspberry Pi -> Drive Uno (USB)
                               +--------> Terrain Uno (USB)
+                              +--------> BE-220 GPS (serial)
 
 Drive Uno:   shared motor output, left D2 Hall, A1/A2 pressure
-Terrain Uno: downward TOF-10120, GY-521 MPU6050, BE-220 GPS
-Raspberry Pi: serial bridges -> safety supervisor -> diagnostics/Foxglove
+Terrain Uno: downward TOF-10120, GY-521 MPU6050
+Raspberry Pi: BE-220 GPS + serial bridges -> safety supervisor -> diagnostics/Foxglove
 ```
 
 - 왼쪽 휠 홀센서만 사용하며 D2/FALLING, 자석 6개로 설정되어 있다. 공통
   드라이브 구조라 오른쪽 ROS 값은 왼쪽 측정값을 복제한 추정치다.
 - 압력센서 임계값은 좌우 ADC 25이고 dead-man으로 동작한다.
+  ROS 시작 또는 serial 재연결 뒤에는 `/walker/set_enabled true`를 명시적으로
+  호출해야 하며, 압력 입력만으로 자동 재시작하지 않는다.
 - TOF는 약 25 cm 아래 지면을 향한다. 초기 기준면 학습 후 EMA 거리,
   적응 기준값, 변화량과 4회 연속 검출을 함께 사용해 높아진 물체와
   낮아진 바닥을 구분한다. 확정 시 모터 명령을 즉시 0으로 만들고 MCU
@@ -28,7 +31,8 @@ Raspberry Pi: serial bridges -> safety supervisor -> diagnostics/Foxglove
 - MPU6050은 3축 가속도·자이로와 중력 기반 roll/pitch를 발행한다. 지자기센서가
   없으므로 yaw는 관측하지 않는다. MPU 오류는 진단 경고이며 TOF 단차 안전
   정지를 대신하지 않으므로, MPU 교체 전에도 TOF 기반 모터 정지 시험은 가능하다.
-- GPS는 Terrain Uno에서 기본 활성이다. 지도·API가 없으면 횡단보도 노드는
+- GPS는 Raspberry Pi의 별도 serial 장치에서 `gps_node`가 직접 수신한다.
+  지도·API가 없으면 횡단보도 노드는
   종료되지 않고 준비 여부만 `/diagnostics`에 표시하며 모터 명령을 발행하지 않는다.
 - 배터리 정격은 12 V다. 배터리-ADC 분압 회로가 없으므로 `/battery_state`의
   실제 전압·잔량은 미측정으로 유지한다.
@@ -42,7 +46,8 @@ bash scripts/test.sh
 SAFESTRIDE_ENABLE_CRUISE=false bash scripts/run.sh
 ```
 
-운영 직렬 장치는 `/dev/safestride-drive`, `/dev/safestride-terrain`이다. 펌웨어는
+운영 직렬 장치는 `/dev/safestride-drive`, `/dev/safestride-terrain`, GPIO UART
+`/dev/ttyS0`이다. 펌웨어는
 프로토콜 v4이므로 두 Uno와 Pi 소프트웨어를 함께 갱신한다.
 
 ```bash

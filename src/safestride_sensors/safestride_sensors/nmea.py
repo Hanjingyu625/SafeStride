@@ -1,4 +1,5 @@
-"""Small, dependency-free BE-220 NMEA parser used by the future ROS node."""
+"""Small, dependency-free BE-220 NMEA parser used by the Pi ROS node."""
+import math
 from dataclasses import dataclass
 from typing import Optional
 
@@ -17,6 +18,15 @@ def _coordinate(raw: str, hemisphere: str) -> float:
     value = float(raw)
     degrees = int(value // 100)
     minutes = value - degrees * 100
+    maximum_degrees = 90 if hemisphere in {'N', 'S'} else 180
+    if (
+        not math.isfinite(value)
+        or degrees > maximum_degrees
+        or minutes < 0.0
+        or minutes >= 60.0
+        or (degrees == maximum_degrees and minutes != 0.0)
+    ):
+        raise ValueError('NMEA coordinate is out of range')
     result = degrees + minutes / 60.0
     return -result if hemisphere in {'S', 'W'} else result
 
@@ -37,11 +47,15 @@ def parse_fix(sentence: str) -> Optional[GpsFix]:
         kind = fields[0][-3:]
         if kind == 'RMC' and len(fields) >= 8:
             valid = fields[2] == 'A'
+            if not valid:
+                return GpsFix(math.nan, math.nan, None, False)
             return GpsFix(_coordinate(fields[3], fields[4]),
                           _coordinate(fields[5], fields[6]),
                           float(fields[7] or 0.0) * 0.514444, valid)
         if kind == 'GGA' and len(fields) >= 7:
             valid = int(fields[6] or 0) > 0
+            if not valid:
+                return GpsFix(math.nan, math.nan, None, False)
             return GpsFix(_coordinate(fields[2], fields[3]),
                           _coordinate(fields[4], fields[5]), None, valid)
     except (ValueError, IndexError):

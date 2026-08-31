@@ -117,9 +117,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument(
                 'enable_gps',
                 default_value='true',
-                description=(
-                    'Publish BE-220 data received by the Terrain Uno.'
-                ),
+                description='Start the Raspberry Pi BE-220 serial adapter.',
             ),
             DeclareLaunchArgument(
                 'enable_crosswalk',
@@ -205,15 +203,15 @@ def generate_launch_description() -> LaunchDescription:
                 name='terrain_bridge',
                 output='screen',
                 condition=IfCondition(enable_terrain),
-                parameters=[
-                    config_file,
-                    {
-                        'gps.enabled': ParameterValue(
-                            enable_gps,
-                            value_type=bool,
-                        ),
-                    },
-                ],
+                parameters=[config_file],
+            ),
+            Node(
+                package='safestride_sensors',
+                executable='gps_node',
+                name='gps_node',
+                output='screen',
+                condition=IfCondition(enable_gps),
+                parameters=[config_file],
             ),
             Node(
                 package='safestride_navigation',

@@ -10,17 +10,6 @@ constexpr uint16_t TELEMETRY_PERIOD_MS = 50U;
 constexpr uint16_t SESSION_LOSS_TIMEOUT_MS = 1500U;
 constexpr int AVR_BOOT_COUNTER_EEPROM_ADDRESS = 8;
 
-// BE-220 NMEA input on Terrain Uno. AltSoftSerial uses fixed ATmega328P pins:
-// D8 is RX from GPS TX, and D9 is TX to GPS RX. The module must be configured
-// to 9600 baud before connection. The factory 115200 baud leaves too little
-// interrupt-latency margin on a 16 MHz Uno while TOF and USB serial also run.
-constexpr bool ENABLE_GPS = true;
-constexpr uint8_t GPS_RX_PIN = 8U;
-constexpr uint8_t GPS_TX_PIN = 9U;
-constexpr uint32_t GPS_BAUD = 9600UL;
-constexpr uint16_t GPS_TELEMETRY_PERIOD_MS = 200U;
-constexpr uint16_t GPS_STALE_TIMEOUT_MS = 2000U;
-
 // The TOF-10120 datasheet gives the 8-bit address as 0xA4. Arduino Wire uses
 // the corresponding 7-bit address, 0x52.
 constexpr uint8_t TOF_I2C_ADDRESS = 0x52U;
@@ -43,6 +32,9 @@ constexpr bool ENABLE_MPU6050 = true;
 constexpr uint8_t MPU6050_ADDRESS_LOW = 0x68U;
 constexpr uint8_t MPU6050_ADDRESS_HIGH = 0x69U;
 constexpr uint16_t MPU6050_SAMPLE_PERIOD_MS = 50U;
+// DLPF is enabled, so the MPU6050 register source rate is 1 kHz. A divider
+// of 49 makes the sensor output rate match the firmware's 20 Hz read rate.
+constexpr uint8_t MPU6050_SAMPLE_RATE_DIVIDER = 49U;
 constexpr uint16_t MPU6050_RECONNECT_PERIOD_MS = 1000U;
 constexpr uint8_t MPU6050_MAX_CONSECUTIVE_ERRORS = 3U;
 constexpr float MPU6050_ATTITUDE_ALPHA = 0.15F;
@@ -69,13 +61,9 @@ static_assert(
     TOF_BASELINE_SAMPLES >= TOF_REQUIRED_FRAMES,
     "TOF baseline must contain enough samples");
 static_assert(
-    GPS_RX_PIN == 8U && GPS_TX_PIN == 9U,
-    "AltSoftSerial on Arduino Uno requires GPS RX/TX pins D8/D9");
-static_assert(
-    GPS_BAUD >= 4800UL && GPS_BAUD <= 31250UL,
-    "Terrain Uno GPS baud must be reliable with AltSoftSerial");
-static_assert(
-    GPS_STALE_TIMEOUT_MS > GPS_TELEMETRY_PERIOD_MS,
-    "GPS stale timeout must exceed its telemetry period");
+    (1000UL / (static_cast<uint32_t>(MPU6050_SAMPLE_RATE_DIVIDER) + 1UL)) *
+            MPU6050_SAMPLE_PERIOD_MS ==
+        1000UL,
+    "MPU6050 output and firmware sample periods must match");
 
 }  // namespace safestride_terrain_config

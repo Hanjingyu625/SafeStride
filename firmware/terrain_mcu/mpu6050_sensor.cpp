@@ -54,6 +54,10 @@ Mpu6050Sensor::Mpu6050Sensor()
       pitch_mrad_(0.0F) {}
 
 void Mpu6050Sensor::begin(uint32_t now_ms) {
+  configured_ = false;
+  valid_ = false;
+  attitude_initialized_ = false;
+  consecutive_errors_ = 0U;
   last_sample_ms_ = now_ms - cfg::MPU6050_SAMPLE_PERIOD_MS;
   last_reconnect_ms_ = now_ms - cfg::MPU6050_RECONNECT_PERIOD_MS;
   if (cfg::ENABLE_MPU6050) {
@@ -123,6 +127,7 @@ void Mpu6050Sensor::update(uint32_t now_ms) {
 
 bool Mpu6050Sensor::configure() {
   valid_ = false;
+  attitude_initialized_ = false;
   address_ = 0U;
   if (probe(cfg::MPU6050_ADDRESS_LOW)) {
     address_ = cfg::MPU6050_ADDRESS_LOW;
@@ -132,7 +137,8 @@ bool Mpu6050Sensor::configure() {
     return false;
   }
   if (!writeRegister(REG_PWR_MGMT_1, 0x01U) ||
-      !writeRegister(REG_SMPLRT_DIV, 0x04U) ||
+      !writeRegister(
+          REG_SMPLRT_DIV, cfg::MPU6050_SAMPLE_RATE_DIVIDER) ||
       !writeRegister(REG_CONFIG, 0x03U) ||
       !writeRegister(REG_GYRO_CONFIG, 0x00U) ||
       !writeRegister(REG_ACCEL_CONFIG, 0x00U)) {

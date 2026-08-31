@@ -32,9 +32,13 @@ FND 표시가 12 V로 일정해도 Pi 단자의 5 V 순간 강하는 별도 측�
 | 핀 | 연결 |
 |---:|---|
 | A4/A5 | TOF-10120(`0x52`)와 GY-521 MPU6050(`0x68`/`0x69`) SDA/SCL |
-| D8 | BE-220 TX → Uno RX (AltSoftSerial) |
-| D9 | Uno TX → BE-220 RX |
 | GND | 모든 센서와 공통 GND |
 
-BE-220은 Uno 부하를 고려해 9600 baud로 설정한다. TOF는 아래쪽을 향해 약
-25 cm 높이에 고정하고 장착부 흔들림이 거리 변화로 들어오지 않게 한다.
+TOF는 아래쪽을 향해 약 25 cm 높이에 고정하고 장착부 흔들림이 거리 변화로
+들어오지 않게 한다.
+
+## Raspberry Pi GPS
+
+BE-220은 Pi GPIO UART를 통해 Raspberry Pi에 직접 연결하고, 운영 장치 이름은
+`/dev/ttyS0`, 기본 baudrate는 115200이다. GPS와 Pi의 GND를 공유하고 TTL 전압
+레벨이 Pi 입력 허용 범위와 맞는지 확인한다.

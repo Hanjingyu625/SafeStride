@@ -12,8 +12,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from safestride_interfaces.msg import TerrainStatus
-from sensor_msgs.msg import Imu, NavSatFix, NavSatStatus, Range
-from std_msgs.msg import Float32
+from sensor_msgs.msg import Imu, Range
 
 try:
     import serial
@@ -39,9 +38,35 @@ from .validation import bounded_int, finite_float
 
 CAP_TOF10120 = 1 << 8
 CAP_MPU6050 = 1 << 9
-CAP_GPS = 1 << 10
-GPS_FIX_VALID = 1 << 0
-GPS_SPEED_VALID = 1 << 1
+GRAVITY_M_S2 = 9.80665
+
+
+def _gravity_compensated_acceleration(
+    accel_x_m_s2: float,
+    accel_y_m_s2: float,
+    accel_z_m_s2: float,
+    roll_rad: float,
+    pitch_rad: float,
+) -> tuple[float, float, float]:
+    """Remove the gravity vector expressed in the IMU body frame.
+
+    MPU6050 acceleration includes gravity. With the board's +Z-up mounting,
+    the gravity measurement in body coordinates is
+    ``(-g sin(pitch), g sin(roll) cos(pitch), g cos(roll) cos(pitch))``.
+    ``sensor_msgs/Imu.linear_acceleration`` is the non-gravitational value.
+    """
+    gravity_x = -GRAVITY_M_S2 * math.sin(pitch_rad)
+    gravity_y = (
+        GRAVITY_M_S2 * math.sin(roll_rad) * math.cos(pitch_rad)
+    )
+    gravity_z = (
+        GRAVITY_M_S2 * math.cos(roll_rad) * math.cos(pitch_rad)
+    )
+    return (
+        accel_x_m_s2 - gravity_x,
+        accel_y_m_s2 - gravity_y,
+        accel_z_m_s2 - gravity_z,
+    )
 
 
 class TerrainBridgeNode(Node):
@@ -77,12 +102,6 @@ class TerrainBridgeNode(Node):
         self._status_pub = self.create_publisher(
             TerrainStatus, self._topic_status, 10
         )
-        self._gps_fix_pub = self.create_publisher(
-            NavSatFix, self._topic_gps_fix, qos_profile_sensor_data
-        )
-        self._gps_speed_pub = self.create_publisher(
-            Float32, self._topic_gps_speed, qos_profile_sensor_data
-        )
         self._diagnostics_pub = self.create_publisher(
             DiagnosticArray, self._topic_diagnostics, 10
         )
@@ -110,14 +129,10 @@ class TerrainBridgeNode(Node):
             ('range.min_m', 0.10),
             ('range.max_m', 2.00),
             ('range.field_of_view_rad', 0.052),
-            ('gps.enabled', True),
             ('frames.tof', 'terrain_tof_link'),
             ('frames.imu', 'imu_link'),
-            ('frames.gps', 'gps_link'),
             ('topics.tof', '/terrain/tof'),
             ('topics.imu', '/terrain/imu'),
-            ('topics.gps_fix', '/gps/fix'),
-            ('topics.gps_speed', '/gps/speed'),
             ('topics.status', '/terrain/status'),
             ('topics.diagnostics', '/diagnostics'),
         )
@@ -182,12 +197,8 @@ class TerrainBridgeNode(Node):
             )
         self._frame_tof = str(self._value('frames.tof'))
         self._frame_imu = str(self._value('frames.imu'))
-        self._frame_gps = str(self._value('frames.gps'))
-        self._gps_enabled = bool(self._value('gps.enabled'))
         self._topic_tof = str(self._value('topics.tof'))
         self._topic_imu = str(self._value('topics.imu'))
-        self._topic_gps_fix = str(self._value('topics.gps_fix'))
-        self._topic_gps_speed = str(self._value('topics.gps_speed'))
         self._topic_status = str(self._value('topics.status'))
         self._topic_diagnostics = str(self._value('topics.diagnostics'))
 
@@ -417,7 +428,6 @@ class TerrainBridgeNode(Node):
         )
         self._tof_pub.publish(message)
         self._publish_imu(telemetry)
-        self._publish_gps(telemetry)
         self._publish_status()
 
     @staticmethod
@@ -464,15 +474,17 @@ class TerrainBridgeNode(Node):
             message.angular_velocity.z = (
                 telemetry.mpu_gyro_z_mrad_s / 1000.0
             )
-            gravity_per_mg = 9.80665 / 1000.0
-            message.linear_acceleration.x = (
-                telemetry.mpu_accel_x_mg * gravity_per_mg
-            )
-            message.linear_acceleration.y = (
-                telemetry.mpu_accel_y_mg * gravity_per_mg
-            )
-            message.linear_acceleration.z = (
-                telemetry.mpu_accel_z_mg * gravity_per_mg
+            gravity_per_mg = GRAVITY_M_S2 / 1000.0
+            (
+                message.linear_acceleration.x,
+                message.linear_acceleration.y,
+                message.linear_acceleration.z,
+            ) = _gravity_compensated_acceleration(
+                telemetry.mpu_accel_x_mg * gravity_per_mg,
+                telemetry.mpu_accel_y_mg * gravity_per_mg,
+                telemetry.mpu_accel_z_mg * gravity_per_mg,
+                roll,
+                pitch,
             )
             message.angular_velocity_covariance[0] = 0.02
             message.angular_velocity_covariance[4] = 0.02
@@ -486,29 +498,6 @@ class TerrainBridgeNode(Node):
             message.angular_velocity_covariance[0] = -1.0
             message.linear_acceleration_covariance[0] = -1.0
         self._imu_pub.publish(message)
-
-    def _publish_gps(self, telemetry: TerrainTelemetryPayload) -> None:
-        if not self._gps_enabled:
-            return
-        fix = NavSatFix()
-        fix.header.stamp = self.get_clock().now().to_msg()
-        fix.header.frame_id = self._frame_gps
-        fix.status.service = NavSatStatus.SERVICE_GPS
-        if telemetry.gps_flags & GPS_FIX_VALID:
-            fix.status.status = NavSatStatus.STATUS_FIX
-            fix.latitude = telemetry.gps_latitude_e7 / 1.0e7
-            fix.longitude = telemetry.gps_longitude_e7 / 1.0e7
-        else:
-            fix.status.status = NavSatStatus.STATUS_NO_FIX
-            fix.latitude = float('nan')
-            fix.longitude = float('nan')
-        fix.altitude = float('nan')
-        fix.position_covariance_type = NavSatFix.COVARIANCE_TYPE_UNKNOWN
-        self._gps_fix_pub.publish(fix)
-        if telemetry.gps_flags & GPS_SPEED_VALID:
-            speed = Float32()
-            speed.data = telemetry.gps_speed_mm_s / 1000.0
-            self._gps_speed_pub.publish(speed)
 
     def _publish_status(self) -> None:
         now = self._now()
@@ -600,20 +589,14 @@ class TerrainBridgeNode(Node):
             status.level = DiagnosticStatus.ERROR
             status.message = 'Terrain firmware lacks TOF-10120 capability'
         elif not (self._capabilities & CAP_MPU6050):
-            status.level = DiagnosticStatus.ERROR
+            status.level = DiagnosticStatus.WARN
             status.message = 'Terrain firmware lacks MPU6050 capability'
         elif telemetry is None or not telemetry.tof_valid:
             status.level = DiagnosticStatus.ERROR
             status.message = 'TOF-10120 reading invalid'
         elif not telemetry.mpu_valid:
-            status.level = DiagnosticStatus.ERROR
+            status.level = DiagnosticStatus.WARN
             status.message = 'MPU6050 reading invalid'
-        elif self._gps_enabled and not (self._capabilities & CAP_GPS):
-            status.level = DiagnosticStatus.WARN
-            status.message = 'Terrain firmware lacks GPS capability'
-        elif self._gps_enabled and not (telemetry.gps_flags & GPS_FIX_VALID):
-            status.level = DiagnosticStatus.WARN
-            status.message = 'GPS enabled; waiting for a valid fix'
         elif (
             self._parser.crc_error_count
             or self._parser.frame_error_count
@@ -670,13 +653,6 @@ class TerrainBridgeNode(Node):
             KeyValue(
                 key='mpu6050_valid',
                 value=str(bool(telemetry and telemetry.mpu_valid)).lower(),
-            ),
-            KeyValue(
-                key='gps_fix_valid',
-                value=(
-                    str(bool(telemetry.gps_flags & GPS_FIX_VALID)).lower()
-                    if telemetry is not None else 'unknown'
-                ),
             ),
             KeyValue(
                 key='crc_errors', value=str(self._parser.crc_error_count)

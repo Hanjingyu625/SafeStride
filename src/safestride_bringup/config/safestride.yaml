@@ -69,13 +69,10 @@ terrain_bridge:
     telemetry: {timeout_s: 0.30}
     diagnostics: {publish_rate_hz: 1.0}
     range: {min_m: 0.10, max_m: 2.0, field_of_view_rad: 0.052}
-    gps: {enabled: true}
-    frames: {tof: terrain_tof_link, imu: imu_link, gps: gps_link}
+    frames: {tof: terrain_tof_link, imu: imu_link}
     topics:
       tof: /terrain/tof
       imu: /terrain/imu
-      gps_fix: /gps/fix
-      gps_speed: /gps/speed
       status: /terrain/status
       diagnostics: /diagnostics
 
@@ -143,8 +140,9 @@ surface_perception:
 
 gps_node:
   ros__parameters:
+    # BE-220 is connected directly to the Raspberry Pi, not the Terrain Uno.
     port: /dev/safestride-gps
-    baudrate: 9600
+    baudrate: 115200
     poll_rate_hz: 50.0
     reconnect_period_s: 1.0
     frame_id: gps_link
