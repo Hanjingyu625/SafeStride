@@ -27,6 +27,7 @@ def generate_launch_description() -> LaunchDescription:
     wheel_radius = LaunchConfiguration('wheel_radius')
     wheel_separation = LaunchConfiguration('wheel_separation')
     enable_gps = LaunchConfiguration('enable_gps')
+    gps_port = LaunchConfiguration('gps_port')
     enable_crosswalk = LaunchConfiguration('enable_crosswalk')
     crosswalk_file = LaunchConfiguration('crosswalk_file')
     intersection_map_file = LaunchConfiguration('intersection_map_file')
@@ -122,6 +123,11 @@ def generate_launch_description() -> LaunchDescription:
                 'enable_gps',
                 default_value='true',
                 description='Start the Raspberry Pi BE-220 serial adapter.',
+            ),
+            DeclareLaunchArgument(
+                'gps_port',
+                default_value='/dev/serial0',
+                description='Raspberry Pi UART device used by the BE-220.',
             ),
             DeclareLaunchArgument(
                 'enable_crosswalk',
@@ -235,7 +241,7 @@ def generate_launch_description() -> LaunchDescription:
                 name='gps_node',
                 output='screen',
                 condition=IfCondition(enable_gps),
-                parameters=[config_file],
+                parameters=[config_file, {'port': gps_port}],
             ),
             Node(
                 package='safestride_navigation',

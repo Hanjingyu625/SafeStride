@@ -23,6 +23,29 @@ class TestGpsMotionTracker(unittest.TestCase):
         self.assertEqual(self.tracker.heading(1.0, 5.0), 91.0)
         self.assertEqual(self.tracker.heading_source, 'rmc_course')
 
+    def test_stationary_position_drift_does_not_create_heading(self):
+        self.tracker.update(0.0, 0.0, 0.0, allow_heading=False)
+        self.tracker.update(
+            8.0 / 111_320.0,
+            0.0,
+            2.0,
+            allow_heading=False,
+        )
+        self.assertIsNone(self.tracker.heading(2.0, 5.0))
+        self.assertEqual(self.tracker.heading_source, 'unavailable')
+
+    def test_heading_anchor_restarts_when_motion_is_confirmed(self):
+        self.tracker.update(0.0, 0.0, 0.0, allow_heading=False)
+        drifted = 8.0 / 111_320.0
+        self.tracker.update(drifted, 0.0, 2.0, allow_heading=False)
+        self.tracker.update(
+            drifted + 3.0 / 111_320.0,
+            0.0,
+            4.0,
+            allow_heading=True,
+        )
+        self.assertAlmostEqual(self.tracker.heading(4.0, 5.0), 0.0, places=2)
+
     def test_reports_stuck_only_when_motion_is_reported(self):
         self.tracker.update(0.0, 0.0, 0.0)
         self.assertFalse(

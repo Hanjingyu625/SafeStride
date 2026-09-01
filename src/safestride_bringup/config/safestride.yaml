@@ -148,12 +148,28 @@ gps_node:
     frame_id: gps_link
     fix_topic: /gps/fix
     speed_topic: /gps/speed
+    raw_speed_topic: /gps/speed_raw
     course_topic: /gps/course
     diagnostics_topic: /diagnostics
     nmea_timeout_s: 2.0
     fix_timeout_s: 2.0
     diagnostic_rate_hz: 1.0
     course_min_speed_mps: 0.20
+    # GPS is a fallback. Hall odometry remains authoritative for walking speed.
+    speed_filter_window_s: 8.0
+    speed_filter_minimum_span_s: 4.0
+    speed_filter_minimum_samples: 5
+    speed_filter_minimum_displacement_m: 1.0
+    speed_filter_hdop_displacement_scale_m: 0.50
+    speed_filter_minimum_path_efficiency: 0.55
+    speed_filter_minimum_course_coherence: 0.55
+    speed_filter_maximum_hdop: 5.0
+    speed_filter_minimum_satellites: 5
+    speed_filter_require_quality: true
+    speed_filter_enter_confirmations: 2
+    speed_filter_exit_confirmations: 3
+    speed_filter_smoothing_alpha: 0.35
+    speed_filter_maximum_speed_mps: 3.0
 
 crosswalk_controller:
   ros__parameters:
@@ -177,6 +193,8 @@ crosswalk_controller:
     gps_change_threshold_m: 0.5
     gps_stuck_timeout_s: 5.0
     gps_stuck_speed_mps: 0.15
+    wheel_motion_min_speed_mps: 0.02
+    wheel_motion_hold_s: 3.5
     signal_refresh_interval_s: 3.0
     signal_cache_max_age_s: 12.0
     signal_request_timeout_s: 3.0
@@ -201,7 +219,7 @@ foxglove_bridge:
     topic_whitelist:
       - ^/(diagnostics|walker/status|wheel/hall|handle/pressure|battery_state)$
       - ^/terrain/(tof|imu|status)$
-      - ^/(gps/fix|gps/speed|gps/course|crosswalk/status|odom|tf|tf_static|robot_description)$
+      - ^/(gps/fix|gps/speed|gps/speed_raw|gps/course|crosswalk/status|odom|tf|tf_static|robot_description)$
     service_whitelist: ['(?!)']
     param_whitelist: ['(?!)']
     client_topic_whitelist: ['(?!)']

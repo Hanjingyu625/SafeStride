@@ -35,7 +35,14 @@ class GpsMotionTracker:
         self._heading_time: Optional[float] = None
         self.heading_source = 'unavailable'
 
-    def update(self, latitude: float, longitude: float, now: float) -> None:
+    def update(
+        self,
+        latitude: float,
+        longitude: float,
+        now: float,
+        *,
+        allow_heading: bool = True,
+    ) -> None:
         current = (latitude, longitude)
         if self._change_anchor is None:
             self._change_anchor = current
@@ -51,6 +58,9 @@ class GpsMotionTracker:
                 self._change_anchor = current
                 self._position_change_time = now
 
+        if not allow_heading:
+            self._heading_anchor = current
+            return
         if self._heading_anchor is None:
             self._heading_anchor = current
             return

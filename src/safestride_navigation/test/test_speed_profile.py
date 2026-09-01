@@ -22,6 +22,12 @@ class TestSpeedProfile(unittest.TestCase):
             restored = UserSpeedProfile(str(path))
             self.assertEqual(list(restored.samples), [0.45])
 
+    def test_unconfirmed_motion_is_not_learned(self):
+        profile = UserSpeedProfile(default_speed_mps=0.5)
+        profile.add(0.75, allow_update=False)
+        self.assertEqual(list(profile.samples), [])
+        self.assertEqual(profile.safe_speed(), 0.5)
+
 
 if __name__ == '__main__':
     unittest.main()

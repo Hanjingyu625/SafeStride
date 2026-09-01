@@ -2,9 +2,18 @@
 
 The standalone `smart_crosswalk_controller_v6.py` logic has been split into
 testable ROS 2 components. The Raspberry Pi `gps_node` reads the BE-220 directly
-from `/dev/serial0` and publishes `/gps/fix`, `/gps/speed` and `/gps/course`.
+from `/dev/serial0` or `/dev/ttyS0` and publishes `/gps/fix`, filtered
+`/gps/speed`, diagnostic `/gps/speed_raw`, and motion-gated `/gps/course`.
 Terrain Uno does not relay GPS data. The crosswalk controller is monitor-only by
 default and therefore does not publish `/cmd_vel` unless explicitly enabled.
+
+The GPS speed filter requires a fresh GGA quality report, at least five
+satellites, HDOP no worse than 5.0, and spatially consistent movement over a
+rolling window. Raw RMC speed alone never proves movement. Wheel-derived
+`/odom` is authoritative whenever it is fresh, including its zero-speed state;
+the filtered GPS speed is only a fallback. This prevents stationary GNSS drift
+from changing the user speed profile. Very slow walking is retained by Hall
+odometry rather than guessed from low-cost GNSS noise.
 
 ## Prepare crosswalk data
 
@@ -31,11 +40,11 @@ intersection MAP CSV normalized for offline startup. Override it with
 API is available, the controller refreshes this seed in the background and
 caches the newer result without blocking signal timing requests.
 
-When RMC course is fresh, or the GPS position has moved at least 2 m, candidates
-more than 60 degrees away from the travel direction are rejected. Before a
-heading is available, the nearest polygon is used. GPS course is direction of
-travel, not a compass heading, so it is intentionally unavailable while the
-walker is stationary.
+While wheel or filtered GPS movement is confirmed, a fresh RMC course or at
+least 2 m of GPS position movement supplies travel direction. Candidates more
+than 60 degrees away from that direction are rejected. Before a heading is
+available, the nearest polygon is used. GPS course is direction of travel, not
+a compass heading, so it is intentionally unavailable while stationary.
 
 ## Configure signal timing
 
@@ -70,6 +79,8 @@ export SAFESTRIDE_ENABLE_CROSSWALK=true
 bash scripts/run.sh
 ros2 topic echo /crosswalk/status
 ros2 topic echo /gps/fix
+ros2 topic echo /gps/speed
+ros2 topic echo /gps/speed_raw
 ros2 topic echo /gps/course
 ros2 topic echo /diagnostics --field status
 ```

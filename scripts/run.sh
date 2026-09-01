@@ -8,6 +8,16 @@ enable_perception="${SAFESTRIDE_ENABLE_PERCEPTION:-false}"
 enable_cruise="${SAFESTRIDE_ENABLE_CRUISE:-true}"
 enable_crosswalk="${SAFESTRIDE_ENABLE_CROSSWALK:-true}"
 enable_gps="${SAFESTRIDE_ENABLE_GPS:-true}"
+gps_port="${SAFESTRIDE_GPS_PORT:-}"
+if [[ -z "${gps_port}" ]]; then
+  if [[ -e /dev/serial0 ]]; then
+    gps_port=/dev/serial0
+  elif [[ -e /dev/ttyS0 ]]; then
+    gps_port=/dev/ttyS0
+  else
+    gps_port=/dev/serial0
+  fi
+fi
 crosswalk_file="${SAFESTRIDE_CROSSWALK_FILE:-${workspace}/raspberry_pi/standard_crosswalks.json}"
 intersection_map_file="${SAFESTRIDE_INTERSECTION_MAP_FILE:-${workspace}/raspberry_pi/v2x_intersections.json}"
 default_signal_api_key_file="${workspace}/raspberry_pi/api_key.txt"
@@ -34,7 +44,6 @@ check_serial_role() {
     echo "Add the current user to dialout, then log in again." >&2
     exit 1
   fi
-
   resolved="$(readlink -f "${port}")"
   if command -v udevadm >/dev/null 2>&1; then
     actual_serial="$(
@@ -64,6 +73,7 @@ check_serial_device() {
     echo "Add the current user to dialout, then log in again." >&2
     exit 1
   fi
+  echo "${role} port: ${port} -> $(readlink -f "${port}")"
 }
 
 if [[ "${config}" == "${workspace}/config/raspberry_pi.yaml" &&
@@ -75,7 +85,7 @@ if [[ "${config}" == "${workspace}/config/raspberry_pi.yaml" &&
       /dev/safestride-terrain 8583030333935131E120 Terrain
   fi
   if [[ "${enable_gps}" == "true" ]]; then
-    check_serial_device /dev/serial0 GPS
+    check_serial_device "${gps_port}" GPS
   fi
 fi
 
@@ -151,6 +161,7 @@ exec ros2 launch safestride_bringup safestride.launch.py \
   perception_camera_index:="${SAFESTRIDE_PERCEPTION_CAMERA_INDEX:-0}" \
   perception_camera_backend:="${SAFESTRIDE_PERCEPTION_CAMERA_BACKEND:-v4l2}" \
   enable_gps:="${enable_gps}" \
+  gps_port:="${gps_port}" \
   enable_crosswalk:="${enable_crosswalk}" \
   crosswalk_file:="${crosswalk_file}" \
   intersection_map_file:="${intersection_map_file}" \

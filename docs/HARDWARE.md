@@ -40,5 +40,6 @@ TOF는 아래쪽을 향해 약 25 cm 높이에 고정하고 장착부 흔들림�
 ## Raspberry Pi GPS
 
 BE-220은 Pi GPIO UART를 통해 Raspberry Pi에 직접 연결하고, 운영 장치 이름은
-`/dev/serial0`, 기본 baudrate는 115200이다. GPS와 Pi의 GND를 공유하고 TTL 전압
-레벨이 Pi 입력 허용 범위와 맞는지 확인한다.
+`/dev/serial0` 또는 `/dev/ttyS0`, 기본 baudrate는 115200이다. 실행 스크립트가
+두 경로를 자동 선택하며 필요하면 `SAFESTRIDE_GPS_PORT`로 지정한다. GPS와 Pi의
+GND를 공유하고 TTL 전압 레벨이 Pi 입력 허용 범위와 맞는지 확인한다.

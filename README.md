@@ -47,7 +47,8 @@ SAFESTRIDE_ENABLE_CRUISE=false bash scripts/run.sh
 ```
 
 운영 직렬 장치는 `/dev/safestride-drive`, `/dev/safestride-terrain`, GPIO UART
-`/dev/serial0`이다. 펌웨어는
+`/dev/serial0` 또는 `/dev/ttyS0`이다. `scripts/run.sh`가 GPS UART를 자동으로
+선택하며 `SAFESTRIDE_GPS_PORT`로 덮어쓸 수 있다. 펌웨어는
 프로토콜 v4이므로 두 Uno와 Pi 소프트웨어를 함께 갱신한다.
 
 ```bash
@@ -64,7 +65,8 @@ arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
 | `/terrain/tof` | `sensor_msgs/Range` | TOF 원거리 |
 | `/terrain/status` | `TerrainStatus` | 필터·기준·오차·변화량·raised/drop 상태 |
 | `/terrain/imu` | `sensor_msgs/Imu` | MPU6050 가속도·자이로·roll/pitch |
-| `/gps/fix`, `/gps/speed`, `/gps/course` | 표준 GPS 토픽 | BE-220 위치·속도·이동방향 |
+| `/gps/fix`, `/gps/speed`, `/gps/course` | GPS 토픽 | 위치·검증된 fallback 속도·이동 중 방향 |
+| `/gps/speed_raw` | `std_msgs/Float32` | BE-220 RMC 원시 속도(진단 전용) |
 | `/crosswalk/status` | `CrosswalkStatus` | 지도/API/GPS 기반 모니터 결과 |
 | `/walker/status` | `WalkerStatus` | Drive MCU 링크·arm·fault 상태 |
 | `/diagnostics` | `DiagnosticArray` | 시스템 준비 상태와 오류 원인 |

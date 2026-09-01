@@ -84,6 +84,8 @@ class CrosswalkController(Node):
             'gps_change_threshold_m': 0.5,
             'gps_stuck_timeout_s': 5.0,
             'gps_stuck_speed_mps': 0.15,
+            'wheel_motion_min_speed_mps': 0.02,
+            'wheel_motion_hold_s': 3.5,
             'signal_refresh_interval_s': 3.0,
             'signal_cache_max_age_s': 12.0,
             'signal_request_timeout_s': 3.0,
@@ -174,6 +176,10 @@ class CrosswalkController(Node):
         )
         self._gps_stuck_timeout = self._positive('gps_stuck_timeout_s')
         self._gps_stuck_speed = self._nonnegative('gps_stuck_speed_mps')
+        self._wheel_motion_min_speed = self._nonnegative(
+            'wheel_motion_min_speed_mps'
+        )
+        self._wheel_motion_hold = self._positive('wheel_motion_hold_s')
         self._signal_refresh = self._positive(
             'signal_refresh_interval_s'
         )
@@ -219,6 +225,7 @@ class CrosswalkController(Node):
         self._odom_time: Optional[float] = None
         self._odom_position: Optional[Tuple[float, float]] = None
         self._wheel_distance_m = 0.0
+        self._last_wheel_motion_time: Optional[float] = None
 
         self._executor = ThreadPoolExecutor(
             max_workers=2,
@@ -385,7 +392,12 @@ class CrosswalkController(Node):
         if valid:
             now = self._now()
             current = (latitude, longitude)
-            self._gps_motion.update(latitude, longitude, now)
+            self._gps_motion.update(
+                latitude,
+                longitude,
+                now,
+                allow_heading=self._motion_confirmed(now),
+            )
             self._fix = current
             self._fix_time = now
 
@@ -397,8 +409,13 @@ class CrosswalkController(Node):
 
     def _gps_course_callback(self, message: Float32) -> None:
         course = float(message.data)
-        if math.isfinite(course) and 0.0 <= course <= 360.0:
-            self._gps_motion.set_course(course, self._now())
+        now = self._now()
+        if (
+            math.isfinite(course)
+            and 0.0 <= course <= 360.0
+            and self._motion_confirmed(now)
+        ):
+            self._gps_motion.set_course(course, now)
 
     def _odom_callback(self, message: Odometry) -> None:
         now = self._now()
@@ -407,6 +424,8 @@ class CrosswalkController(Node):
         if math.isfinite(speed) and 0.0 <= speed <= 3.0:
             self._odom_speed = speed
             self._odom_time = now
+            if speed >= self._wheel_motion_min_speed:
+                self._last_wheel_motion_time = now
 
         position = message.pose.pose.position
         current = (float(position.x), float(position.y))
@@ -419,16 +438,50 @@ class CrosswalkController(Node):
             )
             if 0.0 <= step <= 2.0:
                 self._wheel_distance_m += step
+                if step > 0.001:
+                    self._last_wheel_motion_time = now
         self._odom_position = current
 
-    def _measured_speed(self, now: float) -> Optional[float]:
+    def _wheel_motion_active(self, now: float) -> bool:
+        return (
+            self._fresh(now, self._odom_time, self._speed_timeout)
+            and self._fresh(
+                now,
+                self._last_wheel_motion_time,
+                self._wheel_motion_hold,
+            )
+        )
+
+    def _motion_confirmed(self, now: float) -> bool:
         if self._fresh(now, self._odom_time, self._speed_timeout):
-            return self._odom_speed
+            return self._wheel_motion_active(now)
+        return bool(
+            self._fresh(now, self._gps_speed_time, self._speed_timeout)
+            and self._gps_speed is not None
+            and self._gps_speed > 0.0
+        )
+
+    def _measured_motion(
+        self,
+        now: float,
+    ) -> Tuple[Optional[float], str, bool]:
+        if self._fresh(now, self._odom_time, self._speed_timeout):
+            return (
+                self._odom_speed,
+                'wheel_odom',
+                self._wheel_motion_active(now),
+            )
         if self._fresh(now, self._gps_speed_time, self._speed_timeout):
-            return self._gps_speed
-        return None
+            return (
+                self._gps_speed,
+                'gps_filtered',
+                bool(self._gps_speed is not None and self._gps_speed > 0.0),
+            )
+        return None, 'unavailable', False
 
     def _heading(self, now: float) -> Optional[float]:
+        if not self._motion_confirmed(now):
+            return None
         return self._gps_motion.heading(now, self._heading_timeout)
 
     def _consume_signal_future(self, now: float) -> None:
@@ -600,6 +653,9 @@ class CrosswalkController(Node):
         active: Optional[Mapping[str, Any]],
         heading: Optional[float],
         gps_stuck: bool,
+        measured_speed: Optional[float],
+        speed_source: str,
+        motion_confirmed: bool,
     ) -> None:
         if now - self._last_diagnostic < 1.0:
             return
@@ -762,6 +818,19 @@ class CrosswalkController(Node):
                 key='effective_speed_mps',
                 value='%.3f' % effective_speed_mps,
             ),
+            KeyValue(
+                key='measured_speed_mps',
+                value=(
+                    '%.3f' % measured_speed
+                    if measured_speed is not None
+                    else 'nan'
+                ),
+            ),
+            KeyValue(key='measured_speed_source', value=speed_source),
+            KeyValue(
+                key='motion_confirmed',
+                value=str(motion_confirmed).lower(),
+            ),
         ]
         array = DiagnosticArray()
         array.header.stamp = self.get_clock().now().to_msg()
@@ -792,12 +861,19 @@ class CrosswalkController(Node):
                 configured_id='',
             )
         )
-        measured_speed = self._measured_speed(now)
+        measured_speed, speed_source, motion_confirmed = (
+            self._measured_motion(now)
+        )
         heading = self._heading(now)
         self._nearest_intersection = None
+        stuck_speed = measured_speed
+        if motion_confirmed and (
+            stuck_speed is None or stuck_speed < self._gps_stuck_speed
+        ):
+            stuck_speed = self._gps_stuck_speed
         gps_stuck = gps_valid and self._gps_motion.coordinates_stuck(
             now,
-            measured_speed,
+            stuck_speed,
             timeout_s=self._gps_stuck_timeout,
             minimum_speed_mps=self._gps_stuck_speed,
         )
@@ -871,8 +947,11 @@ class CrosswalkController(Node):
             )
             self._profile.add(
                 measured_speed,
-                allow_update=self._controller.state
-                not in ('WAIT_AT_CURB', 'CROSSING_URGENT'),
+                allow_update=(
+                    motion_confirmed
+                    and self._controller.state
+                    not in ('WAIT_AT_CURB', 'CROSSING_URGENT')
+                ),
             )
         else:
             self._controller.reset('GPS unavailable or stale')
@@ -934,6 +1013,9 @@ class CrosswalkController(Node):
             active=active,
             heading=heading,
             gps_stuck=gps_stuck,
+            measured_speed=measured_speed,
+            speed_source=speed_source,
+            motion_confirmed=motion_confirmed,
         )
 
     def destroy_node(self) -> bool:
