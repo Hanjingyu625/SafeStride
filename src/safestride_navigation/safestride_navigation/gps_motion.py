@@ -6,6 +6,27 @@ from typing import Optional, Tuple
 from .crosswalk_data import bearing_deg, haversine_m
 
 
+def select_motion_measurement(
+    *,
+    odom_fresh: bool,
+    odom_speed_mps: Optional[float],
+    wheel_motion_active: bool,
+    gps_fresh: bool,
+    gps_speed_mps: Optional[float],
+    allow_gps_speed_fallback: bool,
+) -> Tuple[Optional[float], str, bool]:
+    """Select a motion source without treating GNSS drift as wheel motion."""
+    if odom_fresh:
+        return odom_speed_mps, 'wheel_odom', wheel_motion_active
+    if allow_gps_speed_fallback and gps_fresh:
+        return (
+            gps_speed_mps,
+            'gps_filtered',
+            bool(gps_speed_mps is not None and gps_speed_mps > 0.0),
+        )
+    return None, 'unavailable', False
+
+
 class GpsMotionTracker:
     def __init__(
         self,
@@ -116,4 +137,4 @@ class GpsMotionTracker:
         )
 
 
-__all__ = ['GpsMotionTracker']
+__all__ = ['GpsMotionTracker', 'select_motion_measurement']

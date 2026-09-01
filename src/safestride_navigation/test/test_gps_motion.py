@@ -1,6 +1,9 @@
 import unittest
 
-from safestride_navigation.gps_motion import GpsMotionTracker
+from safestride_navigation.gps_motion import (
+    GpsMotionTracker,
+    select_motion_measurement,
+)
 
 
 class TestGpsMotionTracker(unittest.TestCase):
@@ -73,6 +76,41 @@ class TestGpsMotionTracker(unittest.TestCase):
                 minimum_speed_mps=0.15,
             )
         )
+
+
+class TestMotionSourceSelection(unittest.TestCase):
+    def test_wheel_odometry_is_authoritative(self):
+        measurement = select_motion_measurement(
+            odom_fresh=True,
+            odom_speed_mps=0.18,
+            wheel_motion_active=True,
+            gps_fresh=True,
+            gps_speed_mps=0.75,
+            allow_gps_speed_fallback=True,
+        )
+        self.assertEqual(measurement, (0.18, 'wheel_odom', True))
+
+    def test_gps_motion_is_blocked_by_default_without_odometry(self):
+        measurement = select_motion_measurement(
+            odom_fresh=False,
+            odom_speed_mps=None,
+            wheel_motion_active=False,
+            gps_fresh=True,
+            gps_speed_mps=0.75,
+            allow_gps_speed_fallback=False,
+        )
+        self.assertEqual(measurement, (None, 'unavailable', False))
+
+    def test_gps_fallback_requires_explicit_opt_in(self):
+        measurement = select_motion_measurement(
+            odom_fresh=False,
+            odom_speed_mps=None,
+            wheel_motion_active=False,
+            gps_fresh=True,
+            gps_speed_mps=0.30,
+            allow_gps_speed_fallback=True,
+        )
+        self.assertEqual(measurement, (0.30, 'gps_filtered', True))
 
 
 if __name__ == '__main__':

@@ -183,6 +183,8 @@ crosswalk_controller:
     gps_stuck_speed_mps: 0.15
     wheel_motion_min_speed_mps: 0.02
     wheel_motion_hold_s: 3.5
+    # Hall odometry is required; GNSS alone cannot verify very slow motion.
+    allow_gps_speed_fallback: false
     signal_refresh_interval_s: 3.0
     signal_cache_max_age_s: 12.0
     signal_request_timeout_s: 3.0

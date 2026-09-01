@@ -21,7 +21,7 @@ from .crosswalk_data import (
     CrosswalkSpatialIndex,
     load_crosswalks,
 )
-from .gps_motion import GpsMotionTracker
+from .gps_motion import GpsMotionTracker, select_motion_measurement
 from .intersection_map import (
     DEFAULT_INTERSECTION_MAP_URL,
     load_intersection_map,
@@ -86,6 +86,7 @@ class CrosswalkController(Node):
             'gps_stuck_speed_mps': 0.15,
             'wheel_motion_min_speed_mps': 0.02,
             'wheel_motion_hold_s': 3.5,
+            'allow_gps_speed_fallback': False,
             'signal_refresh_interval_s': 3.0,
             'signal_cache_max_age_s': 12.0,
             'signal_request_timeout_s': 3.0,
@@ -180,6 +181,9 @@ class CrosswalkController(Node):
             'wheel_motion_min_speed_mps'
         )
         self._wheel_motion_hold = self._positive('wheel_motion_hold_s')
+        self._allow_gps_speed_fallback = bool(
+            self.get_parameter('allow_gps_speed_fallback').value
+        )
         self._signal_refresh = self._positive(
             'signal_refresh_interval_s'
         )
@@ -453,31 +457,28 @@ class CrosswalkController(Node):
         )
 
     def _motion_confirmed(self, now: float) -> bool:
-        if self._fresh(now, self._odom_time, self._speed_timeout):
-            return self._wheel_motion_active(now)
-        return bool(
-            self._fresh(now, self._gps_speed_time, self._speed_timeout)
-            and self._gps_speed is not None
-            and self._gps_speed > 0.0
-        )
+        return self._measured_motion(now)[2]
 
     def _measured_motion(
         self,
         now: float,
     ) -> Tuple[Optional[float], str, bool]:
-        if self._fresh(now, self._odom_time, self._speed_timeout):
-            return (
-                self._odom_speed,
-                'wheel_odom',
-                self._wheel_motion_active(now),
-            )
-        if self._fresh(now, self._gps_speed_time, self._speed_timeout):
-            return (
-                self._gps_speed,
-                'gps_filtered',
-                bool(self._gps_speed is not None and self._gps_speed > 0.0),
-            )
-        return None, 'unavailable', False
+        return select_motion_measurement(
+            odom_fresh=self._fresh(
+                now,
+                self._odom_time,
+                self._speed_timeout,
+            ),
+            odom_speed_mps=self._odom_speed,
+            wheel_motion_active=self._wheel_motion_active(now),
+            gps_fresh=self._fresh(
+                now,
+                self._gps_speed_time,
+                self._speed_timeout,
+            ),
+            gps_speed_mps=self._gps_speed,
+            allow_gps_speed_fallback=self._allow_gps_speed_fallback,
+        )
 
     def _heading(self, now: float) -> Optional[float]:
         if not self._motion_confirmed(now):
