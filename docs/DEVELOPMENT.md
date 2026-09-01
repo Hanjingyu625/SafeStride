@@ -141,8 +141,8 @@ CPU latency on the Pi. The exported input contract remains RGB 224x224 with
 ImageNet normalization, matching the ROS perception node.
 
 The surface scale multiplies the ROS velocity command; it is not raw Arduino
-PWM. With the current 0.15 m wheel radius, the 0.08 m/s default request is about
-533 mrad/s. Open-loop firmware maps that non-zero target to PWM 92, above the
+PWM. With the measured 0.115 m wheel radius, the 0.08 m/s default request is
+about 696 mrad/s. Open-loop firmware maps that non-zero target to PWM 92, above the
 tested PWM 90 motor dead zone. Because the temporary open-loop range is only
 PWM 90 through 100, the current 0.4x through 1.2x surface scales produce only a
 small electrical-output difference around the default cruise speed. Reliable

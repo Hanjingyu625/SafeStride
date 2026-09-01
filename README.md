@@ -14,12 +14,12 @@ Raspberry Pi 4, Ubuntu Server 24.04, ROS 2 Jazzy와 Arduino Uno 2대로 구성�
                               +--------> Terrain Uno (USB)
                               +--------> BE-220 GPS (serial)
 
-Drive Uno:   shared motor output, left D2 Hall, left A2/right A1 pressure
+Drive Uno:   shared motor output, left A3 WSH135 Hall, left A2/right A1 pressure
 Terrain Uno: downward TOF-10120, GY-521 MPU6050
 Raspberry Pi: BE-220 GPS + serial bridges -> safety supervisor -> diagnostics/Foxglove
 ```
 
-- 왼쪽 휠 홀센서만 사용하며 D2/FALLING, 자석 6개로 설정되어 있다. 공통
+- 왼쪽 휠 WSH135 아날로그 홀센서만 사용하며 A3, 자석 6개로 설정되어 있다. 공통
   드라이브 구조라 오른쪽 ROS 값은 왼쪽 측정값을 복제한 추정치다.
 - 압력센서 임계값은 좌우 ADC 80이고 dead-man으로 동작한다.
   ROS 시작 또는 serial 재연결 뒤에는 `/walker/set_enabled true`를 명시적으로

@@ -13,7 +13,7 @@
 Ubuntu PC -- SSH/Ethernet or Wi-Fi --> Raspberry Pi 4
                                          |
                                          +-- USB --> Drive Uno
-                                         |           D2 left Hall, left A2/right A1 pressure
+                                         |           A3 WSH135 Hall, left A2/right A1 pressure
                                          |
                                          +-- USB --> Terrain Uno
                                          |           TOF10120, MPU6050

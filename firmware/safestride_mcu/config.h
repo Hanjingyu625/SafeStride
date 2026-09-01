@@ -36,15 +36,19 @@ constexpr uint16_t ARM_STATIONARY_DWELL_MS = 250U;
 // motor output. Set this false when closed-loop Hall safety is commissioned.
 constexpr bool DEADMAN_DIRECT_DRIVE = true;
 
-// One single-output Hall sensor is installed on the LEFT wheel only. D2 uses
-// interrupt 0 on the Uno and counts falling edges. Six magnets are fitted to
-// that wheel. The shared motor driver means the measured speed is mirrored to
-// both ROS wheel fields; it is not independent right-wheel odometry.
-constexpr uint8_t LEFT_HALL_PIN = 2U;
-constexpr uint8_t HALL_ACTIVE_LEVEL = LOW;
-// Reject sub-millisecond electrical chatter without discarding valid pulses
-// if the measured pulse-per-revolution value is increased later.
-constexpr uint32_t HALL_MIN_PULSE_INTERVAL_US = 500UL;
+// WSH135 is a linear analogue Hall sensor on the LEFT wheel. At 5 V its
+// no-field output is near 2.5 V. A3 is sampled around that boot-time baseline;
+// either magnetic polarity counts once, then must return inside the release
+// band before another pulse can be counted. Six magnets are fitted.
+constexpr uint8_t HALL_ANALOG_PIN = A3;
+constexpr uint32_t HALL_SAMPLE_PERIOD_US = CONTROL_PERIOD_US;
+constexpr uint8_t HALL_ADC_SAMPLES = 8U;
+constexpr uint8_t HALL_BASELINE_SAMPLES = 64U;
+constexpr uint16_t HALL_BASELINE_SAMPLE_DELAY_US = 250U;
+constexpr int32_t HALL_BASELINE_TRACK_DIVISOR = 128L;
+constexpr uint16_t HALL_TRIGGER_DELTA_ADC = 30U;
+constexpr uint16_t HALL_RELEASE_DELTA_ADC = 12U;
+constexpr uint32_t HALL_MIN_PULSE_INTERVAL_US = 20000UL;
 constexpr uint32_t HALL_ZERO_TIMEOUT_US = 3000000UL;
 constexpr uint32_t HALL_PULSES_PER_WHEEL_REV = 6UL;
 constexpr bool HALL_CALIBRATED = true;
@@ -121,7 +125,7 @@ constexpr float ADC_REFERENCE_V = 5.0F;
 constexpr float BATTERY_DIVIDER_RATIO = 3.0F;
 
 constexpr bool ENABLE_CURRENT_SENSE = false;
-constexpr uint8_t LEFT_CURRENT_SENSE_PIN = A3;
+constexpr uint8_t LEFT_CURRENT_SENSE_PIN = A0;
 constexpr uint8_t RIGHT_CURRENT_SENSE_PIN = A4;
 constexpr float CURRENT_ZERO_V = 2.5F;
 constexpr float CURRENT_MA_PER_V = 1000.0F;
@@ -180,6 +184,15 @@ static_assert(
         HALL_ZERO_TIMEOUT_US > HALL_MIN_PULSE_INTERVAL_US,
     "Hall timing limits are invalid");
 static_assert(
+    HALL_ADC_SAMPLES > 0U && HALL_BASELINE_SAMPLES > 0U &&
+        HALL_SAMPLE_PERIOD_US > 0UL &&
+        HALL_BASELINE_TRACK_DIVISOR > 0L,
+    "analogue Hall sampling configuration is invalid");
+static_assert(
+    HALL_TRIGGER_DELTA_ADC > HALL_RELEASE_DELTA_ADC &&
+        HALL_TRIGGER_DELTA_ADC <= 1023U,
+    "analogue Hall thresholds require trigger/release hysteresis");
+static_assert(
     COMMAND_WATCHDOG_MAX_MS >= COMMAND_TTL_MIN_MS,
     "command TTL range is invalid");
 static_assert(
@@ -225,8 +238,10 @@ static_assert(
     "Drive pressure channels must match the installed A2/A1 harness");
 static_assert(
     PRESSURE_LEFT_PIN != PRESSURE_RIGHT_PIN &&
+        PRESSURE_LEFT_PIN != HALL_ANALOG_PIN &&
+        PRESSURE_RIGHT_PIN != HALL_ANALOG_PIN &&
         PRESSURE_LEFT_PIN != ESTOP_PIN &&
         PRESSURE_RIGHT_PIN != ESTOP_PIN,
-    "Drive pressure pins must be distinct from E-stop placeholder");
+    "Drive pressure, Hall, and E-stop pins must be distinct");
 
 }  // namespace safestride_config

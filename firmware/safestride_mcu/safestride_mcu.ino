@@ -7,6 +7,7 @@
 
 #include "config.h"
 #include "controller_state.h"
+#include "analog_hall_sensor.h"
 #include "motor_control.h"
 #include "pressure_sensor.h"
 #include "protocol.h"
@@ -45,13 +46,10 @@ constexpr uint8_t PRESSURE_FLAG_LEFT_PRESENT = 1U << 0U;
 constexpr uint8_t PRESSURE_FLAG_RIGHT_PRESENT = 1U << 1U;
 constexpr uint8_t PRESSURE_FLAG_CALIBRATED = 1U << 2U;
 
-volatile uint32_t g_left_hall_pulse_count = 0UL;
-volatile uint32_t g_left_hall_last_pulse_us = 0UL;
-volatile uint32_t g_left_hall_period_us = 0UL;
-
 proto::FrameReceiver g_receiver;
 DriveController g_drive;
 PressureSensorPair g_pressure;
+AnalogHallSensor g_hall;
 
 ControllerState g_state = ControllerState::BOOT;
 uint16_t g_fault_bits = 0U;
@@ -102,43 +100,13 @@ bool driverFaultActive() {
              cfg::DRIVER_FAULT_ACTIVE_LEVEL;
 }
 
-void recordHallPulse(
-    volatile uint32_t& pulse_count,
-    volatile uint32_t& last_pulse_us,
-    volatile uint32_t& period_us) {
-  const uint32_t now_us = micros();
-  const uint32_t elapsed_us = now_us - last_pulse_us;
-  if (last_pulse_us != 0UL &&
-      elapsed_us < cfg::HALL_MIN_PULSE_INTERVAL_US) {
-    return;
-  }
-  if (last_pulse_us != 0UL) {
-    period_us = elapsed_us;
-  }
-  last_pulse_us = now_us;
-  ++pulse_count;
-}
-
-void leftHallIsr() {
-  recordHallPulse(
-      g_left_hall_pulse_count,
-      g_left_hall_last_pulse_us,
-      g_left_hall_period_us);
-}
-
 void readHallSamples(
     uint32_t now_us,
     HallSample& left,
     HallSample& right) {
-  uint32_t left_last_us = 0UL;
-  noInterrupts();
-  left.pulse_count = g_left_hall_pulse_count;
-  left.period_us = g_left_hall_period_us;
-  left_last_us = g_left_hall_last_pulse_us;
-  interrupts();
-  left.age_us = left_last_us == 0UL
-      ? 0xFFFFFFFFUL
-      : now_us - left_last_us;
+  left.pulse_count = g_hall.pulseCount();
+  left.period_us = g_hall.periodUs();
+  left.age_us = g_hall.ageUs(now_us);
   // The shared drive has one physical Hall input. Keep the legacy two-wheel
   // telemetry layout by mirroring the left measurement into the right field.
   right = left;
@@ -564,6 +532,7 @@ void runControlLoop(uint32_t now_us) {
   }
   g_last_control_us = now_us;
 
+  g_hall.update(now_us);
   HallSample left_hall = {0UL, 0UL, 0xFFFFFFFFUL};
   HallSample right_hall = {0UL, 0UL, 0xFFFFFFFFUL};
   readHallSamples(now_us, left_hall, right_hall);
@@ -636,20 +605,8 @@ void setup() {
   if (cfg::USE_DRIVER_FAULT_PIN) {
     pinMode(cfg::DRIVER_FAULT_PIN, INPUT_PULLUP);
   }
-  pinMode(cfg::LEFT_HALL_PIN, INPUT_PULLUP);
-
-  const int left_interrupt =
-      digitalPinToInterrupt(cfg::LEFT_HALL_PIN);
-  if (left_interrupt == NOT_AN_INTERRUPT) {
-    g_fault_bits |= FAULT_LEFT_HALL;
-  } else {
-    attachInterrupt(
-        left_interrupt,
-        leftHallIsr,
-        cfg::HALL_ACTIVE_LEVEL == LOW ? FALLING : RISING);
-  }
-
   Serial.begin(cfg::SERIAL_BAUD);
+  g_hall.begin(micros());
   g_pressure.begin(millis());
   g_boot_id = makeBootId();
   g_state = estopActive()

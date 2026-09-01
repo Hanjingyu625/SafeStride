@@ -78,6 +78,6 @@ fi
 
 echo "Dead-man direct drive allowed for ${duration}s at 0.10 m/s."
 echo "Hold the pressure dead-man; releasing it disables motor output."
-echo "The left D2 Hall sensor remains telemetry-only in this mode."
+echo "The left A3 WSH135 Hall sensor remains telemetry-only in this mode."
 sleep "${duration}"
 echo "Test complete; sending disable command."

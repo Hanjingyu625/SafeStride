@@ -137,7 +137,7 @@
     "Plot!speed": {
       "paths": [
         {
-          "value": "/wheel/hall.left_velocity_rad_s.@mul(0.15)",
+          "value": "/wheel/hall.left_velocity_rad_s.@mul(0.115)",
           "label": "Hall speed (m/s)",
           "color": "#42a5f5",
           "enabled": true,

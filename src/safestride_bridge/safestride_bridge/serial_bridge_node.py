@@ -208,7 +208,7 @@ class SerialBridgeNode(Node):
             ('command.auto_arm_magnet_bench_mode', False),
             ('telemetry.timeout_s', 0.30),
             ('diagnostics.publish_rate_hz', 1.0),
-            ('base.wheel_radius_m', 0.15),
+            ('base.wheel_radius_m', 0.115),
             ('base.wheel_separation_m', 0.55),
             ('base.hall_pulses_per_revolution', 6),
             ('base.max_wheel_speed_rad_s', 3.0),

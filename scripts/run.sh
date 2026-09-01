@@ -151,7 +151,7 @@ export ROS_AUTOMATIC_DISCOVERY_RANGE="${ROS_AUTOMATIC_DISCOVERY_RANGE:-SUBNET}"
 # /walker/set_enabled false remains a manual stop until true clears the block.
 launch_args=(
   "config_file:=${config}"
-  "wheel_radius:=${SAFESTRIDE_WHEEL_RADIUS_M:-0.15}"
+  "wheel_radius:=${SAFESTRIDE_WHEEL_RADIUS_M:-0.115}"
   "wheel_separation:=${SAFESTRIDE_WHEEL_SEPARATION_M:-0.55}"
   "enable_terrain:=${enable_terrain}"
   "enable_cruise:=${enable_cruise}"

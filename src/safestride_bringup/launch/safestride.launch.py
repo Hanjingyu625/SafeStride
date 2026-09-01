@@ -73,7 +73,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 'wheel_radius',
-                default_value='0.15',
+                default_value='0.115',
                 description='Measured powered-wheel radius in metres.',
             ),
             DeclareLaunchArgument(

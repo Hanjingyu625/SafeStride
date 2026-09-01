@@ -21,15 +21,15 @@ SafeStride의 Drive MCU, Terrain MCU, GPS와 웹캠 노드 상태를 한 화면�
 | GPS Map | `/gps/fix` 위치와 최근 5분 이동 경로 |
 | Inclination | MPU6050 기반 pitch/roll, 단위 degree |
 
-홀 속도는 현재 설정된 휠 반지름 0.15 m를 사용해 다음과 같이 표시한다.
+홀 속도는 현재 설정된 휠 반지름 0.115 m를 사용해 다음과 같이 표시한다.
 
 ```text
-speed_m_s = /wheel/hall.left_velocity_rad_s * 0.15
+speed_m_s = /wheel/hall.left_velocity_rad_s * 0.115
 ```
 
-현재 하드웨어는 왼쪽 D2 홀센서 하나만 사용한다. `/wheel/hall`의 오른쪽 속도는
+현재 하드웨어는 왼쪽 A3 WSH135 홀센서 하나만 사용한다. `/wheel/hall`의 오른쪽 속도는
 왼쪽 측정값을 복제한 공통 구동계 추정치이므로 대시보드에는 왼쪽 값만 표시한다.
-휠 반지름을 바꾸면 레이아웃의 `@mul(0.15)`도 같은 값으로 수정해야 한다.
+휠 반지름을 바꾸면 레이아웃의 `@mul(0.115)`도 같은 값으로 수정해야 한다.
 
 ## 1. Raspberry Pi 준비
 

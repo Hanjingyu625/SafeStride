@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="safestride">
   <!-- Replace these measured values before using odometry on the real walker. -->
-  <xacro:arg name="wheel_radius" default="0.15"/>
+  <xacro:arg name="wheel_radius" default="0.115"/>
   <xacro:arg name="wheel_separation" default="0.55"/>
   <xacro:arg name="wheel_width" default="0.04"/>
 

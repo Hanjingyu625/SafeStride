@@ -8,6 +8,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 DRIVE_CONFIG = ROOT / "firmware/safestride_mcu/config.h"
 DRIVE_FIRMWARE = ROOT / "firmware/safestride_mcu/safestride_mcu.ino"
+ANALOG_HALL = ROOT / "firmware/safestride_mcu/analog_hall_sensor.cpp"
 TERRAIN_FIRMWARE = ROOT / "firmware/terrain_mcu/terrain_mcu.ino"
 TERRAIN_CONFIG = ROOT / "firmware/terrain_mcu/config.h"
 DRIVE_PROTOCOL = ROOT / "firmware/safestride_mcu/protocol.h"
@@ -49,6 +50,7 @@ class TestHardwareIntegrity(unittest.TestCase):
     def setUpClass(cls):
         cls.config = DRIVE_CONFIG.read_text(encoding="utf-8")
         cls.drive = DRIVE_FIRMWARE.read_text(encoding="utf-8")
+        cls.analog_hall = ANALOG_HALL.read_text(encoding="utf-8")
         cls.terrain = TERRAIN_FIRMWARE.read_text(encoding="utf-8")
         cls.terrain_config = TERRAIN_CONFIG.read_text(encoding="utf-8")
         cls.bridge = BRIDGE.read_text(encoding="utf-8")
@@ -61,7 +63,7 @@ class TestHardwareIntegrity(unittest.TestCase):
 
     def test_drive_active_pins_are_unique(self):
         names = (
-            "LEFT_HALL_PIN",
+            "HALL_ANALOG_PIN",
             "MOTOR_PWM_PIN",
             "MOTOR_IN1_PIN",
             "MOTOR_IN2_PIN",
@@ -242,11 +244,18 @@ class TestHardwareIntegrity(unittest.TestCase):
 
     def test_calibrated_single_left_hall_and_pressure(self):
         self.assertEqual(
-            constant_expression(self.config, "LEFT_HALL_PIN"), "2U"
+            constant_expression(self.config, "HALL_ANALOG_PIN"), "A3"
         )
         self.assertEqual(
-            constant_expression(self.config, "HALL_ACTIVE_LEVEL"), "LOW"
+            constant_expression(self.config, "HALL_TRIGGER_DELTA_ADC"),
+            "30U",
         )
+        self.assertEqual(
+            constant_expression(self.config, "HALL_RELEASE_DELTA_ADC"),
+            "12U",
+        )
+        self.assertIn("analogRead(cfg::HALL_ANALOG_PIN)", self.analog_hall)
+        self.assertNotIn("attachInterrupt(", self.drive)
         self.assertEqual(
             constant_expression(self.config, "HALL_PULSES_PER_WHEEL_REV"),
             "6UL",

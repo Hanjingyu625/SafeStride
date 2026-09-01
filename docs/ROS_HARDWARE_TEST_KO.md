@@ -14,7 +14,9 @@ arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
 
 ## 2. 센서 단독 확인
 
-- 왼쪽 휠 1회전에서 D2 Hall pulse가 6 증가한다.
+- 전원을 넣을 때 WSH135에서 자석을 떼어 기준값을 잡는다. 이후 왼쪽 휠
+  1회전에서 A3 Hall pulse가 정확히 6 증가하고, 자석을 센서 앞에서 흔들어도
+  자석이 빠져나가기 전에는 같은 pulse를 중복 계산하지 않는다.
 - 왼쪽 A2/오른쪽 A1을 누르면 각각 raw가 80 이상이고 양손에서 dead-man이 true다.
 - TOF 정지 기준면은 약 0.25 m이며 초기 10샘플 후 valid가 true가 된다.
 - GY-521을 기울이면 `/terrain/imu`와 status roll/pitch가 변한다. MPU가 아직

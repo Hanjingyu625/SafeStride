@@ -7,6 +7,7 @@ namespace {
 
 uint32_t g_test_millis = 0UL;
 int g_pressure_adc = 200;
+int g_hall_adc = 512;
 
 }  // namespace
 
@@ -16,13 +17,18 @@ void pinMode(uint8_t, uint8_t) {}
 void digitalWrite(uint8_t, uint8_t) {}
 int digitalRead(uint8_t) { return LOW; }
 void analogWrite(uint8_t, int) {}
-int analogRead(uint8_t) { return g_pressure_adc; }
+int analogRead(uint8_t pin) {
+  return pin == safestride_config::HALL_ANALOG_PIN
+      ? g_hall_adc
+      : g_pressure_adc;
+}
 int digitalPinToInterrupt(uint8_t) { return 0; }
 void attachInterrupt(int, void (*)(), int) {}
 void noInterrupts() {}
 void interrupts() {}
 uint32_t millis() { return g_test_millis; }
 uint32_t micros() { return g_test_millis * 1000UL; }
+void delayMicroseconds(unsigned int) {}
 
 void HardwareSerial::begin(uint32_t) {}
 int HardwareSerial::available() { return 0; }

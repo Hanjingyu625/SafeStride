@@ -1,6 +1,6 @@
 # Integration roadmap
 
-- [x] 왼쪽 D2 Hall 6 pulse/rev와 압력 threshold 80 반영
+- [x] 왼쪽 A3 WSH135 Hall 6 pulse/rev와 압력 threshold 80 반영
 - [x] TOF EMA, 적응 기준, 양방향 변화와 연속 검출 구현
 - [x] GY-521 MPU6050 3축 가속도·자이로 구현
 - [x] BE-220 GPS 기본 활성 및 지도/API readiness monitor 구현
