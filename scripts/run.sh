@@ -149,22 +149,27 @@ export ROS_AUTOMATIC_DISCOVERY_RANGE="${ROS_AUTOMATIC_DISCOVERY_RANGE:-SUBNET}"
 
 # The deployed config drives forward while the pressure dead-man is held.
 # /walker/set_enabled false remains a manual stop until true clears the block.
-exec ros2 launch safestride_bringup safestride.launch.py \
-  config_file:="${config}" \
-  wheel_radius:="${SAFESTRIDE_WHEEL_RADIUS_M:-0.15}" \
-  wheel_separation:="${SAFESTRIDE_WHEEL_SEPARATION_M:-0.55}" \
-  enable_terrain:="${enable_terrain}" \
-  enable_cruise:="${enable_cruise}" \
-  enable_perception:="${enable_perception}" \
-  perception_model_path:="${SAFESTRIDE_PERCEPTION_MODEL:-${workspace}/raspberry_pi/road_surface_inference/road_surface_public_mix_torchscript.pt}" \
-  perception_classes_path:="${SAFESTRIDE_PERCEPTION_CLASSES:-${workspace}/raspberry_pi/road_surface_inference/target_classes.json}" \
-  perception_camera_index:="${SAFESTRIDE_PERCEPTION_CAMERA_INDEX:-0}" \
-  perception_camera_backend:="${SAFESTRIDE_PERCEPTION_CAMERA_BACKEND:-v4l2}" \
-  enable_gps:="${enable_gps}" \
-  gps_port:="${gps_port}" \
-  enable_crosswalk:="${enable_crosswalk}" \
-  crosswalk_file:="${crosswalk_file}" \
-  intersection_map_file:="${intersection_map_file}" \
-  signal_api_key_file:="${signal_api_key_file}" \
-  intersection_id:="${intersection_id}" \
-  enable_foxglove:="${SAFESTRIDE_ENABLE_FOXGLOVE:-false}"
+launch_args=(
+  "config_file:=${config}"
+  "wheel_radius:=${SAFESTRIDE_WHEEL_RADIUS_M:-0.15}"
+  "wheel_separation:=${SAFESTRIDE_WHEEL_SEPARATION_M:-0.55}"
+  "enable_terrain:=${enable_terrain}"
+  "enable_cruise:=${enable_cruise}"
+  "enable_perception:=${enable_perception}"
+  "perception_model_path:=${SAFESTRIDE_PERCEPTION_MODEL:-${workspace}/raspberry_pi/road_surface_inference/road_surface_public_mix_torchscript.pt}"
+  "perception_classes_path:=${SAFESTRIDE_PERCEPTION_CLASSES:-${workspace}/raspberry_pi/road_surface_inference/target_classes.json}"
+  "perception_camera_index:=${SAFESTRIDE_PERCEPTION_CAMERA_INDEX:-0}"
+  "perception_camera_backend:=${SAFESTRIDE_PERCEPTION_CAMERA_BACKEND:-v4l2}"
+  "enable_gps:=${enable_gps}"
+  "gps_port:=${gps_port}"
+  "enable_crosswalk:=${enable_crosswalk}"
+  "crosswalk_file:=${crosswalk_file}"
+  "intersection_map_file:=${intersection_map_file}"
+  "signal_api_key_file:=${signal_api_key_file}"
+  "enable_foxglove:=${SAFESTRIDE_ENABLE_FOXGLOVE:-false}"
+)
+if [[ -n "${intersection_id}" ]]; then
+  launch_args+=("intersection_id:=${intersection_id}")
+fi
+
+exec ros2 launch safestride_bringup safestride.launch.py "${launch_args[@]}"
