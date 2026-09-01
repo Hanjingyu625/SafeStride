@@ -89,6 +89,42 @@ class TestGpsSpeedFilter(unittest.TestCase):
         self.assertEqual(estimate.filtered_speed_mps, 0.0)
         self.assertEqual(estimate.state, 'degraded')
 
+    def test_coherent_position_drift_disagrees_with_doppler_speed(self):
+        speed_filter = GpsSpeedFilter()
+        raw_speeds = (0.17, 0.07, 0.03, 0.19, 0.06, 0.11, 0.06, 0.08, 0.03)
+        estimate = None
+        for second, raw_speed in enumerate(raw_speeds):
+            estimate = speed_filter.update(
+                time_s=float(second),
+                latitude=37.54 + latitude_offset(0.80 * second),
+                longitude=127.08,
+                speed_mps=raw_speed,
+                hdop=1.53,
+                satellites=8,
+            )
+
+        self.assertIsNotNone(estimate)
+        self.assertFalse(estimate.moving)
+        self.assertEqual(estimate.filtered_speed_mps, 0.0)
+        self.assertLess(estimate.speed_agreement, 0.20)
+        self.assertAlmostEqual(estimate.position_speed_mps, 0.80, delta=0.01)
+
+    def test_speed_agreement_threshold_is_configurable(self):
+        speed_filter = GpsSpeedFilter(minimum_speed_agreement=0.10)
+        estimate = None
+        for second in range(10):
+            estimate = speed_filter.update(
+                time_s=float(second),
+                latitude=37.54 + latitude_offset(0.80 * second),
+                longitude=127.08,
+                speed_mps=0.10,
+                hdop=1.5,
+                satellites=8,
+            )
+
+        self.assertIsNotNone(estimate)
+        self.assertTrue(estimate.moving)
+
     def test_single_speed_spike_is_rejected(self):
         speed_filter = GpsSpeedFilter()
         estimate = None

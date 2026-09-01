@@ -48,6 +48,7 @@ class GpsNode(Node):
         self.declare_parameter(
             'speed_filter_minimum_course_coherence', 0.55
         )
+        self.declare_parameter('speed_filter_minimum_speed_agreement', 0.60)
         self.declare_parameter('speed_filter_maximum_hdop', 5.0)
         self.declare_parameter('speed_filter_minimum_satellites', 5)
         self.declare_parameter('speed_filter_require_quality', True)
@@ -117,6 +118,11 @@ class GpsNode(Node):
             minimum_course_coherence=float(
                 self.get_parameter(
                     'speed_filter_minimum_course_coherence'
+                ).value
+            ),
+            minimum_speed_agreement=float(
+                self.get_parameter(
+                    'speed_filter_minimum_speed_agreement'
                 ).value
             ),
             maximum_hdop=float(
@@ -499,6 +505,30 @@ class GpsNode(Node):
                 key='speed_filter_course_coherence',
                 value=self._format_float(
                     self._last_speed_estimate.course_coherence
+                    if self._last_speed_estimate is not None
+                    else math.nan
+                ),
+            ),
+            KeyValue(
+                key='speed_filter_raw_median_mps',
+                value=self._format_float(
+                    self._last_speed_estimate.raw_speed_median_mps
+                    if self._last_speed_estimate is not None
+                    else math.nan
+                ),
+            ),
+            KeyValue(
+                key='speed_filter_position_speed_mps',
+                value=self._format_float(
+                    self._last_speed_estimate.position_speed_mps
+                    if self._last_speed_estimate is not None
+                    else math.nan
+                ),
+            ),
+            KeyValue(
+                key='speed_filter_speed_agreement',
+                value=self._format_float(
+                    self._last_speed_estimate.speed_agreement
                     if self._last_speed_estimate is not None
                     else math.nan
                 ),

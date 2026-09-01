@@ -146,6 +146,8 @@ gps_node:
     speed_filter_hdop_displacement_scale_m: 0.50
     speed_filter_minimum_path_efficiency: 0.55
     speed_filter_minimum_course_coherence: 0.55
+    # Reject coherent GNSS position drift when RMC Doppler speed disagrees.
+    speed_filter_minimum_speed_agreement: 0.60
     speed_filter_maximum_hdop: 5.0
     speed_filter_minimum_satellites: 5
     speed_filter_require_quality: true

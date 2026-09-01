@@ -55,6 +55,9 @@ class GpsSpeedEstimate:
     displacement_m: float
     path_efficiency: float
     course_coherence: float
+    raw_speed_median_mps: float
+    position_speed_mps: float
+    speed_agreement: float
     movement_threshold_m: float
     quality_ok: bool
 
@@ -89,6 +92,7 @@ class GpsSpeedFilter:
         hdop_displacement_scale_m: float = 0.50,
         minimum_path_efficiency: float = 0.55,
         minimum_course_coherence: float = 0.55,
+        minimum_speed_agreement: float = 0.60,
         maximum_hdop: float = 5.0,
         minimum_satellites: int = 5,
         require_quality: bool = True,
@@ -121,6 +125,7 @@ class GpsSpeedFilter:
         bounded_values = (
             minimum_path_efficiency,
             minimum_course_coherence,
+            minimum_speed_agreement,
             smoothing_alpha,
         )
         if not all(
@@ -136,6 +141,7 @@ class GpsSpeedFilter:
         self.hdop_displacement_scale_m = hdop_displacement_scale_m
         self.minimum_path_efficiency = minimum_path_efficiency
         self.minimum_course_coherence = minimum_course_coherence
+        self.minimum_speed_agreement = minimum_speed_agreement
         self.maximum_hdop = maximum_hdop
         self.minimum_satellites = minimum_satellites
         self.require_quality = bool(require_quality)
@@ -229,6 +235,16 @@ class GpsSpeedFilter:
         course_coherence = _course_coherence(
             item.course_deg for item in self._samples
         )
+        raw_speed_median = statistics.median(
+            item.speed_mps for item in self._samples
+        )
+        position_speed = displacement_m / span_s if span_s > 0.0 else 0.0
+        fastest_speed = max(raw_speed_median, position_speed)
+        speed_agreement = (
+            min(raw_speed_median, position_speed) / fastest_speed
+            if fastest_speed > 0.0
+            else 1.0
+        )
         hdop_values = [
             item.hdop
             for item in self._samples
@@ -264,6 +280,7 @@ class GpsSpeedFilter:
             and displacement_m >= movement_threshold_m
             and path_efficiency >= self.minimum_path_efficiency
             and course_consistent
+            and speed_agreement >= self.minimum_speed_agreement
         )
 
         if moving_evidence:
@@ -278,11 +295,7 @@ class GpsSpeedFilter:
                 self._moving = False
 
         if self._moving:
-            raw_median = statistics.median(
-                item.speed_mps for item in self._samples
-            )
-            position_speed = displacement_m / span_s if span_s > 0.0 else 0.0
-            candidate = 0.7 * raw_median + 0.3 * position_speed
+            candidate = 0.7 * raw_speed_median + 0.3 * position_speed
             candidate = min(self.maximum_speed_mps, max(0.0, candidate))
             if self._filtered_speed <= 0.0:
                 self._filtered_speed = candidate
@@ -310,6 +323,9 @@ class GpsSpeedFilter:
             displacement_m=displacement_m,
             path_efficiency=path_efficiency,
             course_coherence=course_coherence,
+            raw_speed_median_mps=raw_speed_median,
+            position_speed_mps=position_speed,
+            speed_agreement=speed_agreement,
             movement_threshold_m=movement_threshold_m,
             quality_ok=quality_ok,
         )
