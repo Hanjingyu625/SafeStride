@@ -140,6 +140,8 @@ gps_node:
     course_min_speed_mps: 0.20
     # GPS is a fallback. Hall odometry remains authoritative for walking speed.
     speed_filter_window_s: 8.0
+    # Ignore receiver-acquisition transients after startup or reconnect.
+    speed_filter_settling_time_s: 15.0
     speed_filter_minimum_span_s: 4.0
     speed_filter_minimum_samples: 5
     speed_filter_minimum_displacement_m: 1.0

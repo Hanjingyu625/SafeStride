@@ -86,6 +86,7 @@ class GpsSpeedFilter:
         self,
         *,
         window_s: float = 8.0,
+        settling_time_s: float = 15.0,
         minimum_span_s: float = 4.0,
         minimum_samples: int = 5,
         minimum_displacement_m: float = 1.0,
@@ -118,6 +119,8 @@ class GpsSpeedFilter:
             )
         if minimum_span_s >= window_s:
             raise ValueError('minimum_span_s must be smaller than window_s')
+        if not math.isfinite(settling_time_s) or settling_time_s < 0.0:
+            raise ValueError('settling_time_s must be finite and non-negative')
         if minimum_samples < 2 or minimum_satellites < 1:
             raise ValueError('GPS speed filter sample counts are invalid')
         if enter_confirmations < 1 or exit_confirmations < 1:
@@ -135,6 +138,7 @@ class GpsSpeedFilter:
             raise ValueError('GPS speed filter ratios must be in (0, 1]')
 
         self.window_s = window_s
+        self.settling_time_s = settling_time_s
         self.minimum_span_s = minimum_span_s
         self.minimum_samples = minimum_samples
         self.minimum_displacement_m = minimum_displacement_m
@@ -151,6 +155,7 @@ class GpsSpeedFilter:
         self.maximum_speed_mps = maximum_speed_mps
 
         self._samples: Deque[_Sample] = deque()
+        self._started_at: Optional[float] = None
         self._moving = False
         self._enter_count = 0
         self._exit_count = 0
@@ -158,6 +163,7 @@ class GpsSpeedFilter:
 
     def reset(self) -> None:
         self._samples.clear()
+        self._started_at = None
         self._moving = False
         self._enter_count = 0
         self._exit_count = 0
@@ -202,6 +208,8 @@ class GpsSpeedFilter:
             hdop=parsed_hdop,
             satellites=parsed_satellites,
         )
+        if self._started_at is None:
+            self._started_at = sample.time_s
         self._samples.append(sample)
         oldest_time = time_s - self.window_s
         while len(self._samples) > 1 and self._samples[0].time_s < oldest_time:
@@ -270,12 +278,17 @@ class GpsSpeedFilter:
             len(self._samples) >= self.minimum_samples
             and span_s >= self.minimum_span_s
         )
+        settling = (
+            self._started_at is not None
+            and last.time_s - self._started_at < self.settling_time_s
+        )
         course_consistent = (
             math.isnan(course_coherence)
             or course_coherence >= self.minimum_course_coherence
         )
         moving_evidence = (
             ready
+            and not settling
             and quality_ok
             and displacement_m >= movement_threshold_m
             and path_efficiency >= self.minimum_path_efficiency
@@ -283,7 +296,11 @@ class GpsSpeedFilter:
             and speed_agreement >= self.minimum_speed_agreement
         )
 
-        if moving_evidence:
+        if settling:
+            self._moving = False
+            self._enter_count = 0
+            self._exit_count = 0
+        elif moving_evidence:
             self._enter_count += 1
             self._exit_count = 0
             if self._enter_count >= self.enter_confirmations:
@@ -311,6 +328,8 @@ class GpsSpeedFilter:
             if self._moving
             else ('stationary' if ready else 'initializing')
         )
+        if settling:
+            state = 'settling'
         if ready and not quality_ok:
             state = 'degraded'
         return GpsSpeedEstimate(

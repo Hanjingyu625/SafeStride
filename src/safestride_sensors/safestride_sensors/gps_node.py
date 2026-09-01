@@ -38,6 +38,7 @@ class GpsNode(Node):
         self.declare_parameter('diagnostic_rate_hz', 1.0)
         self.declare_parameter('course_min_speed_mps', 0.20)
         self.declare_parameter('speed_filter_window_s', 8.0)
+        self.declare_parameter('speed_filter_settling_time_s', 15.0)
         self.declare_parameter('speed_filter_minimum_span_s', 4.0)
         self.declare_parameter('speed_filter_minimum_samples', 5)
         self.declare_parameter('speed_filter_minimum_displacement_m', 1.0)
@@ -93,6 +94,11 @@ class GpsNode(Node):
         self._speed_filter = GpsSpeedFilter(
             window_s=float(
                 self.get_parameter('speed_filter_window_s').value
+            ),
+            settling_time_s=float(
+                self.get_parameter(
+                    'speed_filter_settling_time_s'
+                ).value
             ),
             minimum_span_s=float(
                 self.get_parameter('speed_filter_minimum_span_s').value
