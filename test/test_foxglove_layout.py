@@ -33,13 +33,14 @@ REQUIRED_TOPICS = {
     "/gps/speed",
     "/crosswalk/status",
     "/perception/surface_condition",
+    "/camera/image/compressed",
     "/diagnostics",
 }
 
 REQUIRED_EXPRESSIONS = {
     "/walker/status.state",
     "/walker/status.deadman",
-    "/wheel/hall.left_velocity_rad_s.@mul(0.15)",
+    "/wheel/hall.left_velocity_rad_s.@mul(0.115)",
     "/handle/pressure.left_filtered",
     "/handle/pressure.right_filtered",
     "/terrain/status.tof_filtered_m",
@@ -108,9 +109,9 @@ class TestFoxgloveLayout(unittest.TestCase):
         ).read_text(encoding="utf-8")
         pressure_paths = self.layout["configById"]["Plot!pressure"]["paths"]
 
-        self.assertIn('SAFESTRIDE_WHEEL_RADIUS_M:-0.15', run_script)
+        self.assertIn('SAFESTRIDE_WHEEL_RADIUS_M:-0.115', run_script)
         self.assertIn(
-            "/wheel/hall.left_velocity_rad_s.@mul(0.15)",
+            "/wheel/hall.left_velocity_rad_s.@mul(0.115)",
             configured_expressions(self.layout),
         )
         self.assertIn("PRESSURE_LEFT_PRESENT_THRESHOLD = 80.0F", drive_config)

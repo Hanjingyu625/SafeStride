@@ -12,6 +12,7 @@ from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
+from sensor_msgs.msg import CompressedImage
 
 from safestride_interfaces.msg import SurfaceCondition
 
@@ -62,6 +63,10 @@ class SurfacePerceptionNode(Node):
         self.declare_parameter('camera.width', 640)
         self.declare_parameter('camera.height', 480)
         self.declare_parameter('camera.reconnect_period_s', 2.0)
+        self.declare_parameter(
+            'camera.compressed_topic', '/camera/image/compressed'
+        )
+        self.declare_parameter('camera.jpeg_quality', 70)
         self.declare_parameter('model.path', '')
         self.declare_parameter('model.classes_path', '')
         self.declare_parameter('model.confidence_threshold', 0.65)
@@ -96,6 +101,17 @@ class SurfacePerceptionNode(Node):
             60.0,
             minimum_inclusive=False,
         )
+        self._camera_compressed_topic = str(
+            self.get_parameter('camera.compressed_topic').value
+        ).strip()
+        if not self._camera_compressed_topic:
+            raise ValueError('camera.compressed_topic must not be empty')
+        jpeg_quality = self.get_parameter('camera.jpeg_quality').value
+        if isinstance(jpeg_quality, bool) or not isinstance(jpeg_quality, int):
+            raise ValueError('camera.jpeg_quality must be an integer')
+        if not 1 <= jpeg_quality <= 100:
+            raise ValueError('camera.jpeg_quality must be between 1 and 100')
+        self._camera_jpeg_quality = jpeg_quality
         self._confidence_threshold = _finite_parameter(
             'model.confidence_threshold',
             self.get_parameter('model.confidence_threshold').value,
@@ -191,6 +207,11 @@ class SurfacePerceptionNode(Node):
         self._surface_publisher = self.create_publisher(
             SurfaceCondition,
             str(self.get_parameter('surface_topic').value),
+            qos_profile_sensor_data,
+        )
+        self._preview_publisher = self.create_publisher(
+            CompressedImage,
+            self._camera_compressed_topic,
             qos_profile_sensor_data,
         )
         self._diagnostic_publisher = self.create_publisher(
@@ -347,6 +368,24 @@ class SurfacePerceptionNode(Node):
         message.model_version = self._model_version
         self._surface_publisher.publish(message)
 
+    def _publish_preview(self, frame) -> None:
+        ok, encoded = self._cv2.imencode(
+            '.jpg',
+            frame,
+            [self._cv2.IMWRITE_JPEG_QUALITY, self._camera_jpeg_quality],
+        )
+        if not ok:
+            self.get_logger().warning(
+                'Cannot encode camera preview', throttle_duration_sec=5.0
+            )
+            return
+        message = CompressedImage()
+        message.header.stamp = self.get_clock().now().to_msg()
+        message.header.frame_id = self._frame_id
+        message.format = 'jpeg'
+        message.data = encoded.tobytes()
+        self._preview_publisher.publish(message)
+
     def _timer_callback(self) -> None:
         now = self._now_seconds()
         if self._camera is None and not self._open_camera(now):
@@ -367,6 +406,7 @@ class SurfacePerceptionNode(Node):
             return
 
         self._consecutive_read_failures = 0
+        self._publish_preview(frame)
         try:
             result = self._infer(frame)
         except Exception as error:
@@ -436,6 +476,10 @@ class SurfacePerceptionNode(Node):
             KeyValue(key='cpu_threads', value=str(self._cpu_threads)),
             KeyValue(key='model_version', value=self._model_version),
             KeyValue(key='camera_backend', value=self._camera_backend),
+            KeyValue(
+                key='camera_preview_topic',
+                value=self._camera_compressed_topic,
+            ),
         ]
         array = DiagnosticArray()
         array.header.stamp = self.get_clock().now().to_msg()

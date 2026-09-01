@@ -87,8 +87,9 @@ Foxglove에서 모터 enable이나 `/cmd_vel` 명령을 보낼 수 없다.
   `/terrain/status.mpu_valid=false`와 Diagnostics 경고를 함께 확인한다.
 - GPS: 유효 fix 전에는 위도·경도가 NaN이므로 지도가 비어 있을 수 있다.
   `ros2 topic echo /gps/fix --once`에서 `status.status >= 0`이 된 뒤 확인한다.
-- 웹캠 영상 자체는 현재 ROS image 토픽으로 발행하지 않는다. 대시보드에는
-  웹캠 처리 결과인 `/perception/surface_condition`과 노드 진단만 표시한다.
+- 웹캠 영상은 노면 추론에 사용한 프레임을 `/camera/image/compressed`로
+  1 FPS 발행한다. Foxglove의 Image 패널에서 이 토픽을 선택하면 실제 카메라
+  구도와 노면 처리 결과를 함께 확인할 수 있다.
 
 ## 4. 토픽이 비어 있을 때
 
