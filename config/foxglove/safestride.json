@@ -1,0 +1,353 @@
+{
+  "layout": {
+    "direction": "row",
+    "splitPercentage": 35,
+    "first": {
+      "direction": "column",
+      "splitPercentage": 34,
+      "first": "StateTransitions!safestride-state",
+      "second": {
+        "direction": "column",
+        "splitPercentage": 52,
+        "first": "RawMessages!walker-status",
+        "second": "DiagnosticsSummary!diagnostics"
+      }
+    },
+    "second": {
+      "direction": "row",
+      "splitPercentage": 58,
+      "first": {
+        "direction": "column",
+        "splitPercentage": 33,
+        "first": "Plot!speed",
+        "second": {
+          "direction": "column",
+          "splitPercentage": 50,
+          "first": "Plot!pressure",
+          "second": "Plot!tof"
+        }
+      },
+      "second": {
+        "direction": "column",
+        "splitPercentage": 56,
+        "first": "Map!gps",
+        "second": "Plot!tilt"
+      }
+    }
+  },
+  "configById": {
+    "StateTransitions!safestride-state": {
+      "paths": [
+        {
+          "value": "/walker/status.state",
+          "label": "Drive state",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "customStates": {
+            "type": "discrete",
+            "states": [
+              { "value": "0", "label": "DISCONNECTED", "color": "#9e9e9e" },
+              { "value": "1", "label": "DISARMED", "color": "#42a5f5" },
+              { "value": "2", "label": "ARMED", "color": "#66bb6a" },
+              { "value": "3", "label": "SAFE_STOP", "color": "#ffa726" },
+              { "value": "4", "label": "ESTOP", "color": "#ef5350" },
+              { "value": "5", "label": "FAULT", "color": "#d32f2f" }
+            ]
+          }
+        },
+        {
+          "value": "/walker/status.deadman",
+          "label": "Dead-man",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/handle/pressure.alert",
+          "label": "Pressure alert",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "customStates": {
+            "type": "discrete",
+            "states": [
+              { "value": "0", "label": "NORMAL", "color": "#66bb6a" },
+              { "value": "1", "label": "WARNING", "color": "#ffa726" },
+              { "value": "2", "label": "HANDS_OFF", "color": "#ef5350" }
+            ]
+          }
+        },
+        {
+          "value": "/terrain/status.tof_alert",
+          "label": "TOF alert",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "customStates": {
+            "type": "discrete",
+            "states": [
+              { "value": "0", "label": "NORMAL", "color": "#66bb6a" },
+              { "value": "1", "label": "RAISED?", "color": "#ffee58" },
+              { "value": "2", "label": "DROP?", "color": "#ffca28" },
+              { "value": "3", "label": "RAISED", "color": "#ffa726" },
+              { "value": "4", "label": "DROP", "color": "#ef5350" },
+              { "value": "5", "label": "INVALID", "color": "#d32f2f" }
+            ]
+          }
+        },
+        {
+          "value": "/terrain/status.terrain_hazard",
+          "label": "Terrain hazard",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/crosswalk/status.state",
+          "label": "Crosswalk state",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/perception/surface_condition.classification",
+          "label": "Surface class",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "isSynced": true,
+      "timeWindowMode": "sliding",
+      "xAxisRange": 60,
+      "playbackBarPosition": "right",
+      "showPoints": false,
+      "showLegend": true,
+      "xAxisDisplayMethod": "relative"
+    },
+    "RawMessages!walker-status": {
+      "topicPath": "/walker/status",
+      "diffEnabled": false,
+      "expansion": "all",
+      "defaultExpanded": true,
+      "fontSize": 12
+    },
+    "DiagnosticsSummary!diagnostics": {
+      "minLevel": 0,
+      "pinnedIds": [],
+      "topicToRender": "/diagnostics",
+      "hardwareIdFilter": "",
+      "sortByLevel": true,
+      "secondsUntilStale": 3
+    },
+    "Plot!speed": {
+      "paths": [
+        {
+          "value": "/wheel/hall.left_velocity_rad_s.@mul(0.15)",
+          "label": "Hall speed (m/s)",
+          "color": "#42a5f5",
+          "enabled": true,
+          "lineSize": 2,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/gps/speed.data",
+          "label": "GPS speed (m/s)",
+          "color": "#66bb6a",
+          "enabled": true,
+          "lineSize": 2,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "minYValue": 0,
+      "maxYValue": 0.6,
+      "showLegend": true,
+      "legendDisplay": "top",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showYAxisGridLines": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "timeWindowMode": "sliding",
+      "followingViewWidth": 60,
+      "playbackBarPosition": "right",
+      "xAxisDisplayMethod": "relative",
+      "yAxisLabel": "Speed (m/s)"
+    },
+    "Plot!pressure": {
+      "paths": [
+        {
+          "value": "/handle/pressure.left_filtered",
+          "label": "Left A2 filtered",
+          "color": "#42a5f5",
+          "enabled": true,
+          "lineSize": 2,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/handle/pressure.right_filtered",
+          "label": "Right A1 filtered",
+          "color": "#ef5350",
+          "enabled": true,
+          "lineSize": 2,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "80",
+          "label": "Present threshold",
+          "color": "#ffa726",
+          "enabled": true,
+          "lineSize": 1,
+          "lineStyle": "dashed",
+          "showLine": true
+        }
+      ],
+      "minYValue": 0,
+      "maxYValue": 1023,
+      "showLegend": true,
+      "legendDisplay": "top",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showYAxisGridLines": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "timeWindowMode": "sliding",
+      "followingViewWidth": 60,
+      "playbackBarPosition": "right",
+      "xAxisDisplayMethod": "relative",
+      "yAxisLabel": "Pressure ADC"
+    },
+    "Plot!tof": {
+      "paths": [
+        {
+          "value": "/terrain/status.tof_filtered_m",
+          "label": "TOF filtered (m)",
+          "color": "#42a5f5",
+          "enabled": true,
+          "lineSize": 2,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/terrain/status.tof_reference_m",
+          "label": "TOF reference (m)",
+          "color": "#66bb6a",
+          "enabled": true,
+          "lineSize": 2,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/terrain/status.tof_error_m",
+          "label": "TOF error (m)",
+          "color": "#ef5350",
+          "enabled": true,
+          "lineSize": 2,
+          "showLine": true,
+          "timestampMethod": "receiveTime",
+          "yAxisId": "tof-error"
+        },
+        {
+          "value": "/terrain/status.tof_change_m",
+          "label": "TOF change (m)",
+          "color": "#ffa726",
+          "enabled": true,
+          "lineSize": 1,
+          "showLine": true,
+          "timestampMethod": "receiveTime",
+          "yAxisId": "tof-error"
+        }
+      ],
+      "minYValue": 0,
+      "maxYValue": 1.5,
+      "showLegend": true,
+      "legendDisplay": "top",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showYAxisGridLines": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "timeWindowMode": "sliding",
+      "followingViewWidth": 60,
+      "playbackBarPosition": "right",
+      "xAxisDisplayMethod": "relative",
+      "yAxisLabel": "Distance (m)",
+      "secondaryAxes": [
+        {
+          "id": "tof-error",
+          "label": "Error/change (m)",
+          "min": -0.3,
+          "max": 0.3,
+          "showTickLabels": true,
+          "showGridLines": false
+        }
+      ]
+    },
+    "Map!gps": {
+      "customTileUrl": "",
+      "disabledTopics": ["/odom"],
+      "followTopic": "/gps/fix",
+      "layer": "map",
+      "topicColors": {
+        "/gps/fix": "#42a5f5"
+      },
+      "zoomLevel": 18,
+      "topicConfig": {
+        "/gps/fix": {
+          "historyMode": "previous",
+          "pointDisplayMode": "dot",
+          "pointSize": 8,
+          "timeWindowSeconds": 300,
+          "showHeading": false,
+          "showVelocity": false,
+          "order": 0
+        }
+      }
+    },
+    "Plot!tilt": {
+      "paths": [
+        {
+          "value": "/terrain/status.pitch_rad.@degrees",
+          "label": "Pitch (deg)",
+          "color": "#ab47bc",
+          "enabled": true,
+          "lineSize": 2,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/terrain/status.roll_rad.@degrees",
+          "label": "Roll (deg)",
+          "color": "#26a69a",
+          "enabled": true,
+          "lineSize": 2,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "minYValue": -45,
+      "maxYValue": 45,
+      "showLegend": true,
+      "legendDisplay": "top",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showYAxisGridLines": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "timeWindowMode": "sliding",
+      "followingViewWidth": 60,
+      "playbackBarPosition": "right",
+      "xAxisDisplayMethod": "relative",
+      "yAxisLabel": "Inclination (deg)"
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "linkedGlobalVariables": [],
+  "playbackConfig": {
+    "speed": 1,
+    "messageOrder": "receiveTime"
+  }
+}

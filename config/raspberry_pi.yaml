@@ -210,6 +210,7 @@ foxglove_bridge:
       - ^/(diagnostics|walker/status|wheel/hall|handle/pressure|battery_state)$
       - ^/terrain/(tof|imu|status)$
       - ^/(gps/fix|gps/speed|gps/speed_raw|gps/course|crosswalk/status|odom|tf|tf_static|robot_description)$
+      - ^/perception/surface_condition$
     service_whitelist: ['(?!)']
     param_whitelist: ['(?!)']
     client_topic_whitelist: ['(?!)']
