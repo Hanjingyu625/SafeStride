@@ -29,6 +29,7 @@ def generate_launch_description() -> LaunchDescription:
     enable_gps = LaunchConfiguration('enable_gps')
     enable_crosswalk = LaunchConfiguration('enable_crosswalk')
     crosswalk_file = LaunchConfiguration('crosswalk_file')
+    intersection_map_file = LaunchConfiguration('intersection_map_file')
     signal_api_key_file = LaunchConfiguration('signal_api_key_file')
     intersection_id = LaunchConfiguration('intersection_id')
     enable_foxglove = LaunchConfiguration('enable_foxglove')
@@ -131,6 +132,11 @@ def generate_launch_description() -> LaunchDescription:
                 'crosswalk_file',
                 default_value='',
                 description='Absolute path to normalized crosswalk JSON.',
+            ),
+            DeclareLaunchArgument(
+                'intersection_map_file',
+                default_value='',
+                description='Offline normalized Seoul V2X intersection map.',
             ),
             DeclareLaunchArgument(
                 'signal_api_key_file',
@@ -242,6 +248,10 @@ def generate_launch_description() -> LaunchDescription:
                     {
                         'crosswalk_file': ParameterValue(
                             crosswalk_file,
+                            value_type=str,
+                        ),
+                        'intersection_map_file': ParameterValue(
+                            intersection_map_file,
                             value_type=str,
                         ),
                         'api_key_file': ParameterValue(

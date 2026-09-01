@@ -2,7 +2,7 @@
 
 The standalone `smart_crosswalk_controller_v6.py` logic has been split into
 testable ROS 2 components. The Raspberry Pi `gps_node` reads the BE-220 directly
-from `/dev/ttyS0` and publishes `/gps/fix`, `/gps/speed` and `/gps/course`.
+from `/dev/serial0` and publishes `/gps/fix`, `/gps/speed` and `/gps/course`.
 Terrain Uno does not relay GPS data. The crosswalk controller is monitor-only by
 default and therefore does not publish `/cmd_vel` unless explicitly enabled.
 
@@ -25,6 +25,12 @@ python3 tools/convert_crosswalk_shp.py \
 builds a spatial index once, then searches only nearby records rather than
 scanning the complete map at 5 Hz.
 
+The tracked `raspberry_pi/v2x_intersections.json` is the official Seoul T-Data
+intersection MAP CSV normalized for offline startup. Override it with
+`SAFESTRIDE_INTERSECTION_MAP_FILE=/absolute/path/intersections.json`. When the
+API is available, the controller refreshes this seed in the background and
+caches the newer result without blocking signal timing requests.
+
 When RMC course is fresh, or the GPS position has moved at least 2 m, candidates
 more than 60 degrees away from the travel direction are rejected. Before a
 heading is available, the nearest polygon is used. GPS course is direction of
@@ -33,21 +39,27 @@ walker is stationary.
 
 ## Configure signal timing
 
-Do not commit the Seoul V2X API key. Store only the key in a user-readable file
-such as `/etc/safestride/signal_api_key.txt`:
+`scripts/run.sh` first uses `/etc/safestride/signal_api_key.txt` when it exists,
+then falls back to `raspberry_pi/api_key.txt` for this deployed prototype:
 
 ```bash
 sudo install -d -m 750 /etc/safestride
-sudo install -m 600 /path/to/new-key.txt \
+sudo install -o "$USER" -g "$(id -gn)" -m 600 /path/to/new-key.txt \
   /etc/safestride/signal_api_key.txt
 ```
 
 With a key present, the ROS node asynchronously downloads the V2X intersection
-map, matches the selected crosswalk to an intersection within 120 m, and then
-requests its pedestrian signal timing. A tested fixed ID can override matching
-with `SAFESTRIDE_INTERSECTION_ID=1678`. With no valid ID, API key, network, or
-fresh signal value, the policy fails closed at the curb and reports the reason
-in `/diagnostics`.
+map, caches it under `~/.cache/safestride/`, matches the selected crosswalk to
+an intersection within 120 m, and then requests its pedestrian signal timing.
+`SAFESTRIDE_INTERSECTION_ID` is only a bench fallback when no API key is
+configured. A configured key always enables live matching and never falls back
+to a stale fixed ID. With no valid ID, API key, network, or fresh signal value,
+the policy fails closed at the curb and reports the reason in `/diagnostics`.
+
+Each selection change is logged as GPS coordinates, crosswalk index and
+distance, intersection ID and name, and the ID source. The same fields are in
+the `SafeStride/Crosswalk Controller` diagnostic, so a stale fixed ID cannot be
+mistaken for a live GPS match.
 
 ## Start in monitor-only mode
 

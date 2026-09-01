@@ -9,7 +9,12 @@ enable_cruise="${SAFESTRIDE_ENABLE_CRUISE:-true}"
 enable_crosswalk="${SAFESTRIDE_ENABLE_CROSSWALK:-true}"
 enable_gps="${SAFESTRIDE_ENABLE_GPS:-true}"
 crosswalk_file="${SAFESTRIDE_CROSSWALK_FILE:-${workspace}/raspberry_pi/standard_crosswalks.json}"
-signal_api_key_file="${SAFESTRIDE_SIGNAL_API_KEY_FILE:-/etc/safestride/signal_api_key.txt}"
+intersection_map_file="${SAFESTRIDE_INTERSECTION_MAP_FILE:-${workspace}/raspberry_pi/v2x_intersections.json}"
+default_signal_api_key_file="${workspace}/raspberry_pi/api_key.txt"
+if [[ -r /etc/safestride/signal_api_key.txt ]]; then
+  default_signal_api_key_file=/etc/safestride/signal_api_key.txt
+fi
+signal_api_key_file="${SAFESTRIDE_SIGNAL_API_KEY_FILE:-${default_signal_api_key_file}}"
 intersection_id="${SAFESTRIDE_INTERSECTION_ID:-}"
 
 check_serial_role() {
@@ -80,6 +85,24 @@ if [[ "${enable_crosswalk}" == "true" && ! -r "${crosswalk_file}" ]]; then
   exit 1
 fi
 
+if [[ "${enable_crosswalk}" == "true" ]]; then
+  echo "Crosswalk map: ${crosswalk_file}"
+  if [[ -r "${intersection_map_file}" ]]; then
+    echo "Offline V2X map: ${intersection_map_file}"
+  else
+    echo "Offline V2X map is missing: ${intersection_map_file}" >&2
+  fi
+  if [[ -r "${signal_api_key_file}" ]]; then
+    echo "V2X API key file: ${signal_api_key_file}"
+  else
+    echo "V2X API key file is missing: ${signal_api_key_file}" >&2
+    echo "Crosswalk location will be visible, but signal timing is disabled." >&2
+  fi
+  if [[ -n "${intersection_id}" ]]; then
+    echo "Static intersection fallback: ${intersection_id}" >&2
+  fi
+fi
+
 set +u
 source /opt/ros/jazzy/setup.bash
 source "${workspace}/install/setup.bash"
@@ -130,6 +153,7 @@ exec ros2 launch safestride_bringup safestride.launch.py \
   enable_gps:="${enable_gps}" \
   enable_crosswalk:="${enable_crosswalk}" \
   crosswalk_file:="${crosswalk_file}" \
+  intersection_map_file:="${intersection_map_file}" \
   signal_api_key_file:="${signal_api_key_file}" \
   intersection_id:="${intersection_id}" \
   enable_foxglove:="${SAFESTRIDE_ENABLE_FOXGLOVE:-false}"

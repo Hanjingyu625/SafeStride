@@ -1,0 +1,6009 @@
+{
+  "source": "Seoul T-Data intersection MAP information",
+  "source_data_id": "10144",
+  "source_file": "v2xCrossroadMapInformation_20241114_final.csv",
+  "source_updated": "2024-11-14",
+  "intersection_count": 1000,
+  "intersections": [
+    {
+      "intersection_id": "10",
+      "name": "난곡우체국앞",
+      "latitude": 37.4777135,
+      "longitude": 126.9153603
+    },
+    {
+      "intersection_id": "1007",
+      "name": "우리은행암사",
+      "latitude": 37.5547454,
+      "longitude": 127.1364893
+    },
+    {
+      "intersection_id": "101",
+      "name": "수서역",
+      "latitude": 37.4873221,
+      "longitude": 127.101742
+    },
+    {
+      "intersection_id": "1014",
+      "name": "선사사거리",
+      "latitude": 37.5547665,
+      "longitude": 127.1291998
+    },
+    {
+      "intersection_id": "1015",
+      "name": "대한볼링협회",
+      "latitude": 37.5311298,
+      "longitude": 127.137503
+    },
+    {
+      "intersection_id": "1016",
+      "name": "강동아트센터",
+      "latitude": 37.5517116,
+      "longitude": 127.1563351
+    },
+    {
+      "intersection_id": "1017",
+      "name": "명일여고앞",
+      "latitude": 37.5491714,
+      "longitude": 127.1493232
+    },
+    {
+      "intersection_id": "1029",
+      "name": "풍납사거리",
+      "latitude": 37.528011,
+      "longitude": 127.1191417
+    },
+    {
+      "intersection_id": "1030",
+      "name": "방이2동주민센터",
+      "latitude": 37.5145952,
+      "longitude": 127.1148971
+    },
+    {
+      "intersection_id": "1031",
+      "name": "개롱근린공원",
+      "latitude": 37.4932805,
+      "longitude": 127.1296167
+    },
+    {
+      "intersection_id": "1037",
+      "name": "아시아선수촌정문",
+      "latitude": 37.5097733,
+      "longitude": 127.0788142
+    },
+    {
+      "intersection_id": "1038",
+      "name": "광평교",
+      "latitude": 37.4896637,
+      "longitude": 127.1091864
+    },
+    {
+      "intersection_id": "1040",
+      "name": "신림교입구",
+      "latitude": 37.4824117,
+      "longitude": 126.9298743
+    },
+    {
+      "intersection_id": "1041",
+      "name": "관악소방서",
+      "latitude": 37.4739563,
+      "longitude": 126.9530389
+    },
+    {
+      "intersection_id": "1042",
+      "name": "롯데백화점관악",
+      "latitude": 37.4898846,
+      "longitude": 126.9253618
+    },
+    {
+      "intersection_id": "1047",
+      "name": "은천로입구",
+      "latitude": 37.4863436,
+      "longitude": 126.9350321
+    },
+    {
+      "intersection_id": "1049",
+      "name": "당곡초교입구",
+      "latitude": 37.488432,
+      "longitude": 126.9301134
+    },
+    {
+      "intersection_id": "1057",
+      "name": "삼성아파트삼거리",
+      "latitude": 37.5433189,
+      "longitude": 127.1023666
+    },
+    {
+      "intersection_id": "1058",
+      "name": "올림픽대교북단",
+      "latitude": 37.5411583,
+      "longitude": 127.095843
+    },
+    {
+      "intersection_id": "1059",
+      "name": "구의사거리",
+      "latitude": 37.5450815,
+      "longitude": 127.085301
+    },
+    {
+      "intersection_id": "1062",
+      "name": "광산사거리",
+      "latitude": 37.643182,
+      "longitude": 127.0223348
+    },
+    {
+      "intersection_id": "1063",
+      "name": "번동사거리",
+      "latitude": 37.6354763,
+      "longitude": 127.0338317
+    },
+    {
+      "intersection_id": "1066",
+      "name": "우리은행중화",
+      "latitude": 37.6053721,
+      "longitude": 127.0787309
+    },
+    {
+      "intersection_id": "1068",
+      "name": "신내차량기지",
+      "latitude": 37.6129609,
+      "longitude": 127.1013286
+    },
+    {
+      "intersection_id": "1069",
+      "name": "동일로지하차도",
+      "latitude": 37.5950098,
+      "longitude": 127.0803091
+    },
+    {
+      "intersection_id": "107",
+      "name": "래미안파크팰리스",
+      "latitude": 37.4971179,
+      "longitude": 127.1325641
+    },
+    {
+      "intersection_id": "1070",
+      "name": "석관지구대앞",
+      "latitude": 37.6110042,
+      "longitude": 127.0626167
+    },
+    {
+      "intersection_id": "1071",
+      "name": "광운대입구",
+      "latitude": 37.6169501,
+      "longitude": 127.056418
+    },
+    {
+      "intersection_id": "1073",
+      "name": "서울과학기술대입구",
+      "latitude": 37.6289119,
+      "longitude": 127.0713419
+    },
+    {
+      "intersection_id": "1074",
+      "name": "노원자동차검사소",
+      "latitude": 37.6379678,
+      "longitude": 127.0724311
+    },
+    {
+      "intersection_id": "1075",
+      "name": "중계경남아파트",
+      "latitude": 37.6435364,
+      "longitude": 127.0648555
+    },
+    {
+      "intersection_id": "1077",
+      "name": "중계역",
+      "latitude": 37.6455616,
+      "longitude": 127.0638932
+    },
+    {
+      "intersection_id": "108",
+      "name": "수협은행압구정",
+      "latitude": 37.52364,
+      "longitude": 127.0283351
+    },
+    {
+      "intersection_id": "1082",
+      "name": "리치다이아몬드호텔",
+      "latitude": 37.647864,
+      "longitude": 127.0157962
+    },
+    {
+      "intersection_id": "1086",
+      "name": "수유시장앞",
+      "latitude": 37.6306573,
+      "longitude": 127.024451
+    },
+    {
+      "intersection_id": "1088",
+      "name": "강월초교입구",
+      "latitude": 37.5170546,
+      "longitude": 126.8394136
+    },
+    {
+      "intersection_id": "1089",
+      "name": "노해근린공원",
+      "latitude": 37.6491922,
+      "longitude": 127.0695663
+    },
+    {
+      "intersection_id": "109",
+      "name": "서초삼성스위트아파트",
+      "latitude": 37.4953066,
+      "longitude": 127.0250233
+    },
+    {
+      "intersection_id": "1091",
+      "name": "내발산초교앞",
+      "latitude": 37.5508022,
+      "longitude": 126.8363575
+    },
+    {
+      "intersection_id": "1092",
+      "name": "강서소방서",
+      "latitude": 37.558026,
+      "longitude": 126.8609272
+    },
+    {
+      "intersection_id": "1102",
+      "name": "온수삼거리",
+      "latitude": 37.4931506,
+      "longitude": 126.8374117
+    },
+    {
+      "intersection_id": "1103",
+      "name": "동부제강입구",
+      "latitude": 37.4916277,
+      "longitude": 126.8326653
+    },
+    {
+      "intersection_id": "1104",
+      "name": "목동야구장",
+      "latitude": 37.528839,
+      "longitude": 126.8803406
+    },
+    {
+      "intersection_id": "1108",
+      "name": "역말사거리",
+      "latitude": 37.6058605,
+      "longitude": 126.9153867
+    },
+    {
+      "intersection_id": "1109",
+      "name": "서울혁신파크",
+      "latitude": 37.608822,
+      "longitude": 126.9313876
+    },
+    {
+      "intersection_id": "111",
+      "name": "현대빌딩본관",
+      "latitude": 37.5773531,
+      "longitude": 126.9881574
+    },
+    {
+      "intersection_id": "1112",
+      "name": "은천치안센터",
+      "latitude": 37.4830837,
+      "longitude": 126.9437765
+    },
+    {
+      "intersection_id": "1114",
+      "name": "청룡초교",
+      "latitude": 37.4757545,
+      "longitude": 126.9527111
+    },
+    {
+      "intersection_id": "1117",
+      "name": "관악구청",
+      "latitude": 37.4787077,
+      "longitude": 126.952316
+    },
+    {
+      "intersection_id": "1123",
+      "name": "대치삼성아파트앞",
+      "latitude": 37.4982423,
+      "longitude": 127.0588972
+    },
+    {
+      "intersection_id": "1125",
+      "name": "도구로입구",
+      "latitude": 37.4788254,
+      "longitude": 126.9896875
+    },
+    {
+      "intersection_id": "1126",
+      "name": "오륜주유소",
+      "latitude": 37.5094109,
+      "longitude": 127.1406962
+    },
+    {
+      "intersection_id": "1129",
+      "name": "광진교북단삼거리",
+      "latitude": 37.5468186,
+      "longitude": 127.1058991
+    },
+    {
+      "intersection_id": "1132",
+      "name": "신월마이홈아파트",
+      "latitude": 37.5225465,
+      "longitude": 126.8479725
+    },
+    {
+      "intersection_id": "1133",
+      "name": "양화교밑",
+      "latitude": 37.5471526,
+      "longitude": 126.8804472
+    },
+    {
+      "intersection_id": "1134",
+      "name": "신서중",
+      "latitude": 37.5154598,
+      "longitude": 126.8549984
+    },
+    {
+      "intersection_id": "1137",
+      "name": "서울시설공단남단",
+      "latitude": 37.5717896,
+      "longitude": 127.0379466
+    },
+    {
+      "intersection_id": "1141",
+      "name": "목동중학교앞",
+      "latitude": 37.5197869,
+      "longitude": 126.8724966
+    },
+    {
+      "intersection_id": "1142",
+      "name": "광영여고",
+      "latitude": 37.5392483,
+      "longitude": 126.8241611
+    },
+    {
+      "intersection_id": "1147",
+      "name": "강서구청",
+      "latitude": 37.5515969,
+      "longitude": 126.8494681
+    },
+    {
+      "intersection_id": "1148",
+      "name": "등촌동",
+      "latitude": 37.5579696,
+      "longitude": 126.8445957
+    },
+    {
+      "intersection_id": "1149",
+      "name": "신월초교입구",
+      "latitude": 37.5405044,
+      "longitude": 126.8362387
+    },
+    {
+      "intersection_id": "1156",
+      "name": "양강중",
+      "latitude": 37.5240653,
+      "longitude": 126.850906
+    },
+    {
+      "intersection_id": "1157",
+      "name": "열병합발전소앞",
+      "latitude": 37.5392572,
+      "longitude": 126.885634
+    },
+    {
+      "intersection_id": "1159",
+      "name": "광남중고교입구",
+      "latitude": 37.5392679,
+      "longitude": 127.0983676
+    },
+    {
+      "intersection_id": "1165",
+      "name": "먹골역",
+      "latitude": 37.6122201,
+      "longitude": 127.0774212
+    },
+    {
+      "intersection_id": "1167",
+      "name": "우리은행태릉역지점",
+      "latitude": 37.6155455,
+      "longitude": 127.0763599
+    },
+    {
+      "intersection_id": "1168",
+      "name": "길음역",
+      "latitude": 37.6042801,
+      "longitude": 127.0251618
+    },
+    {
+      "intersection_id": "1172",
+      "name": "공릉역",
+      "latitude": 37.6256089,
+      "longitude": 127.0730069
+    },
+    {
+      "intersection_id": "1173",
+      "name": "노원구청",
+      "latitude": 37.6536533,
+      "longitude": 127.0576018
+    },
+    {
+      "intersection_id": "1174",
+      "name": "창원초교",
+      "latitude": 37.6517571,
+      "longitude": 127.0415856
+    },
+    {
+      "intersection_id": "1175",
+      "name": "귀뚜라미연구소",
+      "latitude": 37.5618654,
+      "longitude": 126.8271627
+    },
+    {
+      "intersection_id": "1178",
+      "name": "메이필드호텔",
+      "latitude": 37.549146,
+      "longitude": 126.8164821
+    },
+    {
+      "intersection_id": "1179",
+      "name": "우장산역",
+      "latitude": 37.5479585,
+      "longitude": 126.8363561
+    },
+    {
+      "intersection_id": "1181",
+      "name": "불암지구대",
+      "latitude": 37.6522204,
+      "longitude": 127.0775849
+    },
+    {
+      "intersection_id": "1183",
+      "name": "서초푸르지오써밋",
+      "latitude": 37.5017678,
+      "longitude": 127.0219365
+    },
+    {
+      "intersection_id": "1184",
+      "name": "신계초교",
+      "latitude": 37.6299598,
+      "longitude": 127.0540575
+    },
+    {
+      "intersection_id": "1188",
+      "name": "녹번초교",
+      "latitude": 37.603529,
+      "longitude": 126.9254019
+    },
+    {
+      "intersection_id": "1190",
+      "name": "방화사거리",
+      "latitude": 37.5734357,
+      "longitude": 126.8114452
+    },
+    {
+      "intersection_id": "1192",
+      "name": "거리공원오거리",
+      "latitude": 37.497489,
+      "longitude": 126.8931062
+    },
+    {
+      "intersection_id": "1194",
+      "name": "수동물병원",
+      "latitude": 37.4985483,
+      "longitude": 126.8859459
+    },
+    {
+      "intersection_id": "1195",
+      "name": "계남공원",
+      "latitude": 37.5099471,
+      "longitude": 126.8581124
+    },
+    {
+      "intersection_id": "1197",
+      "name": "신도고교",
+      "latitude": 37.6304785,
+      "longitude": 126.9192546
+    },
+    {
+      "intersection_id": "1198",
+      "name": "한국환경산업기술원",
+      "latitude": 37.6095274,
+      "longitude": 126.9329975
+    },
+    {
+      "intersection_id": "1199",
+      "name": "영보빌딩은평",
+      "latitude": 37.6164644,
+      "longitude": 126.9188239
+    },
+    {
+      "intersection_id": "1201",
+      "name": "대림부동산",
+      "latitude": 37.4842028,
+      "longitude": 126.9397976
+    },
+    {
+      "intersection_id": "1202",
+      "name": "병천순대",
+      "latitude": 37.483251,
+      "longitude": 126.9422263
+    },
+    {
+      "intersection_id": "1203",
+      "name": "진광공업사",
+      "latitude": 37.4823876,
+      "longitude": 126.9507765
+    },
+    {
+      "intersection_id": "1204",
+      "name": "유수지삼거리",
+      "latitude": 37.526944,
+      "longitude": 127.1216188
+    },
+    {
+      "intersection_id": "1207",
+      "name": "서이지구대",
+      "latitude": 37.4925273,
+      "longitude": 127.0282361
+    },
+    {
+      "intersection_id": "1210",
+      "name": "동방사우나",
+      "latitude": 37.5217478,
+      "longitude": 126.8464293
+    },
+    {
+      "intersection_id": "1211",
+      "name": "대한도시가스",
+      "latitude": 37.4983006,
+      "longitude": 127.0761548
+    },
+    {
+      "intersection_id": "1213",
+      "name": "장지IC하향",
+      "latitude": 37.4697198,
+      "longitude": 127.1246679
+    },
+    {
+      "intersection_id": "1217",
+      "name": "역촌시장",
+      "latitude": 37.6124172,
+      "longitude": 126.9153304
+    },
+    {
+      "intersection_id": "1219",
+      "name": "홍대역2번출구",
+      "latitude": 37.5567035,
+      "longitude": 126.9236053
+    },
+    {
+      "intersection_id": "1221",
+      "name": "언북중학교",
+      "latitude": 37.5200047,
+      "longitude": 127.0345078
+    },
+    {
+      "intersection_id": "1222",
+      "name": "망우금호아파트",
+      "latitude": 37.6003969,
+      "longitude": 127.1095853
+    },
+    {
+      "intersection_id": "1223",
+      "name": "삼부그린체육센터",
+      "latitude": 37.6071913,
+      "longitude": 127.1009568
+    },
+    {
+      "intersection_id": "1224",
+      "name": "망우역",
+      "latitude": 37.5981879,
+      "longitude": 127.0928062
+    },
+    {
+      "intersection_id": "1225",
+      "name": "코스트코상봉",
+      "latitude": 37.5977124,
+      "longitude": 127.0907475
+    },
+    {
+      "intersection_id": "1226",
+      "name": "상봉지하차도",
+      "latitude": 37.5970829,
+      "longitude": 127.0880897
+    },
+    {
+      "intersection_id": "1228",
+      "name": "상봉역",
+      "latitude": 37.5963673,
+      "longitude": 127.0855416
+    },
+    {
+      "intersection_id": "1229",
+      "name": "서울중랑우체국",
+      "latitude": 37.5958166,
+      "longitude": 127.0834891
+    },
+    {
+      "intersection_id": "123",
+      "name": "석촌빌딩",
+      "latitude": 37.5035548,
+      "longitude": 127.108687
+    },
+    {
+      "intersection_id": "1230",
+      "name": "우리은행중랑교지점",
+      "latitude": 37.5936973,
+      "longitude": 127.0750493
+    },
+    {
+      "intersection_id": "1231",
+      "name": "유수지주차장",
+      "latitude": 37.5811365,
+      "longitude": 127.0833663
+    },
+    {
+      "intersection_id": "124",
+      "name": "반포래미안아이파크정문",
+      "latitude": 37.5013203,
+      "longitude": 127.0119728
+    },
+    {
+      "intersection_id": "1240",
+      "name": "근화제약앞",
+      "latitude": 37.4995128,
+      "longitude": 127.1173909
+    },
+    {
+      "intersection_id": "1246",
+      "name": "중계주공3단지",
+      "latitude": 37.6567244,
+      "longitude": 127.0747857
+    },
+    {
+      "intersection_id": "1248",
+      "name": "대조불광시장",
+      "latitude": 37.6090052,
+      "longitude": 126.9271324
+    },
+    {
+      "intersection_id": "125",
+      "name": "아크로비스타아케이드",
+      "latitude": 37.4993896,
+      "longitude": 127.012412
+    },
+    {
+      "intersection_id": "1250",
+      "name": "신월사거리",
+      "latitude": 37.5358786,
+      "longitude": 126.8283063
+    },
+    {
+      "intersection_id": "1251",
+      "name": "목동812동",
+      "latitude": 37.5192253,
+      "longitude": 126.8682198
+    },
+    {
+      "intersection_id": "1258",
+      "name": "신월1지구대입구",
+      "latitude": 37.5318001,
+      "longitude": 126.8311065
+    },
+    {
+      "intersection_id": "1259",
+      "name": "공항빗물펌프장",
+      "latitude": 37.5564198,
+      "longitude": 126.8163959
+    },
+    {
+      "intersection_id": "126",
+      "name": "종합운동장",
+      "latitude": 37.5118557,
+      "longitude": 127.0783248
+    },
+    {
+      "intersection_id": "1260",
+      "name": "대창빌딩",
+      "latitude": 37.554934,
+      "longitude": 126.8164716
+    },
+    {
+      "intersection_id": "1262",
+      "name": "강서구의회앞",
+      "latitude": 37.5465793,
+      "longitude": 126.8627797
+    },
+    {
+      "intersection_id": "1264",
+      "name": "대륭포스트타워",
+      "latitude": 37.4858373,
+      "longitude": 126.8963407
+    },
+    {
+      "intersection_id": "1267",
+      "name": "장석시장",
+      "latitude": 37.6151403,
+      "longitude": 127.0584078
+    },
+    {
+      "intersection_id": "1268",
+      "name": "국민은행중화동지점",
+      "latitude": 37.598177,
+      "longitude": 127.0801726
+    },
+    {
+      "intersection_id": "1269",
+      "name": "면목한신아파트",
+      "latitude": 37.5859784,
+      "longitude": 127.0766987
+    },
+    {
+      "intersection_id": "127",
+      "name": "백광골프랜드",
+      "latitude": 37.5047906,
+      "longitude": 126.8707855
+    },
+    {
+      "intersection_id": "1274",
+      "name": "한국컨벤션웨딩",
+      "latitude": 37.4972768,
+      "longitude": 126.855287
+    },
+    {
+      "intersection_id": "1275",
+      "name": "양정중",
+      "latitude": 37.5358388,
+      "longitude": 126.887817
+    },
+    {
+      "intersection_id": "1277",
+      "name": "낙성대역앞",
+      "latitude": 37.4773101,
+      "longitude": 126.9632255
+    },
+    {
+      "intersection_id": "1282",
+      "name": "동양미래대학교",
+      "latitude": 37.4995878,
+      "longitude": 126.867515
+    },
+    {
+      "intersection_id": "1283",
+      "name": "제일제당앞",
+      "latitude": 37.499753,
+      "longitude": 126.8746312
+    },
+    {
+      "intersection_id": "1284",
+      "name": "신도림대우푸르지오",
+      "latitude": 37.5094222,
+      "longitude": 126.8888701
+    },
+    {
+      "intersection_id": "1286",
+      "name": "외발산사거리",
+      "latitude": 37.5518562,
+      "longitude": 126.8165775
+    },
+    {
+      "intersection_id": "1289",
+      "name": "성수SKV1센터",
+      "latitude": 37.5469035,
+      "longitude": 127.0666623
+    },
+    {
+      "intersection_id": "129",
+      "name": "화곡고가밑",
+      "latitude": 37.527766,
+      "longitude": 126.8489599
+    },
+    {
+      "intersection_id": "1294",
+      "name": "여의도공원",
+      "latitude": 37.5242539,
+      "longitude": 126.9216726
+    },
+    {
+      "intersection_id": "1296",
+      "name": "여의도광장",
+      "latitude": 37.5269682,
+      "longitude": 126.9259912
+    },
+    {
+      "intersection_id": "130",
+      "name": "목동사거리",
+      "latitude": 37.5324079,
+      "longitude": 126.8637392
+    },
+    {
+      "intersection_id": "1300",
+      "name": "신트리공원앞",
+      "latitude": 37.5136696,
+      "longitude": 126.8558703
+    },
+    {
+      "intersection_id": "1301",
+      "name": "신사동주민센터앞",
+      "latitude": 37.4848622,
+      "longitude": 126.9139674
+    },
+    {
+      "intersection_id": "1303",
+      "name": "구로소방서",
+      "latitude": 37.4980986,
+      "longitude": 126.8650692
+    },
+    {
+      "intersection_id": "1307",
+      "name": "신도림SK뷰",
+      "latitude": 37.5077251,
+      "longitude": 126.8864342
+    },
+    {
+      "intersection_id": "131",
+      "name": "홍익병원",
+      "latitude": 37.529852,
+      "longitude": 126.8639811
+    },
+    {
+      "intersection_id": "1311",
+      "name": "대림우성아파트",
+      "latitude": 37.4943499,
+      "longitude": 126.9108883
+    },
+    {
+      "intersection_id": "1312",
+      "name": "강남웨딩문화원",
+      "latitude": 37.4867716,
+      "longitude": 126.9046821
+    },
+    {
+      "intersection_id": "1313",
+      "name": "사육신공원",
+      "latitude": 37.5127235,
+      "longitude": 126.950755
+    },
+    {
+      "intersection_id": "1315",
+      "name": "화랑대사거리",
+      "latitude": 37.6215202,
+      "longitude": 127.0871954
+    },
+    {
+      "intersection_id": "1316",
+      "name": "기아대교앞",
+      "latitude": 37.4387578,
+      "longitude": 126.9031489
+    },
+    {
+      "intersection_id": "1317",
+      "name": "경남교수아파트",
+      "latitude": 37.4965942,
+      "longitude": 126.9142821
+    },
+    {
+      "intersection_id": "132",
+      "name": "목동7단지",
+      "latitude": 37.5277056,
+      "longitude": 126.8641695
+    },
+    {
+      "intersection_id": "1324",
+      "name": "기상청입구",
+      "latitude": 37.4971956,
+      "longitude": 126.9175609
+    },
+    {
+      "intersection_id": "1327",
+      "name": "태릉시장",
+      "latitude": 37.5995615,
+      "longitude": 127.0799044
+    },
+    {
+      "intersection_id": "1328",
+      "name": "인덕대학입구",
+      "latitude": 37.6287176,
+      "longitude": 127.0566911
+    },
+    {
+      "intersection_id": "1329",
+      "name": "체육과학연구원",
+      "latitude": 37.6353835,
+      "longitude": 127.1058072
+    },
+    {
+      "intersection_id": "133",
+      "name": "목동역",
+      "latitude": 37.5261313,
+      "longitude": 126.86433
+    },
+    {
+      "intersection_id": "134",
+      "name": "남부법원.검찰청",
+      "latitude": 37.522482,
+      "longitude": 126.8654334
+    },
+    {
+      "intersection_id": "1344",
+      "name": "방학신동아아파트",
+      "latitude": 37.6617744,
+      "longitude": 127.0275704
+    },
+    {
+      "intersection_id": "1347",
+      "name": "번3동주민센터",
+      "latitude": 37.6265503,
+      "longitude": 127.0474889
+    },
+    {
+      "intersection_id": "1365",
+      "name": "방화초교",
+      "latitude": 37.5678008,
+      "longitude": 126.807633
+    },
+    {
+      "intersection_id": "1366",
+      "name": "목동119안전센터",
+      "latitude": 37.542824,
+      "longitude": 126.8839612
+    },
+    {
+      "intersection_id": "1369",
+      "name": "둔촌사거리",
+      "latitude": 37.5214436,
+      "longitude": 127.1338209
+    },
+    {
+      "intersection_id": "1370",
+      "name": "에이스하이엔드",
+      "latitude": 37.4814399,
+      "longitude": 126.8924436
+    },
+    {
+      "intersection_id": "1371",
+      "name": "디지털1단지",
+      "latitude": 37.4845783,
+      "longitude": 126.8953766
+    },
+    {
+      "intersection_id": "1375",
+      "name": "서초롯데캐슬아파트",
+      "latitude": 37.5008325,
+      "longitude": 127.0223736
+    },
+    {
+      "intersection_id": "1376",
+      "name": "서초보금자리삼거리",
+      "latitude": 37.4574587,
+      "longitude": 127.015052
+    },
+    {
+      "intersection_id": "1382",
+      "name": "상일IC",
+      "latitude": 37.5469781,
+      "longitude": 127.1735795
+    },
+    {
+      "intersection_id": "1383",
+      "name": "안암교",
+      "latitude": 37.5770521,
+      "longitude": 127.028177
+    },
+    {
+      "intersection_id": "1385",
+      "name": "화랑대역",
+      "latitude": 37.6204416,
+      "longitude": 127.0844659
+    },
+    {
+      "intersection_id": "139",
+      "name": "영등포구청앞",
+      "latitude": 37.5259881,
+      "longitude": 126.8966682
+    },
+    {
+      "intersection_id": "1392",
+      "name": "806전투경찰대",
+      "latitude": 37.6192813,
+      "longitude": 126.9055659
+    },
+    {
+      "intersection_id": "1395",
+      "name": "은혜산부인과",
+      "latitude": 37.607864,
+      "longitude": 126.9247807
+    },
+    {
+      "intersection_id": "1396",
+      "name": "양광교회",
+      "latitude": 37.6084925,
+      "longitude": 126.9286966
+    },
+    {
+      "intersection_id": "1400",
+      "name": "중화역",
+      "latitude": 37.6015902,
+      "longitude": 127.0794582
+    },
+    {
+      "intersection_id": "1409",
+      "name": "능동로분수광장",
+      "latitude": 37.5431087,
+      "longitude": 127.0721262
+    },
+    {
+      "intersection_id": "141",
+      "name": "남정초교",
+      "latitude": 37.5367558,
+      "longitude": 126.9640169
+    },
+    {
+      "intersection_id": "1411",
+      "name": "발산역",
+      "latitude": 37.5585656,
+      "longitude": 126.8382311
+    },
+    {
+      "intersection_id": "1412",
+      "name": "궁동터널입구",
+      "latitude": 37.5070753,
+      "longitude": 126.8382113
+    },
+    {
+      "intersection_id": "1414",
+      "name": "동대문소방서",
+      "latitude": 37.5638221,
+      "longitude": 127.0661796
+    },
+    {
+      "intersection_id": "1417",
+      "name": "신정배수펌프장",
+      "latitude": 37.5255313,
+      "longitude": 126.8778681
+    },
+    {
+      "intersection_id": "1419",
+      "name": "온수역입구",
+      "latitude": 37.4902191,
+      "longitude": 126.8258778
+    },
+    {
+      "intersection_id": "142",
+      "name": "한진해운빌딩앞",
+      "latitude": 37.5240898,
+      "longitude": 126.9255236
+    },
+    {
+      "intersection_id": "1420",
+      "name": "삼성교",
+      "latitude": 37.4708937,
+      "longitude": 126.941437
+    },
+    {
+      "intersection_id": "1424",
+      "name": "교보타워사거리",
+      "latitude": 37.5045212,
+      "longitude": 127.0244863
+    },
+    {
+      "intersection_id": "1426",
+      "name": "산골고개",
+      "latitude": 37.5976128,
+      "longitude": 126.938609
+    },
+    {
+      "intersection_id": "1429",
+      "name": "정은스카이빌",
+      "latitude": 37.5223505,
+      "longitude": 126.8502162
+    },
+    {
+      "intersection_id": "143",
+      "name": "공항천주교회",
+      "latitude": 37.5550885,
+      "longitude": 126.8123755
+    },
+    {
+      "intersection_id": "1437",
+      "name": "KBS스포츠월드",
+      "latitude": 37.5568376,
+      "longitude": 126.8497898
+    },
+    {
+      "intersection_id": "1445",
+      "name": "동문빌딩",
+      "latitude": 37.5212623,
+      "longitude": 126.8687223
+    },
+    {
+      "intersection_id": "1446",
+      "name": "AT센터",
+      "latitude": 37.4686115,
+      "longitude": 127.0398477
+    },
+    {
+      "intersection_id": "1449",
+      "name": "월드빌아파트",
+      "latitude": 37.586706,
+      "longitude": 126.9123647
+    },
+    {
+      "intersection_id": "1452",
+      "name": "난향초교입구",
+      "latitude": 37.4629883,
+      "longitude": 126.9189999
+    },
+    {
+      "intersection_id": "1453",
+      "name": "보성운수종점",
+      "latitude": 37.4641841,
+      "longitude": 126.9191902
+    },
+    {
+      "intersection_id": "146",
+      "name": "탑성마을",
+      "latitude": 37.4587999,
+      "longitude": 127.0560009
+    },
+    {
+      "intersection_id": "1460",
+      "name": "개나리아파트정문",
+      "latitude": 37.4993609,
+      "longitude": 127.0471824
+    },
+    {
+      "intersection_id": "1462",
+      "name": "코오롱글로벌빌딩앞",
+      "latitude": 37.558173,
+      "longitude": 127.0770269
+    },
+    {
+      "intersection_id": "1463",
+      "name": "종로노인복지관앞",
+      "latitude": 37.5756133,
+      "longitude": 127.0050093
+    },
+    {
+      "intersection_id": "1466",
+      "name": "탄천교",
+      "latitude": 37.4942083,
+      "longitude": 127.1037845
+    },
+    {
+      "intersection_id": "1467",
+      "name": "가리봉사거리",
+      "latitude": 37.4817961,
+      "longitude": 126.8866962
+    },
+    {
+      "intersection_id": "147",
+      "name": "창4동주민센터",
+      "latitude": 37.652399,
+      "longitude": 127.0511283
+    },
+    {
+      "intersection_id": "1473",
+      "name": "흰돌교회",
+      "latitude": 37.5884215,
+      "longitude": 127.0799976
+    },
+    {
+      "intersection_id": "1474",
+      "name": "봉화환승주차장",
+      "latitude": 37.6163978,
+      "longitude": 127.0934141
+    },
+    {
+      "intersection_id": "1476",
+      "name": "중랑소방서",
+      "latitude": 37.6156533,
+      "longitude": 127.0950985
+    },
+    {
+      "intersection_id": "1479",
+      "name": "정릉천주교회",
+      "latitude": 37.6078185,
+      "longitude": 127.0040433
+    },
+    {
+      "intersection_id": "148",
+      "name": "국회의사당",
+      "latitude": 37.5288059,
+      "longitude": 126.9165964
+    },
+    {
+      "intersection_id": "1480",
+      "name": "양천향교역",
+      "latitude": 37.5684552,
+      "longitude": 126.8413132
+    },
+    {
+      "intersection_id": "1481",
+      "name": "공진중학교",
+      "latitude": 37.5644029,
+      "longitude": 126.8488601
+    },
+    {
+      "intersection_id": "1483",
+      "name": "개봉1동사거리",
+      "latitude": 37.501598,
+      "longitude": 126.8465594
+    },
+    {
+      "intersection_id": "1486",
+      "name": "등촌역",
+      "latitude": 37.5514435,
+      "longitude": 126.8640003
+    },
+    {
+      "intersection_id": "149",
+      "name": "국회도서관",
+      "latitude": 37.5303325,
+      "longitude": 126.9190971
+    },
+    {
+      "intersection_id": "1491",
+      "name": "종암사거리",
+      "latitude": 37.6034197,
+      "longitude": 127.0321738
+    },
+    {
+      "intersection_id": "1496",
+      "name": "사러가시장앞",
+      "latitude": 37.5058486,
+      "longitude": 126.9110174
+    },
+    {
+      "intersection_id": "1498",
+      "name": "은천삼거리",
+      "latitude": 37.4856388,
+      "longitude": 126.9561764
+    },
+    {
+      "intersection_id": "1499",
+      "name": "삼성129동앞",
+      "latitude": 37.5067948,
+      "longitude": 127.0957856
+    },
+    {
+      "intersection_id": "150",
+      "name": "서울디자인지원센터",
+      "latitude": 37.5729392,
+      "longitude": 127.0075758
+    },
+    {
+      "intersection_id": "1500",
+      "name": "잠실119안전센터",
+      "latitude": 37.5070194,
+      "longitude": 127.0941344
+    },
+    {
+      "intersection_id": "1506",
+      "name": "종묘입구",
+      "latitude": 37.5726051,
+      "longitude": 126.9915319
+    },
+    {
+      "intersection_id": "151",
+      "name": "이화사거리",
+      "latitude": 37.5761684,
+      "longitude": 127.0022106
+    },
+    {
+      "intersection_id": "1510",
+      "name": "심미아파트",
+      "latitude": 37.5250441,
+      "longitude": 126.8562118
+    },
+    {
+      "intersection_id": "1517",
+      "name": "상일동역사거리",
+      "latitude": 37.5571909,
+      "longitude": 127.1713299
+    },
+    {
+      "intersection_id": "1524",
+      "name": "가리봉치안센터",
+      "latitude": 37.4787286,
+      "longitude": 126.8936444
+    },
+    {
+      "intersection_id": "1525",
+      "name": "목동13.14단지",
+      "latitude": 37.5140373,
+      "longitude": 126.8697183
+    },
+    {
+      "intersection_id": "1526",
+      "name": "강서면허시험장",
+      "latitude": 37.5485973,
+      "longitude": 126.8199932
+    },
+    {
+      "intersection_id": "1527",
+      "name": "용마초교",
+      "latitude": 37.5561132,
+      "longitude": 127.081971
+    },
+    {
+      "intersection_id": "1529",
+      "name": "서남충전소",
+      "latitude": 37.5727576,
+      "longitude": 126.8288415
+    },
+    {
+      "intersection_id": "1531",
+      "name": "서빙고역",
+      "latitude": 37.5202893,
+      "longitude": 126.9906666
+    },
+    {
+      "intersection_id": "1536",
+      "name": "부암동주민센터",
+      "latitude": 37.592851,
+      "longitude": 126.9640581
+    },
+    {
+      "intersection_id": "1537",
+      "name": "정동",
+      "latitude": 37.5683276,
+      "longitude": 126.9691612
+    },
+    {
+      "intersection_id": "154",
+      "name": "꿈의숲동문주차장입구",
+      "latitude": 37.6211894,
+      "longitude": 127.0456578
+    },
+    {
+      "intersection_id": "1541",
+      "name": "길동시장",
+      "latitude": 37.5346296,
+      "longitude": 127.1363714
+    },
+    {
+      "intersection_id": "1544",
+      "name": "가마산지하차도",
+      "latitude": 37.4920032,
+      "longitude": 126.8821241
+    },
+    {
+      "intersection_id": "1546",
+      "name": "등서초교입구",
+      "latitude": 37.5526799,
+      "longitude": 126.853288
+    },
+    {
+      "intersection_id": "155",
+      "name": "송정동공영주차장",
+      "latitude": 37.550157,
+      "longitude": 127.0685383
+    },
+    {
+      "intersection_id": "1552",
+      "name": "이수역",
+      "latitude": 37.4853994,
+      "longitude": 126.9821635
+    },
+    {
+      "intersection_id": "1554",
+      "name": "대조초교",
+      "latitude": 37.6132538,
+      "longitude": 126.917613
+    },
+    {
+      "intersection_id": "1558",
+      "name": "국민망우삼거리",
+      "latitude": 37.5991975,
+      "longitude": 127.0973412
+    },
+    {
+      "intersection_id": "1559",
+      "name": "망우지구대",
+      "latitude": 37.5986384,
+      "longitude": 127.0950574
+    },
+    {
+      "intersection_id": "156",
+      "name": "혜화동로터리",
+      "latitude": 37.5855368,
+      "longitude": 127.0011974
+    },
+    {
+      "intersection_id": "1560",
+      "name": "면목아이파크102동",
+      "latitude": 37.5813116,
+      "longitude": 127.0813421
+    },
+    {
+      "intersection_id": "1562",
+      "name": "구로삼각공원",
+      "latitude": 37.5015829,
+      "longitude": 126.891501
+    },
+    {
+      "intersection_id": "1567",
+      "name": "응암1동경향렉스빌",
+      "latitude": 37.6010644,
+      "longitude": 126.9251255
+    },
+    {
+      "intersection_id": "157",
+      "name": "세운상가",
+      "latitude": 37.5705684,
+      "longitude": 126.9950438
+    },
+    {
+      "intersection_id": "1571",
+      "name": "관악현대아파트",
+      "latitude": 37.4908408,
+      "longitude": 126.9564421
+    },
+    {
+      "intersection_id": "1574",
+      "name": "동대문역",
+      "latitude": 37.5720141,
+      "longitude": 127.0122574
+    },
+    {
+      "intersection_id": "1575",
+      "name": "능산사거리",
+      "latitude": 37.608389,
+      "longitude": 127.1009941
+    },
+    {
+      "intersection_id": "158",
+      "name": "청계6가",
+      "latitude": 37.5699421,
+      "longitude": 127.0096899
+    },
+    {
+      "intersection_id": "1590",
+      "name": "동양종합금융증권",
+      "latitude": 37.4939478,
+      "longitude": 127.1215
+    },
+    {
+      "intersection_id": "1596",
+      "name": "월계건강관리센터",
+      "latitude": 37.6314925,
+      "longitude": 127.0610488
+    },
+    {
+      "intersection_id": "1598",
+      "name": "은행사거리",
+      "latitude": 37.6506655,
+      "longitude": 127.0767348
+    },
+    {
+      "intersection_id": "160",
+      "name": "삼성힐스테이트2단지앞",
+      "latitude": 37.512433,
+      "longitude": 127.0511972
+    },
+    {
+      "intersection_id": "1602",
+      "name": "대일고교",
+      "latitude": 37.5393159,
+      "longitude": 126.8637239
+    },
+    {
+      "intersection_id": "1603",
+      "name": "거리공원",
+      "latitude": 37.5008895,
+      "longitude": 126.8901853
+    },
+    {
+      "intersection_id": "1607",
+      "name": "당곡사거리",
+      "latitude": 37.4893893,
+      "longitude": 126.927906
+    },
+    {
+      "intersection_id": "1608",
+      "name": "신성교",
+      "latitude": 37.4709465,
+      "longitude": 126.9377066
+    },
+    {
+      "intersection_id": "1609",
+      "name": "구로한일카센터",
+      "latitude": 37.480483,
+      "longitude": 126.8912405
+    },
+    {
+      "intersection_id": "161",
+      "name": "세곡동주민센터앞",
+      "latitude": 37.4692409,
+      "longitude": 127.1079628
+    },
+    {
+      "intersection_id": "1611",
+      "name": "탑골공원",
+      "latitude": 37.5716041,
+      "longitude": 126.9876359
+    },
+    {
+      "intersection_id": "1612",
+      "name": "군악대",
+      "latitude": 37.5018685,
+      "longitude": 126.9797866
+    },
+    {
+      "intersection_id": "1615",
+      "name": "테라팰리스건대4차",
+      "latitude": 37.5449741,
+      "longitude": 127.0730011
+    },
+    {
+      "intersection_id": "1616",
+      "name": "난곡119안전센터",
+      "latitude": 37.4758076,
+      "longitude": 126.9163204
+    },
+    {
+      "intersection_id": "1619",
+      "name": "서울역사박물관",
+      "latitude": 37.5698431,
+      "longitude": 126.9713258
+    },
+    {
+      "intersection_id": "1620",
+      "name": "국일관",
+      "latitude": 37.5703027,
+      "longitude": 126.9897302
+    },
+    {
+      "intersection_id": "1623",
+      "name": "센스빌오피스텔",
+      "latitude": 37.5494806,
+      "longitude": 127.0561047
+    },
+    {
+      "intersection_id": "1625",
+      "name": "이수교차로",
+      "latitude": 37.4997565,
+      "longitude": 126.98502
+    },
+    {
+      "intersection_id": "1627",
+      "name": "영림중",
+      "latitude": 37.4969637,
+      "longitude": 126.892101
+    },
+    {
+      "intersection_id": "1637",
+      "name": "일영유리",
+      "latitude": 37.6086715,
+      "longitude": 126.9995954
+    },
+    {
+      "intersection_id": "1648",
+      "name": "한전성서지점",
+      "latitude": 37.6057415,
+      "longitude": 126.9341247
+    },
+    {
+      "intersection_id": "1649",
+      "name": "대성주유소",
+      "latitude": 37.603858,
+      "longitude": 126.9349109
+    },
+    {
+      "intersection_id": "165",
+      "name": "신목동역",
+      "latitude": 37.5441406,
+      "longitude": 126.8831132
+    },
+    {
+      "intersection_id": "1650",
+      "name": "가양주유소앞",
+      "latitude": 37.5661718,
+      "longitude": 126.8455307
+    },
+    {
+      "intersection_id": "1654",
+      "name": "동부제일병원",
+      "latitude": 37.6004723,
+      "longitude": 127.1082698
+    },
+    {
+      "intersection_id": "1656",
+      "name": "수락산역남측",
+      "latitude": 37.6760556,
+      "longitude": 127.0552833
+    },
+    {
+      "intersection_id": "1657",
+      "name": "응봉교",
+      "latitude": 37.5473648,
+      "longitude": 127.0365249
+    },
+    {
+      "intersection_id": "1658",
+      "name": "상원삼거리",
+      "latitude": 37.5508627,
+      "longitude": 127.0521265
+    },
+    {
+      "intersection_id": "1659",
+      "name": "당산중",
+      "latitude": 37.5320085,
+      "longitude": 126.9057568
+    },
+    {
+      "intersection_id": "166",
+      "name": "농협태릉지점",
+      "latitude": 37.61826,
+      "longitude": 127.0773038
+    },
+    {
+      "intersection_id": "1661",
+      "name": "노일초교",
+      "latitude": 37.673971,
+      "longitude": 127.0554039
+    },
+    {
+      "intersection_id": "1662",
+      "name": "가좌역",
+      "latitude": 37.5691157,
+      "longitude": 126.9152728
+    },
+    {
+      "intersection_id": "167",
+      "name": "압구정현대아파트77동앞",
+      "latitude": 37.5302933,
+      "longitude": 127.0277142
+    },
+    {
+      "intersection_id": "1670",
+      "name": "화양사거리",
+      "latitude": 37.5483276,
+      "longitude": 127.0674707
+    },
+    {
+      "intersection_id": "1671",
+      "name": "화양시장",
+      "latitude": 37.548019,
+      "longitude": 127.0704906
+    },
+    {
+      "intersection_id": "1672",
+      "name": "어린이대공원역",
+      "latitude": 37.5472691,
+      "longitude": 127.0741779
+    },
+    {
+      "intersection_id": "1673",
+      "name": "건대입구삼거리",
+      "latitude": 37.5463846,
+      "longitude": 127.0762885
+    },
+    {
+      "intersection_id": "1674",
+      "name": "구의시장",
+      "latitude": 37.5446658,
+      "longitude": 127.0906412
+    },
+    {
+      "intersection_id": "1675",
+      "name": "구의수원지",
+      "latitude": 37.5438644,
+      "longitude": 127.0929565
+    },
+    {
+      "intersection_id": "1676",
+      "name": "광장자이아파트",
+      "latitude": 37.5426764,
+      "longitude": 127.0942985
+    },
+    {
+      "intersection_id": "1677",
+      "name": "해동카도크",
+      "latitude": 37.5436728,
+      "longitude": 127.0590234
+    },
+    {
+      "intersection_id": "1678",
+      "name": "건대입구역",
+      "latitude": 37.5399365,
+      "longitude": 127.070598
+    },
+    {
+      "intersection_id": "1679",
+      "name": "건대후문",
+      "latitude": 37.5387924,
+      "longitude": 127.0743779
+    },
+    {
+      "intersection_id": "1680",
+      "name": "자양삼거리",
+      "latitude": 37.5380546,
+      "longitude": 127.077099
+    },
+    {
+      "intersection_id": "1681",
+      "name": "자양초교",
+      "latitude": 37.537659,
+      "longitude": 127.0789587
+    },
+    {
+      "intersection_id": "1682",
+      "name": "자양사거리",
+      "latitude": 37.5365645,
+      "longitude": 127.0835634
+    },
+    {
+      "intersection_id": "1685",
+      "name": "광장현대8단지",
+      "latitude": 37.542021,
+      "longitude": 127.0985017
+    },
+    {
+      "intersection_id": "1691",
+      "name": "잠실대교북단사거리",
+      "latitude": 37.5324684,
+      "longitude": 127.0853888
+    },
+    {
+      "intersection_id": "1692",
+      "name": "치과의사회관앞",
+      "latitude": 37.5487476,
+      "longitude": 127.0583016
+    },
+    {
+      "intersection_id": "1694",
+      "name": "성수1차대우아파트",
+      "latitude": 37.5455673,
+      "longitude": 127.0659301
+    },
+    {
+      "intersection_id": "1695",
+      "name": "세종대",
+      "latitude": 37.5490112,
+      "longitude": 127.0752935
+    },
+    {
+      "intersection_id": "1697",
+      "name": "광진구청",
+      "latitude": 37.5383368,
+      "longitude": 127.0833564
+    },
+    {
+      "intersection_id": "1698",
+      "name": "자양아파트",
+      "latitude": 37.533461,
+      "longitude": 127.0847768
+    },
+    {
+      "intersection_id": "170",
+      "name": "공무원아파트",
+      "latitude": 37.5575715,
+      "longitude": 127.1567067
+    },
+    {
+      "intersection_id": "1704",
+      "name": "배명사거리",
+      "latitude": 37.5024655,
+      "longitude": 127.0969526
+    },
+    {
+      "intersection_id": "1709",
+      "name": "상계교",
+      "latitude": 37.6617107,
+      "longitude": 127.0524475
+    },
+    {
+      "intersection_id": "1713",
+      "name": "강일동입구",
+      "latitude": 37.5622027,
+      "longitude": 127.1704096
+    },
+    {
+      "intersection_id": "1714",
+      "name": "몽촌토성역",
+      "latitude": 37.5174913,
+      "longitude": 127.1127403
+    },
+    {
+      "intersection_id": "1716",
+      "name": "성수사거리",
+      "latitude": 37.5421368,
+      "longitude": 127.0639789
+    },
+    {
+      "intersection_id": "172",
+      "name": "태릉입구역",
+      "latitude": 37.6176423,
+      "longitude": 127.0756441
+    },
+    {
+      "intersection_id": "1722",
+      "name": "성수2가",
+      "latitude": 37.540307,
+      "longitude": 127.0629367
+    },
+    {
+      "intersection_id": "173",
+      "name": "영동전화국",
+      "latitude": 37.5050323,
+      "longitude": 127.0416266
+    },
+    {
+      "intersection_id": "1730",
+      "name": "삼성관음아파트",
+      "latitude": 37.5526424,
+      "longitude": 126.8700037
+    },
+    {
+      "intersection_id": "1734",
+      "name": "대원주유소",
+      "latitude": 37.4864473,
+      "longitude": 126.8564398
+    },
+    {
+      "intersection_id": "1736",
+      "name": "수락초교",
+      "latitude": 37.6836818,
+      "longitude": 127.05543
+    },
+    {
+      "intersection_id": "1737",
+      "name": "용산역앞",
+      "latitude": 37.5264431,
+      "longitude": 126.9652719
+    },
+    {
+      "intersection_id": "1738",
+      "name": "홍파복지원",
+      "latitude": 37.6806881,
+      "longitude": 127.0554436
+    },
+    {
+      "intersection_id": "1741",
+      "name": "온수골사거리",
+      "latitude": 37.6612274,
+      "longitude": 127.0587312
+    },
+    {
+      "intersection_id": "1742",
+      "name": "도봉면허시험장",
+      "latitude": 37.6579539,
+      "longitude": 127.0595619
+    },
+    {
+      "intersection_id": "1743",
+      "name": "상계2.6단지",
+      "latitude": 37.651439,
+      "longitude": 127.0613584
+    },
+    {
+      "intersection_id": "1744",
+      "name": "중계근린공원",
+      "latitude": 37.6411226,
+      "longitude": 127.0659296
+    },
+    {
+      "intersection_id": "1745",
+      "name": "노원구민의정당",
+      "latitude": 37.6387392,
+      "longitude": 127.0669985
+    },
+    {
+      "intersection_id": "1746",
+      "name": "하계역",
+      "latitude": 37.635961,
+      "longitude": 127.0682131
+    },
+    {
+      "intersection_id": "1747",
+      "name": "농협공릉지점",
+      "latitude": 37.6222447,
+      "longitude": 127.074123
+    },
+    {
+      "intersection_id": "1748",
+      "name": "화랑삼거리",
+      "latitude": 37.6238,
+      "longitude": 127.0907754
+    },
+    {
+      "intersection_id": "1749",
+      "name": "태릉사격장",
+      "latitude": 37.6279059,
+      "longitude": 127.0961903
+    },
+    {
+      "intersection_id": "175",
+      "name": "역삼금호어울림",
+      "latitude": 37.4926506,
+      "longitude": 127.0340999
+    },
+    {
+      "intersection_id": "1750",
+      "name": "태릉골프장",
+      "latitude": 37.6301302,
+      "longitude": 127.0980719
+    },
+    {
+      "intersection_id": "1751",
+      "name": "태릉선수촌",
+      "latitude": 37.6335966,
+      "longitude": 127.1033313
+    },
+    {
+      "intersection_id": "1754",
+      "name": "삼육대",
+      "latitude": 37.6379898,
+      "longitude": 127.1076806
+    },
+    {
+      "intersection_id": "176",
+      "name": "우리은행역삼",
+      "latitude": 37.4935164,
+      "longitude": 127.0403703
+    },
+    {
+      "intersection_id": "1760",
+      "name": "이화아파트",
+      "latitude": 37.4905816,
+      "longitude": 126.8929092
+    },
+    {
+      "intersection_id": "1778",
+      "name": "당현2교",
+      "latitude": 37.6507926,
+      "longitude": 127.0684718
+    },
+    {
+      "intersection_id": "179",
+      "name": "길동생태공원",
+      "latitude": 37.5402838,
+      "longitude": 127.1532805
+    },
+    {
+      "intersection_id": "1792",
+      "name": "방학역앞",
+      "latitude": 37.6697209,
+      "longitude": 127.0436376
+    },
+    {
+      "intersection_id": "1793",
+      "name": "강동성심병원",
+      "latitude": 37.5352957,
+      "longitude": 127.1343085
+    },
+    {
+      "intersection_id": "1795",
+      "name": "길동사거리",
+      "latitude": 37.5339461,
+      "longitude": 127.1385557
+    },
+    {
+      "intersection_id": "1796",
+      "name": "하계5.6단지",
+      "latitude": 37.6346551,
+      "longitude": 127.0661125
+    },
+    {
+      "intersection_id": "1797",
+      "name": "마들역",
+      "latitude": 37.664543,
+      "longitude": 127.0578264
+    },
+    {
+      "intersection_id": "1798",
+      "name": "대진여고",
+      "latitude": 37.6461978,
+      "longitude": 127.0662975
+    },
+    {
+      "intersection_id": "1807",
+      "name": "삼성해청아파트",
+      "latitude": 37.5176783,
+      "longitude": 127.0437584
+    },
+    {
+      "intersection_id": "1808",
+      "name": "장지역",
+      "latitude": 37.4793554,
+      "longitude": 127.1258284
+    },
+    {
+      "intersection_id": "1812",
+      "name": "신설동역",
+      "latitude": 37.5755809,
+      "longitude": 127.0232274
+    },
+    {
+      "intersection_id": "1813",
+      "name": "광화문",
+      "latitude": 37.5751483,
+      "longitude": 126.9770766
+    },
+    {
+      "intersection_id": "1814",
+      "name": "종로6가",
+      "latitude": 37.5711036,
+      "longitude": 127.0067086
+    },
+    {
+      "intersection_id": "1815",
+      "name": "경복궁",
+      "latitude": 37.5758544,
+      "longitude": 126.9794201
+    },
+    {
+      "intersection_id": "1816",
+      "name": "종로4가",
+      "latitude": 37.5707425,
+      "longitude": 126.9977692
+    },
+    {
+      "intersection_id": "1817",
+      "name": "종로구청입구",
+      "latitude": 37.5702029,
+      "longitude": 126.9793148
+    },
+    {
+      "intersection_id": "1818",
+      "name": "종로백화점약국",
+      "latitude": 37.5710408,
+      "longitude": 127.0037626
+    },
+    {
+      "intersection_id": "1819",
+      "name": "종로1가",
+      "latitude": 37.5702264,
+      "longitude": 126.9829758
+    },
+    {
+      "intersection_id": "1820",
+      "name": "종로2가",
+      "latitude": 37.5702056,
+      "longitude": 126.9876851
+    },
+    {
+      "intersection_id": "1821",
+      "name": "세종대로사거리",
+      "latitude": 37.5701758,
+      "longitude": 126.977029
+    },
+    {
+      "intersection_id": "1822",
+      "name": "통인교차로",
+      "latitude": 37.5794539,
+      "longitude": 126.9713498
+    },
+    {
+      "intersection_id": "1823",
+      "name": "신교동",
+      "latitude": 37.5838447,
+      "longitude": 126.9703958
+    },
+    {
+      "intersection_id": "1826",
+      "name": "안국역",
+      "latitude": 37.5768589,
+      "longitude": 126.9861801
+    },
+    {
+      "intersection_id": "1827",
+      "name": "통인시장",
+      "latitude": 37.581461,
+      "longitude": 126.9708642
+    },
+    {
+      "intersection_id": "1828",
+      "name": "하림각",
+      "latitude": 37.5978194,
+      "longitude": 126.9626128
+    },
+    {
+      "intersection_id": "1829",
+      "name": "자하문터널북단",
+      "latitude": 37.5951809,
+      "longitude": 126.9636525
+    },
+    {
+      "intersection_id": "1830",
+      "name": "재향군인회",
+      "latitude": 37.5733612,
+      "longitude": 126.9975784
+    },
+    {
+      "intersection_id": "1831",
+      "name": "혜화역",
+      "latitude": 37.5829472,
+      "longitude": 127.001763
+    },
+    {
+      "intersection_id": "1832",
+      "name": "무악재역",
+      "latitude": 37.5819776,
+      "longitude": 126.9505189
+    },
+    {
+      "intersection_id": "1835",
+      "name": "광교",
+      "latitude": 37.5690373,
+      "longitude": 126.9827797
+    },
+    {
+      "intersection_id": "1836",
+      "name": "합청",
+      "latitude": 37.5794179,
+      "longitude": 126.9738268
+    },
+    {
+      "intersection_id": "1838",
+      "name": "구기동정류장",
+      "latitude": 37.6070339,
+      "longitude": 126.9587855
+    },
+    {
+      "intersection_id": "1839",
+      "name": "종로5가",
+      "latitude": 37.5710013,
+      "longitude": 127.0019255
+    },
+    {
+      "intersection_id": "1843",
+      "name": "낙원상가",
+      "latitude": 37.5735455,
+      "longitude": 126.9876807
+    },
+    {
+      "intersection_id": "1846",
+      "name": "구기터널",
+      "latitude": 37.6084681,
+      "longitude": 126.9567144
+    },
+    {
+      "intersection_id": "1847",
+      "name": "신영소방서",
+      "latitude": 37.6058314,
+      "longitude": 126.960618
+    },
+    {
+      "intersection_id": "185",
+      "name": "인권빌딩",
+      "latitude": 37.5342458,
+      "longitude": 126.8635971
+    },
+    {
+      "intersection_id": "1850",
+      "name": "청계2가",
+      "latitude": 37.5682795,
+      "longitude": 126.9876861
+    },
+    {
+      "intersection_id": "1851",
+      "name": "창경궁",
+      "latitude": 37.5790415,
+      "longitude": 126.9966823
+    },
+    {
+      "intersection_id": "1854",
+      "name": "조계사",
+      "latitude": 37.5739436,
+      "longitude": 126.9829375
+    },
+    {
+      "intersection_id": "1855",
+      "name": "팔판동",
+      "latitude": 37.5810688,
+      "longitude": 126.980253
+    },
+    {
+      "intersection_id": "1857",
+      "name": "정부서울청사",
+      "latitude": 3.7575758,
+      "longitude": 126.9743313
+    },
+    {
+      "intersection_id": "186",
+      "name": "용두119안전센터앞",
+      "latitude": 37.5780826,
+      "longitude": 127.0317389
+    },
+    {
+      "intersection_id": "1861",
+      "name": "우리은행효자",
+      "latitude": 37.5781183,
+      "longitude": 126.9718623
+    },
+    {
+      "intersection_id": "1863",
+      "name": "종로3가",
+      "latitude": 37.5704205,
+      "longitude": 126.9921386
+    },
+    {
+      "intersection_id": "1864",
+      "name": "청계4가",
+      "latitude": 37.5690316,
+      "longitude": 126.9979233
+    },
+    {
+      "intersection_id": "1865",
+      "name": "동묘앞역",
+      "latitude": 37.5730228,
+      "longitude": 127.0156343
+    },
+    {
+      "intersection_id": "1866",
+      "name": "성균관대입구",
+      "latitude": 37.5830166,
+      "longitude": 126.9987504
+    },
+    {
+      "intersection_id": "1867",
+      "name": "국립과학관",
+      "latitude": 37.5814946,
+      "longitude": 126.9970056
+    },
+    {
+      "intersection_id": "1869",
+      "name": "둔촌아파트입구삼거리",
+      "latitude": 37.5236777,
+      "longitude": 127.1346825
+    },
+    {
+      "intersection_id": "1871",
+      "name": "LG전자",
+      "latitude": 37.4815134,
+      "longitude": 126.9504182
+    },
+    {
+      "intersection_id": "1873",
+      "name": "낙성대입구",
+      "latitude": 37.478527,
+      "longitude": 126.9598853
+    },
+    {
+      "intersection_id": "1876",
+      "name": "중계종합사회복지관",
+      "latitude": 37.6572335,
+      "longitude": 127.0768473
+    },
+    {
+      "intersection_id": "1877",
+      "name": "중계주공4.5단지",
+      "latitude": 37.6545558,
+      "longitude": 127.0781698
+    },
+    {
+      "intersection_id": "1882",
+      "name": "강서운전면허시험장입구",
+      "latitude": 37.5493647,
+      "longitude": 126.819563
+    },
+    {
+      "intersection_id": "1885",
+      "name": "코끼리약국",
+      "latitude": 37.5081781,
+      "longitude": 127.0879169
+    },
+    {
+      "intersection_id": "189",
+      "name": "관악우성아파트",
+      "latitude": 37.4864113,
+      "longitude": 126.9568561
+    },
+    {
+      "intersection_id": "1893",
+      "name": "강서한강자이타워",
+      "latitude": 37.5656407,
+      "longitude": 126.8465729
+    },
+    {
+      "intersection_id": "1899",
+      "name": "한강대교북단",
+      "latitude": 37.5224199,
+      "longitude": 126.9617766
+    },
+    {
+      "intersection_id": "1900",
+      "name": "중계9단지",
+      "latitude": 37.6411938,
+      "longitude": 127.0763343
+    },
+    {
+      "intersection_id": "1904",
+      "name": "목동월드파크빌",
+      "latitude": 37.5408714,
+      "longitude": 126.8637453
+    },
+    {
+      "intersection_id": "1909",
+      "name": "성가복지병원",
+      "latitude": 37.6063813,
+      "longitude": 127.0311781
+    },
+    {
+      "intersection_id": "1911",
+      "name": "동일로주유소",
+      "latitude": 37.5679478,
+      "longitude": 127.0785921
+    },
+    {
+      "intersection_id": "1912",
+      "name": "신내데시앙정문",
+      "latitude": 37.61083,
+      "longitude": 127.1011727
+    },
+    {
+      "intersection_id": "1914",
+      "name": "워커힐아파트",
+      "latitude": 37.5480903,
+      "longitude": 127.1070931
+    },
+    {
+      "intersection_id": "1915",
+      "name": "둔촌고교입구",
+      "latitude": 37.5352166,
+      "longitude": 127.1453212
+    },
+    {
+      "intersection_id": "1917",
+      "name": "은일로즈힐아파트",
+      "latitude": 37.5163123,
+      "longitude": 126.8369575
+    },
+    {
+      "intersection_id": "1918",
+      "name": "신화중학교",
+      "latitude": 37.5395017,
+      "longitude": 126.8309036
+    },
+    {
+      "intersection_id": "1921",
+      "name": "삼일빌딩앞",
+      "latitude": 37.5627074,
+      "longitude": 127.0003211
+    },
+    {
+      "intersection_id": "1922",
+      "name": "홍은풍림아파트",
+      "latitude": 37.595159,
+      "longitude": 126.9402854
+    },
+    {
+      "intersection_id": "1923",
+      "name": "홍제역",
+      "latitude": 37.5880055,
+      "longitude": 126.9451089
+    },
+    {
+      "intersection_id": "1924",
+      "name": "무악재한화아파트",
+      "latitude": 37.5827395,
+      "longitude": 126.9501417
+    },
+    {
+      "intersection_id": "1926",
+      "name": "안산초교",
+      "latitude": 37.5805804,
+      "longitude": 126.9517861
+    },
+    {
+      "intersection_id": "1928",
+      "name": "서울역광장",
+      "latitude": 37.5540576,
+      "longitude": 126.9729844
+    },
+    {
+      "intersection_id": "1929",
+      "name": "서울역R",
+      "latitude": 37.5570508,
+      "longitude": 126.9726242
+    },
+    {
+      "intersection_id": "1943",
+      "name": "시민교회",
+      "latitude": 37.5545041,
+      "longitude": 127.0863109
+    },
+    {
+      "intersection_id": "1946",
+      "name": "청계광장",
+      "latitude": 37.5694153,
+      "longitude": 126.9771986
+    },
+    {
+      "intersection_id": "1954",
+      "name": "군자역",
+      "latitude": 37.5571793,
+      "longitude": 127.0794927
+    },
+    {
+      "intersection_id": "1957",
+      "name": "어린이회관앞",
+      "latitude": 37.5456142,
+      "longitude": 127.0785874
+    },
+    {
+      "intersection_id": "1958",
+      "name": "고척중",
+      "latitude": 37.5006441,
+      "longitude": 126.863602
+    },
+    {
+      "intersection_id": "196",
+      "name": "세이브마트",
+      "latitude": 37.4739725,
+      "longitude": 126.9176019
+    },
+    {
+      "intersection_id": "1962",
+      "name": "북부도로교통사업소앞",
+      "latitude": 37.6340616,
+      "longitude": 127.0376232
+    },
+    {
+      "intersection_id": "1963",
+      "name": "대명신협",
+      "latitude": 37.5786574,
+      "longitude": 127.04039
+    },
+    {
+      "intersection_id": "1966",
+      "name": "인덕대학",
+      "latitude": 37.6289518,
+      "longitude": 127.0549892
+    },
+    {
+      "intersection_id": "197",
+      "name": "난우지구대",
+      "latitude": 37.4797112,
+      "longitude": 126.9149363
+    },
+    {
+      "intersection_id": "1971",
+      "name": "평안섬유공업사",
+      "latitude": 37.5891509,
+      "longitude": 127.0589138
+    },
+    {
+      "intersection_id": "1972",
+      "name": "배봉초교",
+      "latitude": 37.5786639,
+      "longitude": 127.0684224
+    },
+    {
+      "intersection_id": "1977",
+      "name": "동서울케이블TV앞",
+      "latitude": 37.5428285,
+      "longitude": 127.0618607
+    },
+    {
+      "intersection_id": "1978",
+      "name": "해성자동차공업사앞",
+      "latitude": 37.5432538,
+      "longitude": 127.0604213
+    },
+    {
+      "intersection_id": "198",
+      "name": "신도림역",
+      "latitude": 37.5102262,
+      "longitude": 126.8903682
+    },
+    {
+      "intersection_id": "1980",
+      "name": "잠실새내역",
+      "latitude": 37.5116331,
+      "longitude": 127.0855385
+    },
+    {
+      "intersection_id": "1981",
+      "name": "잠실3사거리",
+      "latitude": 37.5118955,
+      "longitude": 127.0925284
+    },
+    {
+      "intersection_id": "1988",
+      "name": "그랜드마트",
+      "latitude": 37.5596618,
+      "longitude": 126.8386338
+    },
+    {
+      "intersection_id": "1989",
+      "name": "성내천공원앞",
+      "latitude": 37.5251481,
+      "longitude": 127.1254038
+    },
+    {
+      "intersection_id": "199",
+      "name": "신도림주민센터",
+      "latitude": 37.5057642,
+      "longitude": 126.8836059
+    },
+    {
+      "intersection_id": "1990",
+      "name": "팬코",
+      "latitude": 37.5607703,
+      "longitude": 126.8389868
+    },
+    {
+      "intersection_id": "1991",
+      "name": "등촌1-10단지",
+      "latitude": 37.563219,
+      "longitude": 126.8397947
+    },
+    {
+      "intersection_id": "1992",
+      "name": "대륭드림타운",
+      "latitude": 37.5665502,
+      "longitude": 126.8408441
+    },
+    {
+      "intersection_id": "1999",
+      "name": "원남동사거리",
+      "latitude": 37.5759134,
+      "longitude": 126.9973494
+    },
+    {
+      "intersection_id": "200",
+      "name": "구로역",
+      "latitude": 37.5030259,
+      "longitude": 126.8798092
+    },
+    {
+      "intersection_id": "20001",
+      "name": "이촌역앞(연등)",
+      "latitude": 37.5229798,
+      "longitude": 126.972103
+    },
+    {
+      "intersection_id": "20005",
+      "name": "석관중(연등)",
+      "latitude": 37.6059691,
+      "longitude": 127.0665962
+    },
+    {
+      "intersection_id": "20009",
+      "name": "구로경찰서(연등)",
+      "latitude": 37.4943412,
+      "longitude": 126.8870739
+    },
+    {
+      "intersection_id": "20010",
+      "name": "난곡우체국앞(연등)",
+      "latitude": 37.4778807,
+      "longitude": 126.916527
+    },
+    {
+      "intersection_id": "20026",
+      "name": "삼성동센트럴아이파크(연등)",
+      "latitude": 37.5162776,
+      "longitude": 127.0516058
+    },
+    {
+      "intersection_id": "2003",
+      "name": "석촌호",
+      "latitude": 37.5065529,
+      "longitude": 127.0973009
+    },
+    {
+      "intersection_id": "20030",
+      "name": "강남세무서(연등)1",
+      "latitude": 37.5184194,
+      "longitude": 127.0480101
+    },
+    {
+      "intersection_id": "20034",
+      "name": "논현지구대(연등)",
+      "latitude": 37.5127762,
+      "longitude": 127.0268085
+    },
+    {
+      "intersection_id": "20035",
+      "name": "전기공제회관(연등)",
+      "latitude": 37.514299,
+      "longitude": 127.0201207
+    },
+    {
+      "intersection_id": "20038",
+      "name": "영동고(연등)1",
+      "latitude": 37.5216641,
+      "longitude": 127.0396415
+    },
+    {
+      "intersection_id": "20039",
+      "name": "청담천주교회(연등)",
+      "latitude": 37.5215056,
+      "longitude": 127.0487973
+    },
+    {
+      "intersection_id": "20041",
+      "name": "우리은행청담(연등)",
+      "latitude": 37.5222637,
+      "longitude": 127.0558112
+    },
+    {
+      "intersection_id": "20042",
+      "name": "영동대교남단(연등)",
+      "latitude": 37.5248517,
+      "longitude": 127.0527188
+    },
+    {
+      "intersection_id": "20045",
+      "name": "학동(연등)1",
+      "latitude": 37.523502,
+      "longitude": 127.0416064
+    },
+    {
+      "intersection_id": "20046",
+      "name": "도산공원(연등)",
+      "latitude": 37.5221282,
+      "longitude": 127.0357303
+    },
+    {
+      "intersection_id": "20047",
+      "name": "삼화콘덴서(연등)",
+      "latitude": 37.5209338,
+      "longitude": 127.0319535
+    },
+    {
+      "intersection_id": "20049",
+      "name": "신사역(연등)",
+      "latitude": 37.5157695,
+      "longitude": 127.0184618
+    },
+    {
+      "intersection_id": "20054",
+      "name": "청담초교(연등)",
+      "latitude": 37.5266046,
+      "longitude": 127.0454089
+    },
+    {
+      "intersection_id": "20056",
+      "name": "광림교회(연등)",
+      "latitude": 37.526115,
+      "longitude": 127.0263586
+    },
+    {
+      "intersection_id": "20057",
+      "name": "현대고(연등)",
+      "latitude": 37.5234339,
+      "longitude": 127.0210383
+    },
+    {
+      "intersection_id": "20058",
+      "name": "한남대교남단(연등)1",
+      "latitude": 37.5223813,
+      "longitude": 127.0190757
+    },
+    {
+      "intersection_id": "20062",
+      "name": "서울메트로뒤(연등)",
+      "latitude": 37.4780399,
+      "longitude": 126.9881719
+    },
+    {
+      "intersection_id": "20063",
+      "name": "시스폴사거리(연등)",
+      "latitude": 37.4870134,
+      "longitude": 126.9892559
+    },
+    {
+      "intersection_id": "20064",
+      "name": "한양타운(연등)",
+      "latitude": 37.52578,
+      "longitude": 127.0399912
+    },
+    {
+      "intersection_id": "20068",
+      "name": "백제고분(연등)",
+      "latitude": 37.5084921,
+      "longitude": 127.1154762
+    },
+    {
+      "intersection_id": "20070",
+      "name": "방이사거리(연등)",
+      "latitude": 37.5092497,
+      "longitude": 127.1140938
+    },
+    {
+      "intersection_id": "20073",
+      "name": "대명초교입구(연등)",
+      "latitude": 37.547411,
+      "longitude": 127.15607
+    },
+    {
+      "intersection_id": "20077",
+      "name": "롯데백화점도곡(연등)",
+      "latitude": 37.4973799,
+      "longitude": 127.0562029
+    },
+    {
+      "intersection_id": "20082",
+      "name": "쟁골마을(연등)",
+      "latitude": 37.4832246,
+      "longitude": 127.1044788
+    },
+    {
+      "intersection_id": "20086",
+      "name": "헌인릉입구(연등)",
+      "latitude": 37.460053,
+      "longitude": 127.080002
+    },
+    {
+      "intersection_id": "20089",
+      "name": "세곡동사거리(연등)1",
+      "latitude": 37.4648491,
+      "longitude": 127.1099606
+    },
+    {
+      "intersection_id": "2009",
+      "name": "서울도시가스",
+      "latitude": 37.5052457,
+      "longitude": 126.9445611
+    },
+    {
+      "intersection_id": "20093",
+      "name": "자곡사거리(연등)",
+      "latitude": 37.4752383,
+      "longitude": 127.1052906
+    },
+    {
+      "intersection_id": "20097",
+      "name": "대왕중교(연등)",
+      "latitude": 37.48404,
+      "longitude": 127.0891665
+    },
+    {
+      "intersection_id": "20098",
+      "name": "태화복지관앞(연등)",
+      "latitude": 37.4848326,
+      "longitude": 127.0927019
+    },
+    {
+      "intersection_id": "201",
+      "name": "중앙유통단지",
+      "latitude": 37.5011484,
+      "longitude": 126.8772342
+    },
+    {
+      "intersection_id": "2010",
+      "name": "강서도로사업소",
+      "latitude": 37.5727294,
+      "longitude": 126.8299747
+    },
+    {
+      "intersection_id": "20101",
+      "name": "수서역(연등)1",
+      "latitude": 37.488424,
+      "longitude": 127.1003019
+    },
+    {
+      "intersection_id": "20109",
+      "name": "서초삼성스위트아파트(연등)",
+      "latitude": 37.4940062,
+      "longitude": 127.0256325
+    },
+    {
+      "intersection_id": "20130",
+      "name": "목동사거리(연등)",
+      "latitude": 37.5327016,
+      "longitude": 126.8660821
+    },
+    {
+      "intersection_id": "20133",
+      "name": "목동역(연등)1",
+      "latitude": 37.5262938,
+      "longitude": 126.8635009
+    },
+    {
+      "intersection_id": "20134",
+      "name": "남부법원.검찰청(연등)",
+      "latitude": 37.5244125,
+      "longitude": 126.8648346
+    },
+    {
+      "intersection_id": "20142",
+      "name": "한진해운빌딩앞(연등)",
+      "latitude": 37.5247338,
+      "longitude": 126.9248656
+    },
+    {
+      "intersection_id": "20146",
+      "name": "탑성마을(연등)",
+      "latitude": 37.4597547,
+      "longitude": 127.0543256
+    },
+    {
+      "intersection_id": "20148",
+      "name": "국회의사당(연등)",
+      "latitude": 37.5291901,
+      "longitude": 126.917255
+    },
+    {
+      "intersection_id": "2015",
+      "name": "대명전자삼거리",
+      "latitude": 37.4823424,
+      "longitude": 126.893482
+    },
+    {
+      "intersection_id": "20158",
+      "name": "청계6가(연등)",
+      "latitude": 37.569639,
+      "longitude": 127.0097319
+    },
+    {
+      "intersection_id": "20160",
+      "name": "삼성힐스테이트2단지앞(연등)",
+      "latitude": 37.5119827,
+      "longitude": 127.0496803
+    },
+    {
+      "intersection_id": "2017",
+      "name": "유광사여성병원",
+      "latitude": 37.5432532,
+      "longitude": 126.8388708
+    },
+    {
+      "intersection_id": "202",
+      "name": "고척교",
+      "latitude": 37.4988847,
+      "longitude": 126.8717925
+    },
+    {
+      "intersection_id": "20203",
+      "name": "구로시장(연등)1",
+      "latitude": 37.4873,
+      "longitude": 126.8850638
+    },
+    {
+      "intersection_id": "20206",
+      "name": "오류동삼거리(연등)",
+      "latitude": 37.4943355,
+      "longitude": 126.8400244
+    },
+    {
+      "intersection_id": "20239",
+      "name": "노원롯데백화점(연등)",
+      "latitude": 37.654585,
+      "longitude": 127.061948
+    },
+    {
+      "intersection_id": "2028",
+      "name": "이태원소방파출소",
+      "latitude": 37.5346034,
+      "longitude": 126.9955875
+    },
+    {
+      "intersection_id": "203",
+      "name": "구로시장",
+      "latitude": 37.4883771,
+      "longitude": 126.8846197
+    },
+    {
+      "intersection_id": "20303",
+      "name": "원터공원(연등)1",
+      "latitude": 37.554693,
+      "longitude": 127.150192
+    },
+    {
+      "intersection_id": "2031",
+      "name": "청계한신휴플러스",
+      "latitude": 37.5718504,
+      "longitude": 127.0444346
+    },
+    {
+      "intersection_id": "2032",
+      "name": "신답역",
+      "latitude": 37.5698863,
+      "longitude": 127.0486833
+    },
+    {
+      "intersection_id": "2034",
+      "name": "장지공영차고지앞",
+      "latitude": 37.4801368,
+      "longitude": 127.1387579
+    },
+    {
+      "intersection_id": "20366",
+      "name": "당고개주유소(연등)",
+      "latitude": 37.6695469,
+      "longitude": 127.0805588
+    },
+    {
+      "intersection_id": "20379",
+      "name": "IBK기업은행대림동지점(연등)",
+      "latitude": 37.4970461,
+      "longitude": 126.8989915
+    },
+    {
+      "intersection_id": "2038",
+      "name": "동대문중",
+      "latitude": 37.5733575,
+      "longitude": 127.052225
+    },
+    {
+      "intersection_id": "20386",
+      "name": "망원역(연등)",
+      "latitude": 37.5568793,
+      "longitude": 126.909397
+    },
+    {
+      "intersection_id": "20388",
+      "name": "고려대역(연등)",
+      "latitude": 37.5896848,
+      "longitude": 127.036465
+    },
+    {
+      "intersection_id": "2039",
+      "name": "생태공원삼거리",
+      "latitude": 37.5261462,
+      "longitude": 127.12236
+    },
+    {
+      "intersection_id": "20392",
+      "name": "종암2치안센터(연등)",
+      "latitude": 37.599055,
+      "longitude": 127.0344679
+    },
+    {
+      "intersection_id": "20393",
+      "name": "보훈병원입구(연등)",
+      "latitude": 37.5341124,
+      "longitude": 127.1426528
+    },
+    {
+      "intersection_id": "2040",
+      "name": "청량리119안전센터",
+      "latitude": 37.5871036,
+      "longitude": 127.0526473
+    },
+    {
+      "intersection_id": "20403",
+      "name": "동성공업사(연등)",
+      "latitude": 37.6101463,
+      "longitude": 127.0324361
+    },
+    {
+      "intersection_id": "20406",
+      "name": "삼양입구사거리(연등)1",
+      "latitude": 37.616641,
+      "longitude": 127.029846
+    },
+    {
+      "intersection_id": "20408",
+      "name": "도봉세무서(연등)",
+      "latitude": 37.6189823,
+      "longitude": 127.0290591
+    },
+    {
+      "intersection_id": "20409",
+      "name": "방송대북부별관(연등)",
+      "latitude": 37.6207067,
+      "longitude": 127.0284102
+    },
+    {
+      "intersection_id": "2041",
+      "name": "플라워스토리",
+      "latitude": 37.5144374,
+      "longitude": 127.1427856
+    },
+    {
+      "intersection_id": "20410",
+      "name": "미아역(연등)",
+      "latitude": 37.6271499,
+      "longitude": 127.025859
+    },
+    {
+      "intersection_id": "20416",
+      "name": "대한병원(연등)",
+      "latitude": 37.6362876,
+      "longitude": 127.0230723
+    },
+    {
+      "intersection_id": "2042",
+      "name": "가양3.5단지",
+      "latitude": 37.5628915,
+      "longitude": 126.8517449
+    },
+    {
+      "intersection_id": "20423",
+      "name": "수유3동우체국(연등)",
+      "latitude": 37.642193,
+      "longitude": 127.030145
+    },
+    {
+      "intersection_id": "2043",
+      "name": "등촌아이파크아파트",
+      "latitude": 37.5439455,
+      "longitude": 126.8621637
+    },
+    {
+      "intersection_id": "20433",
+      "name": "창동변전소(연등)",
+      "latitude": 37.6585525,
+      "longitude": 127.0405611
+    },
+    {
+      "intersection_id": "20434",
+      "name": "동부센트레빌아파트앞(연등)",
+      "latitude": 37.6628564,
+      "longitude": 127.0392505
+    },
+    {
+      "intersection_id": "20438",
+      "name": "방학홈플러스(연등)",
+      "latitude": 37.6659281,
+      "longitude": 127.0429938
+    },
+    {
+      "intersection_id": "20445",
+      "name": "도봉한신아파트(연등)",
+      "latitude": 37.6827755,
+      "longitude": 127.045853
+    },
+    {
+      "intersection_id": "2045",
+      "name": "방아삼거리",
+      "latitude": 37.5236865,
+      "longitude": 127.1464939
+    },
+    {
+      "intersection_id": "20450",
+      "name": "박미삼거리(연등)1",
+      "latitude": 37.447284,
+      "longitude": 126.9034026
+    },
+    {
+      "intersection_id": "20451",
+      "name": "상월곡역(연등)1",
+      "latitude": 37.6074855,
+      "longitude": 127.0505732
+    },
+    {
+      "intersection_id": "20452",
+      "name": "석관2동삼성래미안(연등)",
+      "latitude": 37.6085327,
+      "longitude": 127.0525861
+    },
+    {
+      "intersection_id": "20454",
+      "name": "장위사거리(연등)",
+      "latitude": 37.6138007,
+      "longitude": 127.0623226
+    },
+    {
+      "intersection_id": "20456",
+      "name": "월릉교(연등)",
+      "latitude": 37.6155273,
+      "longitude": 127.068844
+    },
+    {
+      "intersection_id": "20457",
+      "name": "태릉가스충전소(연등)",
+      "latitude": 37.6180765,
+      "longitude": 127.072629
+    },
+    {
+      "intersection_id": "20458",
+      "name": "명보사거리(연등)",
+      "latitude": 37.5627579,
+      "longitude": 126.9930872
+    },
+    {
+      "intersection_id": "20463",
+      "name": "돈암1동주민센터(연등)1",
+      "latitude": 37.6022374,
+      "longitude": 127.0250188
+    },
+    {
+      "intersection_id": "20470",
+      "name": "불광역(연등)",
+      "latitude": 37.6121223,
+      "longitude": 126.9285246
+    },
+    {
+      "intersection_id": "20472",
+      "name": "연신내로데오(연등)",
+      "latitude": 37.6184018,
+      "longitude": 126.920178
+    },
+    {
+      "intersection_id": "20477",
+      "name": "역촌사거리(연등)",
+      "latitude": 37.6075679,
+      "longitude": 126.9217924
+    },
+    {
+      "intersection_id": "20478",
+      "name": "역촌역(연등)",
+      "latitude": 37.605473,
+      "longitude": 126.9226238
+    },
+    {
+      "intersection_id": "20482",
+      "name": "신사오거리(연등)1",
+      "latitude": 37.5995239,
+      "longitude": 126.9165965
+    },
+    {
+      "intersection_id": "20483",
+      "name": "청운아파트(연등)",
+      "latitude": 37.5945988,
+      "longitude": 126.9145487
+    },
+    {
+      "intersection_id": "20484",
+      "name": "새절역(연등)",
+      "latitude": 37.5933385,
+      "longitude": 126.9131659
+    },
+    {
+      "intersection_id": "2049",
+      "name": "3.4번정문",
+      "latitude": 37.5349453,
+      "longitude": 126.9847157
+    },
+    {
+      "intersection_id": "205",
+      "name": "한영대학교",
+      "latitude": 37.4978928,
+      "longitude": 126.8523901
+    },
+    {
+      "intersection_id": "2050",
+      "name": "청파동삼거리",
+      "latitude": 37.5482115,
+      "longitude": 126.9700559
+    },
+    {
+      "intersection_id": "2051",
+      "name": "청파동입구",
+      "latitude": 37.5495581,
+      "longitude": 126.9718128
+    },
+    {
+      "intersection_id": "20516",
+      "name": "서울대매점앞(연등)",
+      "latitude": 37.4670538,
+      "longitude": 126.9487171
+    },
+    {
+      "intersection_id": "20526",
+      "name": "신림3교(연등)",
+      "latitude": 37.4721493,
+      "longitude": 126.933292
+    },
+    {
+      "intersection_id": "20529",
+      "name": "선정중고입구(연등)",
+      "latitude": 37.6161564,
+      "longitude": 126.9077564
+    },
+    {
+      "intersection_id": "20538",
+      "name": "강월초교(연등)",
+      "latitude": 37.5161781,
+      "longitude": 126.8348345
+    },
+    {
+      "intersection_id": "2054",
+      "name": "국립중앙박물관",
+      "latitude": 37.5215214,
+      "longitude": 126.9771243
+    },
+    {
+      "intersection_id": "20559",
+      "name": "발산119안전센터(연등)",
+      "latitude": 37.5565925,
+      "longitude": 126.8376186
+    },
+    {
+      "intersection_id": "2056",
+      "name": "국방부",
+      "latitude": 37.534642,
+      "longitude": 126.9758186
+    },
+    {
+      "intersection_id": "2059",
+      "name": "남영삼거리",
+      "latitude": 37.5420484,
+      "longitude": 126.9727794
+    },
+    {
+      "intersection_id": "206",
+      "name": "오류동삼거리",
+      "latitude": 37.4948451,
+      "longitude": 126.841098
+    },
+    {
+      "intersection_id": "2060",
+      "name": "남영역",
+      "latitude": 37.5416827,
+      "longitude": 126.9707873
+    },
+    {
+      "intersection_id": "2061",
+      "name": "다래원",
+      "latitude": 37.5347082,
+      "longitude": 126.9973112
+    },
+    {
+      "intersection_id": "2062",
+      "name": "데이콤빌딩",
+      "latitude": 37.5241886,
+      "longitude": 126.9632141
+    },
+    {
+      "intersection_id": "20622",
+      "name": "녹천교동측(연등)1",
+      "latitude": 37.6453063,
+      "longitude": 127.0583311
+    },
+    {
+      "intersection_id": "2063",
+      "name": "동빙고동",
+      "latitude": 37.5294537,
+      "longitude": 126.9913518
+    },
+    {
+      "intersection_id": "20637",
+      "name": "신설동역앞(연등)",
+      "latitude": 37.5744973,
+      "longitude": 12.7025588
+    },
+    {
+      "intersection_id": "2064",
+      "name": "동자동",
+      "latitude": 37.5511286,
+      "longitude": 126.9722147
+    },
+    {
+      "intersection_id": "20643",
+      "name": "미아서광빌딩(연등)",
+      "latitude": 37.6231767,
+      "longitude": 127.0274346
+    },
+    {
+      "intersection_id": "20644",
+      "name": "숭인시장(연등)",
+      "latitude": 37.6132158,
+      "longitude": 127.0300703
+    },
+    {
+      "intersection_id": "20648",
+      "name": "한성대(연등)1",
+      "latitude": 37.5907561,
+      "longitude": 127.0111831
+    },
+    {
+      "intersection_id": "2065",
+      "name": "대림1동공영주차장앞",
+      "latitude": 37.493279,
+      "longitude": 126.9011983
+    },
+    {
+      "intersection_id": "20659",
+      "name": "강서보건소앞(연등)",
+      "latitude": 37.5492626,
+      "longitude": 126.8680956
+    },
+    {
+      "intersection_id": "20669",
+      "name": "정릉입구(연등)",
+      "latitude": 37.6049273,
+      "longitude": 127.0108736
+    },
+    {
+      "intersection_id": "2067",
+      "name": "버들약국",
+      "latitude": 37.5367616,
+      "longitude": 127.0004367
+    },
+    {
+      "intersection_id": "20674",
+      "name": "신대방삼거리역(연등)1",
+      "latitude": 37.4997102,
+      "longitude": 126.9294786
+    },
+    {
+      "intersection_id": "2068",
+      "name": "KT한강로빌딩",
+      "latitude": 37.5315589,
+      "longitude": 126.9701939
+    },
+    {
+      "intersection_id": "20685",
+      "name": "신방화사거리(연등)1",
+      "latitude": 37.5733729,
+      "longitude": 126.8180938
+    },
+    {
+      "intersection_id": "20690",
+      "name": "잠실현대아파트(연등)",
+      "latitude": 37.5048172,
+      "longitude": 127.0864131
+    },
+    {
+      "intersection_id": "20694",
+      "name": "GS마트입구(연등)",
+      "latitude": 37.4914736,
+      "longitude": 127.1149928
+    },
+    {
+      "intersection_id": "207",
+      "name": "롯데캐슬골드파크3차",
+      "latitude": 37.4618583,
+      "longitude": 126.8977849
+    },
+    {
+      "intersection_id": "2070",
+      "name": "1.2번정문",
+      "latitude": 37.5347627,
+      "longitude": 126.9807569
+    },
+    {
+      "intersection_id": "20704",
+      "name": "서울공업사(연등)1",
+      "latitude": 37.5341874,
+      "longitude": 127.1218243
+    },
+    {
+      "intersection_id": "20706",
+      "name": "오금동근린공원(연등)",
+      "latitude": 37.49955,
+      "longitude": 127.1355299
+    },
+    {
+      "intersection_id": "20708",
+      "name": "강동구청역(연등)",
+      "latitude": 37.5305991,
+      "longitude": 127.121097
+    },
+    {
+      "intersection_id": "20709",
+      "name": "거여동사거리(연등)",
+      "latitude": 37.4964445,
+      "longitude": 127.1379087
+    },
+    {
+      "intersection_id": "20710",
+      "name": "경찰병원후문(연등)",
+      "latitude": 37.4979794,
+      "longitude": 127.1255485
+    },
+    {
+      "intersection_id": "2074",
+      "name": "북한남삼거리",
+      "latitude": 37.5420901,
+      "longitude": 127.0023802
+    },
+    {
+      "intersection_id": "20744",
+      "name": "길동초교(연등)1",
+      "latitude": 37.537881,
+      "longitude": 127.1400498
+    },
+    {
+      "intersection_id": "20745",
+      "name": "박석고개(연등)",
+      "latitude": 37.6259671,
+      "longitude": 126.92011
+    },
+    {
+      "intersection_id": "20746",
+      "name": "북한산래미안(연등)",
+      "latitude": 37.6108495,
+      "longitude": 126.9414422
+    },
+    {
+      "intersection_id": "20748",
+      "name": "신한은행갈현(연등)",
+      "latitude": 37.624681,
+      "longitude": 126.919969
+    },
+    {
+      "intersection_id": "2075",
+      "name": "삼각지역",
+      "latitude": 37.5356753,
+      "longitude": 126.9740138
+    },
+    {
+      "intersection_id": "20753",
+      "name": "화랑교(연등)1",
+      "latitude": 37.4705601,
+      "longitude": 126.9389314
+    },
+    {
+      "intersection_id": "20758",
+      "name": "구로전화국(연등)",
+      "latitude": 37.4796348,
+      "longitude": 126.9025673
+    },
+    {
+      "intersection_id": "20767",
+      "name": "명덕초교입구(연등)",
+      "latitude": 37.557883,
+      "longitude": 127.1445444
+    },
+    {
+      "intersection_id": "20771",
+      "name": "효령아파트(연등)1",
+      "latitude": 37.4801635,
+      "longitude": 126.9936174
+    },
+    {
+      "intersection_id": "2078",
+      "name": "소화아동병원",
+      "latitude": 37.5539112,
+      "longitude": 126.9690403
+    },
+    {
+      "intersection_id": "20785",
+      "name": "관악우림시장(연등)",
+      "latitude": 37.4706778,
+      "longitude": 126.9198405
+    },
+    {
+      "intersection_id": "20795",
+      "name": "뚝섬역(연등)",
+      "latitude": 37.549732,
+      "longitude": 127.0442518
+    },
+    {
+      "intersection_id": "20799",
+      "name": "성내5교(연등)",
+      "latitude": 37.5018177,
+      "longitude": 127.1376793
+    },
+    {
+      "intersection_id": "208",
+      "name": "덕은교",
+      "latitude": 37.5909918,
+      "longitude": 126.8825995
+    },
+    {
+      "intersection_id": "2080",
+      "name": "숙명여대입구",
+      "latitude": 37.5449147,
+      "longitude": 126.9706081
+    },
+    {
+      "intersection_id": "20806",
+      "name": "우이시장(연등)",
+      "latitude": 37.645701,
+      "longitude": 127.0188554
+    },
+    {
+      "intersection_id": "2081",
+      "name": "숙대입구역7번출구",
+      "latitude": 37.543332,
+      "longitude": 126.9724952
+    },
+    {
+      "intersection_id": "20812",
+      "name": "신한은행방학(연등)",
+      "latitude": 37.6627207,
+      "longitude": 127.0361393
+    },
+    {
+      "intersection_id": "20813",
+      "name": "방학한화아파트(연등)",
+      "latitude": 37.662114,
+      "longitude": 127.030846
+    },
+    {
+      "intersection_id": "20815",
+      "name": "창문여고(연등)1",
+      "latitude": 37.6135837,
+      "longitude": 127.0379635
+    },
+    {
+      "intersection_id": "20824",
+      "name": "뚝섬체육공원",
+      "latitude": 37.5461311,
+      "longitude": 127.0447571
+    },
+    {
+      "intersection_id": "2084",
+      "name": "신한은행원효",
+      "latitude": 37.5359665,
+      "longitude": 126.962831
+    },
+    {
+      "intersection_id": "20846",
+      "name": "복선교(연등)",
+      "latitude": 37.6012986,
+      "longitude": 127.0226041
+    },
+    {
+      "intersection_id": "2085",
+      "name": "용마슈퍼",
+      "latitude": 37.540625,
+      "longitude": 126.9582694
+    },
+    {
+      "intersection_id": "2086",
+      "name": "효창공원앞역",
+      "latitude": 37.539299,
+      "longitude": 126.961377
+    },
+    {
+      "intersection_id": "20865",
+      "name": "조양시장(연등)",
+      "latitude": 37.5413493,
+      "longitude": 127.0664744
+    },
+    {
+      "intersection_id": "2088",
+      "name": "용산1호정문",
+      "latitude": 37.537726,
+      "longitude": 126.9739232
+    },
+    {
+      "intersection_id": "20883",
+      "name": "묵2동(연등)",
+      "latitude": 37.6096353,
+      "longitude": 127.0779762
+    },
+    {
+      "intersection_id": "20886",
+      "name": "염광여상(연등)",
+      "latitude": 37.6261901,
+      "longitude": 127.0527494
+    },
+    {
+      "intersection_id": "20894",
+      "name": "방학성원아파트(연등)1",
+      "latitude": 37.6623771,
+      "longitude": 127.0331064
+    },
+    {
+      "intersection_id": "209",
+      "name": "수색교",
+      "latitude": 37.5870096,
+      "longitude": 126.8872464
+    },
+    {
+      "intersection_id": "2090",
+      "name": "용산보건소",
+      "latitude": 37.5379975,
+      "longitude": 126.96634
+    },
+    {
+      "intersection_id": "2091",
+      "name": "용산서",
+      "latitude": 37.5402185,
+      "longitude": 126.9690014
+    },
+    {
+      "intersection_id": "2092",
+      "name": "용산역",
+      "latitude": 37.52728,
+      "longitude": 126.9660279
+    },
+    {
+      "intersection_id": "20922",
+      "name": "동곡삼거리(연등)",
+      "latitude": 37.5620897,
+      "longitude": 127.0752687
+    },
+    {
+      "intersection_id": "2093",
+      "name": "용산우체국",
+      "latitude": 37.530262,
+      "longitude": 126.96897
+    },
+    {
+      "intersection_id": "20936",
+      "name": "광장사거리(연등)",
+      "latitude": 37.5456712,
+      "longitude": 127.1024629
+    },
+    {
+      "intersection_id": "20938",
+      "name": "오장동사거리(연등)",
+      "latitude": 37.5656491,
+      "longitude": 127.0024434
+    },
+    {
+      "intersection_id": "2094",
+      "name": "숙대입구역",
+      "latitude": 37.5451102,
+      "longitude": 126.9720052
+    },
+    {
+      "intersection_id": "2095",
+      "name": "원효로2가",
+      "latitude": 37.535362,
+      "longitude": 126.9616377
+    },
+    {
+      "intersection_id": "2096",
+      "name": "원효3가",
+      "latitude": 37.5342115,
+      "longitude": 126.958772
+    },
+    {
+      "intersection_id": "20961",
+      "name": "구로미성아파트(연등)",
+      "latitude": 37.5045438,
+      "longitude": 126.8779857
+    },
+    {
+      "intersection_id": "20963",
+      "name": "구로구청구의회(연등)",
+      "latitude": 37.4949522,
+      "longitude": 126.8881277
+    },
+    {
+      "intersection_id": "20967",
+      "name": "동구로초교(연등)1",
+      "latitude": 37.4916142,
+      "longitude": 126.8918606
+    },
+    {
+      "intersection_id": "20968",
+      "name": "쌍용자동차서비스(연등)",
+      "latitude": 37.5003049,
+      "longitude": 126.8824666
+    },
+    {
+      "intersection_id": "20976",
+      "name": "신한은행신월동지점(연등)",
+      "latitude": 37.5188617,
+      "longitude": 126.8429704
+    },
+    {
+      "intersection_id": "20980",
+      "name": "롯데마트서울역(연등)",
+      "latitude": 37.554921,
+      "longitude": 126.9677557
+    },
+    {
+      "intersection_id": "20985",
+      "name": "한성대입구역(연등)1",
+      "latitude": 37.5876754,
+      "longitude": 127.0040161
+    },
+    {
+      "intersection_id": "20996",
+      "name": "까치고개(연등)",
+      "latitude": 37.476183,
+      "longitude": 126.9658938
+    },
+    {
+      "intersection_id": "210",
+      "name": "수색서광빌딩",
+      "latitude": 37.5839318,
+      "longitude": 126.8918782
+    },
+    {
+      "intersection_id": "2100",
+      "name": "이촌역",
+      "latitude": 37.5224015,
+      "longitude": 126.9743851
+    },
+    {
+      "intersection_id": "21007",
+      "name": "우리은행암사(연등)1",
+      "latitude": 37.5547374,
+      "longitude": 127.1357137
+    },
+    {
+      "intersection_id": "21014",
+      "name": "선사사거리(연등)",
+      "latitude": 37.5547646,
+      "longitude": 127.1310546
+    },
+    {
+      "intersection_id": "2102",
+      "name": "이태원",
+      "latitude": 37.5342669,
+      "longitude": 126.9902856
+    },
+    {
+      "intersection_id": "21031",
+      "name": "개롱근린공원(연등)",
+      "latitude": 37.4924553,
+      "longitude": 127.1280727
+    },
+    {
+      "intersection_id": "21037",
+      "name": "아시아선수촌정문(연등)",
+      "latitude": 37.5088658,
+      "longitude": 127.0790639
+    },
+    {
+      "intersection_id": "2104",
+      "name": "전자랜드",
+      "latitude": 37.5331201,
+      "longitude": 126.9615924
+    },
+    {
+      "intersection_id": "21040",
+      "name": "신림교입구(연등)",
+      "latitude": 37.4809725,
+      "longitude": 126.9301882
+    },
+    {
+      "intersection_id": "21041",
+      "name": "관악소방서(연등)1",
+      "latitude": 37.4735106,
+      "longitude": 126.9530964
+    },
+    {
+      "intersection_id": "2105",
+      "name": "송원초교",
+      "latitude": 37.5531778,
+      "longitude": 127.0702417
+    },
+    {
+      "intersection_id": "21057",
+      "name": "삼성아파트삼거리(연등)1",
+      "latitude": 37.5429681,
+      "longitude": 127.1013142
+    },
+    {
+      "intersection_id": "2106",
+      "name": "전자상가입구",
+      "latitude": 37.529533,
+      "longitude": 126.9682406
+    },
+    {
+      "intersection_id": "21062",
+      "name": "광산사거리(연등)",
+      "latitude": 37.6440142,
+      "longitude": 127.021217
+    },
+    {
+      "intersection_id": "21066",
+      "name": "우리은행중화(연등)",
+      "latitude": 37.6064612,
+      "longitude": 127.0785712
+    },
+    {
+      "intersection_id": "21068",
+      "name": "신내차량기지(연등)",
+      "latitude": 37.6138235,
+      "longitude": 127.1013836
+    },
+    {
+      "intersection_id": "21073",
+      "name": "서울과학기술대입구(연등)",
+      "latitude": 37.62748,
+      "longitude": 127.0721088
+    },
+    {
+      "intersection_id": "21074",
+      "name": "노원자동차검사소(연등)",
+      "latitude": 37.6380718,
+      "longitude": 127.0738153
+    },
+    {
+      "intersection_id": "21077",
+      "name": "중계역(연등)",
+      "latitude": 37.6470898,
+      "longitude": 127.0631375
+    },
+    {
+      "intersection_id": "21089",
+      "name": "노해근린공원(연등)",
+      "latitude": 37.6477313,
+      "longitude": 127.0700613
+    },
+    {
+      "intersection_id": "21092",
+      "name": "강서소방서(연등)1",
+      "latitude": 37.5582708,
+      "longitude": 126.8603932
+    },
+    {
+      "intersection_id": "211",
+      "name": "LG베스트샵수색점",
+      "latitude": 37.583171,
+      "longitude": 126.8936698
+    },
+    {
+      "intersection_id": "21103",
+      "name": "동부제강입구(연등)",
+      "latitude": 37.4914021,
+      "longitude": 126.831516
+    },
+    {
+      "intersection_id": "21108",
+      "name": "역말사거리(연등)1",
+      "latitude": 37.6057949,
+      "longitude": 126.9145201
+    },
+    {
+      "intersection_id": "2111",
+      "name": "철도정비창",
+      "latitude": 37.5327426,
+      "longitude": 126.9575756
+    },
+    {
+      "intersection_id": "21117",
+      "name": "관악구청(연등)",
+      "latitude": 37.4780939,
+      "longitude": 126.9523002
+    },
+    {
+      "intersection_id": "2112",
+      "name": "길동현대병원",
+      "latitude": 37.5351647,
+      "longitude": 127.138998
+    },
+    {
+      "intersection_id": "21133",
+      "name": "양화교밑(연등)",
+      "latitude": 37.5469228,
+      "longitude": 126.879356
+    },
+    {
+      "intersection_id": "2114",
+      "name": "한강중교앞",
+      "latitude": 37.5257062,
+      "longitude": 126.9918396
+    },
+    {
+      "intersection_id": "21142",
+      "name": "광영여고(연등)",
+      "latitude": 37.5391962,
+      "longitude": 126.8222145
+    },
+    {
+      "intersection_id": "21147",
+      "name": "강서구청(연등)1",
+      "latitude": 37.5521738,
+      "longitude": 126.8499765
+    },
+    {
+      "intersection_id": "21149",
+      "name": "신월초교입구(연등)",
+      "latitude": 37.5409405,
+      "longitude": 126.8378225
+    },
+    {
+      "intersection_id": "21156",
+      "name": "양강중(연등)1",
+      "latitude": 37.5242669,
+      "longitude": 126.8517987
+    },
+    {
+      "intersection_id": "21159",
+      "name": "광남중고교입구(연등)",
+      "latitude": 37.5381399,
+      "longitude": 127.0970826
+    },
+    {
+      "intersection_id": "21165",
+      "name": "먹골역(연등)1",
+      "latitude": 37.6120878,
+      "longitude": 127.0778373
+    },
+    {
+      "intersection_id": "21168",
+      "name": "길음역(연등)1",
+      "latitude": 37.6039261,
+      "longitude": 127.024734
+    },
+    {
+      "intersection_id": "2117",
+      "name": "한남오거리",
+      "latitude": 37.5333663,
+      "longitude": 127.0076873
+    },
+    {
+      "intersection_id": "21172",
+      "name": "공릉역(연등)1",
+      "latitude": 37.6259341,
+      "longitude": 127.0728598
+    },
+    {
+      "intersection_id": "21174",
+      "name": "창원초교(연등)1",
+      "latitude": 37.652265,
+      "longitude": 127.0413931
+    },
+    {
+      "intersection_id": "21179",
+      "name": "우장산역(연등)",
+      "latitude": 37.54949,
+      "longitude": 126.8363497
+    },
+    {
+      "intersection_id": "2118",
+      "name": "한남역",
+      "latitude": 37.528614,
+      "longitude": 127.0067786
+    },
+    {
+      "intersection_id": "21181",
+      "name": "불암지구대(연등)",
+      "latitude": 37.6533966,
+      "longitude": 127.0781724
+    },
+    {
+      "intersection_id": "21183",
+      "name": "서초푸르지오써밋(연등)1",
+      "latitude": 37.5012419,
+      "longitude": 127.0222016
+    },
+    {
+      "intersection_id": "21188",
+      "name": "녹번초교(연등)",
+      "latitude": 37.6047855,
+      "longitude": 126.9242719
+    },
+    {
+      "intersection_id": "21190",
+      "name": "방화사거리(연등)",
+      "latitude": 37.5732068,
+      "longitude": 126.8101633
+    },
+    {
+      "intersection_id": "21192",
+      "name": "거리공원오거리(연등)",
+      "latitude": 37.4978582,
+      "longitude": 126.8938699
+    },
+    {
+      "intersection_id": "21194",
+      "name": "수동물병원(연등)1",
+      "latitude": 37.4995088,
+      "longitude": 126.8875333
+    },
+    {
+      "intersection_id": "21195",
+      "name": "계남공원(연등)",
+      "latitude": 37.5102766,
+      "longitude": 126.859005
+    },
+    {
+      "intersection_id": "21198",
+      "name": "한국환경산업기술원(연등)",
+      "latitude": 37.6096744,
+      "longitude": 126.9354203
+    },
+    {
+      "intersection_id": "212",
+      "name": "수색역",
+      "latitude": 37.5821709,
+      "longitude": 126.8954205
+    },
+    {
+      "intersection_id": "21201",
+      "name": "대림부동산(연등)",
+      "latitude": 37.48525,
+      "longitude": 126.9374479
+    },
+    {
+      "intersection_id": "21202",
+      "name": "병천순대(연등)1",
+      "latitude": 37.4836171,
+      "longitude": 126.941126
+    },
+    {
+      "intersection_id": "21203",
+      "name": "진광공업사(연등)",
+      "latitude": 37.4825329,
+      "longitude": 126.9492382
+    },
+    {
+      "intersection_id": "21213",
+      "name": "장지IC하향(연등)",
+      "latitude": 37.470035,
+      "longitude": 127.1245302
+    },
+    {
+      "intersection_id": "21217",
+      "name": "역촌시장(연등)",
+      "latitude": 37.6129354,
+      "longitude": 126.914
+    },
+    {
+      "intersection_id": "21219",
+      "name": "홍대역2번출구(연등)",
+      "latitude": 37.5572065,
+      "longitude": 126.9242219
+    },
+    {
+      "intersection_id": "21231",
+      "name": "유수지주차장(연등)",
+      "latitude": 37.5822808,
+      "longitude": 127.0838505
+    },
+    {
+      "intersection_id": "2124",
+      "name": "이태원역",
+      "latitude": 37.5344945,
+      "longitude": 126.9939158
+    },
+    {
+      "intersection_id": "21250",
+      "name": "신월사거리(연등)",
+      "latitude": 37.5371441,
+      "longitude": 126.827493
+    },
+    {
+      "intersection_id": "21251",
+      "name": "목동812동(연등)",
+      "latitude": 37.520767,
+      "longitude": 126.868635
+    },
+    {
+      "intersection_id": "21260",
+      "name": "대창빌딩(연등)",
+      "latitude": 37.553863,
+      "longitude": 126.8164989
+    },
+    {
+      "intersection_id": "21264",
+      "name": "대륭포스트타워(연등)",
+      "latitude": 37.485337,
+      "longitude": 126.8972902
+    },
+    {
+      "intersection_id": "21267",
+      "name": "장석시장(연등)",
+      "latitude": 37.6154649,
+      "longitude": 127.058083
+    },
+    {
+      "intersection_id": "21269",
+      "name": "면목한신아파트(연등)1",
+      "latitude": 37.5856743,
+      "longitude": 127.0753053
+    },
+    {
+      "intersection_id": "21277",
+      "name": "낙성대역앞(연등)",
+      "latitude": 37.477049,
+      "longitude": 126.9636648
+    },
+    {
+      "intersection_id": "21283",
+      "name": "제일제당앞(연등)",
+      "latitude": 37.5004043,
+      "longitude": 126.8759525
+    },
+    {
+      "intersection_id": "2129",
+      "name": "잠실대교남단삼거리",
+      "latitude": 37.5159572,
+      "longitude": 127.0981093
+    },
+    {
+      "intersection_id": "213",
+      "name": "수색디지털프라자",
+      "latitude": 37.5808112,
+      "longitude": 126.8976958
+    },
+    {
+      "intersection_id": "2130",
+      "name": "잠실역",
+      "latitude": 37.5132353,
+      "longitude": 127.1000922
+    },
+    {
+      "intersection_id": "21303",
+      "name": "구로소방서(연등)",
+      "latitude": 37.4977441,
+      "longitude": 126.8646923
+    },
+    {
+      "intersection_id": "21311",
+      "name": "대림우성아파트(연등)",
+      "latitude": 37.4954413,
+      "longitude": 126.9114992
+    },
+    {
+      "intersection_id": "21313",
+      "name": "사육신공원(연등)",
+      "latitude": 37.5128022,
+      "longitude": 126.9494858
+    },
+    {
+      "intersection_id": "21316",
+      "name": "기아대교앞(연등)",
+      "latitude": 37.4382008,
+      "longitude": 126.9031535
+    },
+    {
+      "intersection_id": "2132",
+      "name": "석촌호수",
+      "latitude": 37.5087225,
+      "longitude": 127.1039715
+    },
+    {
+      "intersection_id": "21324",
+      "name": "기상청입구(연등)",
+      "latitude": 37.4969717,
+      "longitude": 126.9164402
+    },
+    {
+      "intersection_id": "2133",
+      "name": "석촌역",
+      "latitude": 37.5052298,
+      "longitude": 127.1071752
+    },
+    {
+      "intersection_id": "2134",
+      "name": "송파사거리",
+      "latitude": 37.5019728,
+      "longitude": 127.1101152
+    },
+    {
+      "intersection_id": "2135",
+      "name": "가락시장동문",
+      "latitude": 37.4946294,
+      "longitude": 127.1168205
+    },
+    {
+      "intersection_id": "2136",
+      "name": "가락시장역",
+      "latitude": 37.4925242,
+      "longitude": 127.1187249
+    },
+    {
+      "intersection_id": "21365",
+      "name": "방화초교(연등)",
+      "latitude": 37.5678032,
+      "longitude": 126.8091342
+    },
+    {
+      "intersection_id": "2137",
+      "name": "올림픽훼밀리타운",
+      "latitude": 37.4887568,
+      "longitude": 127.1210399
+    },
+    {
+      "intersection_id": "21375",
+      "name": "서초롯데캐슬아파트(연등)",
+      "latitude": 37.4999125,
+      "longitude": 127.0228049
+    },
+    {
+      "intersection_id": "2138",
+      "name": "문정역",
+      "latitude": 37.4860714,
+      "longitude": 127.1224164
+    },
+    {
+      "intersection_id": "2139",
+      "name": "건영아파트앞",
+      "latitude": 37.482535,
+      "longitude": 127.1242302
+    },
+    {
+      "intersection_id": "214",
+      "name": "수색E마트앞",
+      "latitude": 37.5795337,
+      "longitude": 126.8998951
+    },
+    {
+      "intersection_id": "21400",
+      "name": "중화역(연등)",
+      "latitude": 37.6036056,
+      "longitude": 127.0790987
+    },
+    {
+      "intersection_id": "21409",
+      "name": "능동로분수광장(연등)",
+      "latitude": 37.5419707,
+      "longitude": 127.0716269
+    },
+    {
+      "intersection_id": "21414",
+      "name": "동대문소방서(연등)",
+      "latitude": 37.5642072,
+      "longitude": 127.0664467
+    },
+    {
+      "intersection_id": "21417",
+      "name": "신정배수펌프장(연등)",
+      "latitude": 37.5256524,
+      "longitude": 126.8769215
+    },
+    {
+      "intersection_id": "21419",
+      "name": "온수역입구(연등)",
+      "latitude": 37.4908804,
+      "longitude": 126.8275328
+    },
+    {
+      "intersection_id": "21420",
+      "name": "삼성교(연등)1",
+      "latitude": 37.4706547,
+      "longitude": 126.9414451
+    },
+    {
+      "intersection_id": "2144",
+      "name": "한강자이에클라트",
+      "latitude": 37.5317947,
+      "longitude": 126.9553911
+    },
+    {
+      "intersection_id": "21445",
+      "name": "동문빌딩(연등)",
+      "latitude": 37.522424,
+      "longitude": 126.869004
+    },
+    {
+      "intersection_id": "21453",
+      "name": "보성운수종점(연등)",
+      "latitude": 37.4638686,
+      "longitude": 126.9191125
+    },
+    {
+      "intersection_id": "21466",
+      "name": "탄천교(연등)",
+      "latitude": 37.4946627,
+      "longitude": 127.105169
+    },
+    {
+      "intersection_id": "2148",
+      "name": "신정3동우체국",
+      "latitude": 37.5128637,
+      "longitude": 126.8535417
+    },
+    {
+      "intersection_id": "21481",
+      "name": "공진중학교(연등)1",
+      "latitude": 37.5650581,
+      "longitude": 126.8476041
+    },
+    {
+      "intersection_id": "21483",
+      "name": "개봉1동사거리(연등)",
+      "latitude": 37.5019886,
+      "longitude": 126.8476158
+    },
+    {
+      "intersection_id": "21486",
+      "name": "등촌역(연등)1",
+      "latitude": 37.5509284,
+      "longitude": 126.8646864
+    },
+    {
+      "intersection_id": "21491",
+      "name": "종암사거리(연등)",
+      "latitude": 37.6025487,
+      "longitude": 127.0325559
+    },
+    {
+      "intersection_id": "215",
+      "name": "디지털미디어씨티역",
+      "latitude": 37.5781848,
+      "longitude": 126.9017242
+    },
+    {
+      "intersection_id": "2151",
+      "name": "한마을아파트",
+      "latitude": 37.4966358,
+      "longitude": 126.8627629
+    },
+    {
+      "intersection_id": "2152",
+      "name": "수락초교삼거리",
+      "latitude": 37.684729,
+      "longitude": 127.055475
+    },
+    {
+      "intersection_id": "2153",
+      "name": "늘푸른교회",
+      "latitude": 37.545943,
+      "longitude": 127.1709861
+    },
+    {
+      "intersection_id": "21536",
+      "name": "부암동주민센터(연등)",
+      "latitude": 37.5928162,
+      "longitude": 126.9644963
+    },
+    {
+      "intersection_id": "2154",
+      "name": "강북구민운동장",
+      "latitude": 37.6306592,
+      "longitude": 127.0415525
+    },
+    {
+      "intersection_id": "21544",
+      "name": "가마산지하차도(연등)",
+      "latitude": 37.490603,
+      "longitude": 126.8815614
+    },
+    {
+      "intersection_id": "2155",
+      "name": "용두공원",
+      "latitude": 37.5728995,
+      "longitude": 127.0418413
+    },
+    {
+      "intersection_id": "21552",
+      "name": "이수역(연등)",
+      "latitude": 37.4855904,
+      "longitude": 126.9837126
+    },
+    {
+      "intersection_id": "21554",
+      "name": "대조초교(연등)",
+      "latitude": 37.6142485,
+      "longitude": 126.9177764
+    },
+    {
+      "intersection_id": "2157",
+      "name": "천호사거리",
+      "latitude": 37.5386616,
+      "longitude": 127.1234008
+    },
+    {
+      "intersection_id": "21571",
+      "name": "관악현대아파트(연등)",
+      "latitude": 37.4924041,
+      "longitude": 126.9565221
+    },
+    {
+      "intersection_id": "21575",
+      "name": "능산사거리(연등)1",
+      "latitude": 37.6082848,
+      "longitude": 127.1002232
+    },
+    {
+      "intersection_id": "2158",
+      "name": "강동역",
+      "latitude": 37.5359063,
+      "longitude": 127.1323379
+    },
+    {
+      "intersection_id": "216",
+      "name": "영화아파트",
+      "latitude": 37.4969425,
+      "longitude": 126.8596379
+    },
+    {
+      "intersection_id": "2160",
+      "name": "한강대교남단",
+      "latitude": 37.5135789,
+      "longitude": 126.955953
+    },
+    {
+      "intersection_id": "21602",
+      "name": "대일고교(연등)",
+      "latitude": 37.5378839,
+      "longitude": 126.8635695
+    },
+    {
+      "intersection_id": "21603",
+      "name": "거리공원(연등)",
+      "latitude": 37.5011554,
+      "longitude": 126.8906989
+    },
+    {
+      "intersection_id": "21608",
+      "name": "신성교(연등)1",
+      "latitude": 37.4710349,
+      "longitude": 126.9368786
+    },
+    {
+      "intersection_id": "21611",
+      "name": "탑골공원(연등)",
+      "latitude": 37.572692,
+      "longitude": 126.9878389
+    },
+    {
+      "intersection_id": "21615",
+      "name": "해주카센터(연등)",
+      "latitude": 37.5456904,
+      "longitude": 127.0733388
+    },
+    {
+      "intersection_id": "21619",
+      "name": "서울역사박물관(연등)",
+      "latitude": 37.5692558,
+      "longitude": 126.9705278
+    },
+    {
+      "intersection_id": "2162",
+      "name": "복정역",
+      "latitude": 37.4707525,
+      "longitude": 127.1267581
+    },
+    {
+      "intersection_id": "21625",
+      "name": "이수교차로(연등)",
+      "latitude": 37.5003642,
+      "longitude": 126.985563
+    },
+    {
+      "intersection_id": "21627",
+      "name": "영림중(연등)",
+      "latitude": 37.4961414,
+      "longitude": 126.8905854
+    },
+    {
+      "intersection_id": "21659",
+      "name": "당산중(연등)1",
+      "latitude": 37.5311912,
+      "longitude": 126.9057763
+    },
+    {
+      "intersection_id": "21670",
+      "name": "화양사거리(연등)",
+      "latitude": 37.548192,
+      "longitude": 127.0656782
+    },
+    {
+      "intersection_id": "21672",
+      "name": "어린이대공원역(연등)",
+      "latitude": 37.5476757,
+      "longitude": 127.0726541
+    },
+    {
+      "intersection_id": "21679",
+      "name": "건대후문(연등)",
+      "latitude": 37.5378478,
+      "longitude": 127.0741017
+    },
+    {
+      "intersection_id": "2168",
+      "name": "봉화지구대",
+      "latitude": 37.6144373,
+      "longitude": 127.096044
+    },
+    {
+      "intersection_id": "21681",
+      "name": "자양초교(연등)",
+      "latitude": 37.5371788,
+      "longitude": 127.0806454
+    },
+    {
+      "intersection_id": "2169",
+      "name": "동성아파트앞",
+      "latitude": 37.6103746,
+      "longitude": 127.0961296
+    },
+    {
+      "intersection_id": "21691",
+      "name": "잠실대교북단사거리(연등)",
+      "latitude": 37.5312189,
+      "longitude": 127.0863703
+    },
+    {
+      "intersection_id": "21694",
+      "name": "성수1차대우아파트(연등)",
+      "latitude": 37.5442611,
+      "longitude": 127.0651941
+    },
+    {
+      "intersection_id": "21704",
+      "name": "배명사거리(연등)",
+      "latitude": 37.5025401,
+      "longitude": 127.0983486
+    },
+    {
+      "intersection_id": "21709",
+      "name": "상계교(연등)",
+      "latitude": 37.661596,
+      "longitude": 127.0538888
+    },
+    {
+      "intersection_id": "21722",
+      "name": "성수2가(연등)",
+      "latitude": 37.5393889,
+      "longitude": 127.0623858
+    },
+    {
+      "intersection_id": "21734",
+      "name": "대원주유소(연등)",
+      "latitude": 37.4860288,
+      "longitude": 126.8564925
+    },
+    {
+      "intersection_id": "21737",
+      "name": "용산역앞(연등)",
+      "latitude": 37.5269421,
+      "longitude": 126.9643246
+    },
+    {
+      "intersection_id": "21738",
+      "name": "홍파복지원(연등)",
+      "latitude": 37.6796892,
+      "longitude": 127.0553625
+    },
+    {
+      "intersection_id": "21741",
+      "name": "온수골사거리(연등)",
+      "latitude": 37.6613948,
+      "longitude": 127.0563445
+    },
+    {
+      "intersection_id": "21747",
+      "name": "농협공릉지점(연등)",
+      "latitude": 37.6234531,
+      "longitude": 127.0737503
+    },
+    {
+      "intersection_id": "21748",
+      "name": "화랑삼거리(연등)",
+      "latitude": 37.6230507,
+      "longitude": 127.0902343
+    },
+    {
+      "intersection_id": "2175",
+      "name": "올림픽공원동2문",
+      "latitude": 37.5157944,
+      "longitude": 127.1306615
+    },
+    {
+      "intersection_id": "21754",
+      "name": "삼육대(연등)",
+      "latitude": 37.6387627,
+      "longitude": 127.1086575
+    },
+    {
+      "intersection_id": "2176",
+      "name": "헌릉IC",
+      "latitude": 37.4617934,
+      "longitude": 127.0852378
+    },
+    {
+      "intersection_id": "2179",
+      "name": "신정이펜하우스3단지",
+      "latitude": 37.5138982,
+      "longitude": 126.828698
+    },
+    {
+      "intersection_id": "21815",
+      "name": "경복궁(연등)1",
+      "latitude": 37.5766321,
+      "longitude": 126.9795239
+    },
+    {
+      "intersection_id": "21816",
+      "name": "종로4가(연등)1",
+      "latitude": 37.5701474,
+      "longitude": 126.9978832
+    },
+    {
+      "intersection_id": "21821",
+      "name": "세종대로사거리(연등)1",
+      "latitude": 37.5700921,
+      "longitude": 126.975686
+    },
+    {
+      "intersection_id": "21828",
+      "name": "하림각(연등)",
+      "latitude": 37.5990938,
+      "longitude": 126.9603668
+    },
+    {
+      "intersection_id": "2183",
+      "name": "신정푸른마을입구",
+      "latitude": 37.5151336,
+      "longitude": 126.8332729
+    },
+    {
+      "intersection_id": "21830",
+      "name": "재향군인회(연등)",
+      "latitude": 37.574215,
+      "longitude": 126.997577
+    },
+    {
+      "intersection_id": "21831",
+      "name": "혜화역(연등)1",
+      "latitude": 37.5838473,
+      "longitude": 127.0016025
+    },
+    {
+      "intersection_id": "21832",
+      "name": "무악재역(연등)",
+      "latitude": 37.5813229,
+      "longitude": 126.9509296
+    },
+    {
+      "intersection_id": "21835",
+      "name": "광교(연등)",
+      "latitude": 37.5687245,
+      "longitude": 126.9827649
+    },
+    {
+      "intersection_id": "21843",
+      "name": "낙원상가(연등)",
+      "latitude": 37.5750582,
+      "longitude": 126.9868557
+    },
+    {
+      "intersection_id": "21846",
+      "name": "구기터널(연등)",
+      "latitude": 37.6082765,
+      "longitude": 126.9570866
+    },
+    {
+      "intersection_id": "21847",
+      "name": "신영소방서(연등)",
+      "latitude": 37.6047405,
+      "longitude": 126.9611001
+    },
+    {
+      "intersection_id": "21850",
+      "name": "청계2가(연등)",
+      "latitude": 37.5679802,
+      "longitude": 126.9876671
+    },
+    {
+      "intersection_id": "21851",
+      "name": "상암MBC 연등교차로",
+      "latitude": 37.581607,
+      "longitude": 126.891505
+    },
+    {
+      "intersection_id": "21855",
+      "name": "팔판동(연등)",
+      "latitude": 37.5799968,
+      "longitude": 126.9799195
+    },
+    {
+      "intersection_id": "21857",
+      "name": "정부서울청사(연등)",
+      "latitude": 37.5758331,
+      "longitude": 126.973606
+    },
+    {
+      "intersection_id": "21864",
+      "name": "청계4가(연등)",
+      "latitude": 37.5687441,
+      "longitude": 126.9979823
+    },
+    {
+      "intersection_id": "21865",
+      "name": "동묘앞역(연등)1",
+      "latitude": 37.5734609,
+      "longitude": 127.0173311
+    },
+    {
+      "intersection_id": "21873",
+      "name": "낙성대입구(연등)",
+      "latitude": 37.4779304,
+      "longitude": 126.9613752
+    },
+    {
+      "intersection_id": "21876",
+      "name": "중계종합사회복지관(연등)",
+      "latitude": 37.6565155,
+      "longitude": 127.0780841
+    },
+    {
+      "intersection_id": "21877",
+      "name": "중계주공4.5단지(연등)",
+      "latitude": 37.6554184,
+      "longitude": 127.0782018
+    },
+    {
+      "intersection_id": "2189",
+      "name": "서부트럭터미널",
+      "latitude": 37.5091797,
+      "longitude": 126.8429183
+    },
+    {
+      "intersection_id": "2190",
+      "name": "상계14.16단지",
+      "latitude": 37.6705256,
+      "longitude": 127.0562523
+    },
+    {
+      "intersection_id": "21914",
+      "name": "워커힐아파트(연등)",
+      "latitude": 37.5493233,
+      "longitude": 127.1080542
+    },
+    {
+      "intersection_id": "21918",
+      "name": "신화중학교(연등)",
+      "latitude": 37.5394545,
+      "longitude": 126.829485
+    },
+    {
+      "intersection_id": "21923",
+      "name": "홍제역(연등)",
+      "latitude": 37.5883918,
+      "longitude": 126.9446584
+    },
+    {
+      "intersection_id": "21928",
+      "name": "서울역광장(연등)",
+      "latitude": 37.5543759,
+      "longitude": 126.9726339
+    },
+    {
+      "intersection_id": "2193",
+      "name": "씨티21",
+      "latitude": 37.522548,
+      "longitude": 126.8958703
+    },
+    {
+      "intersection_id": "21943",
+      "name": "시민교회(연등)",
+      "latitude": 37.5548135,
+      "longitude": 127.0855793
+    },
+    {
+      "intersection_id": "21946",
+      "name": "청계광장(연등1)",
+      "latitude": 37.5693733,
+      "longitude": 126.9776009
+    },
+    {
+      "intersection_id": "2195",
+      "name": "대방천사거리",
+      "latitude": 37.4985026,
+      "longitude": 126.9202368
+    },
+    {
+      "intersection_id": "21972",
+      "name": "배봉초교(연등)",
+      "latitude": 37.577757,
+      "longitude": 127.0681239
+    },
+    {
+      "intersection_id": "21981",
+      "name": "잠실3사거리(연등)",
+      "latitude": 37.5126118,
+      "longitude": 127.0922876
+    },
+    {
+      "intersection_id": "2199",
+      "name": "압구정역",
+      "latitude": 37.5272415,
+      "longitude": 127.0285081
+    },
+    {
+      "intersection_id": "21990",
+      "name": "팬코(연등)",
+      "latitude": 37.5608348,
+      "longitude": 126.8382124
+    },
+    {
+      "intersection_id": "21991",
+      "name": "등촌1-10단지(연등)",
+      "latitude": 37.5633146,
+      "longitude": 126.8390096
+    },
+    {
+      "intersection_id": "21992",
+      "name": "대륭드림타운(연등)",
+      "latitude": 37.566633,
+      "longitude": 126.8400877
+    },
+    {
+      "intersection_id": "21999",
+      "name": "서울대병원정문",
+      "latitude": 37.57706,
+      "longitude": 126.997248
+    },
+    {
+      "intersection_id": "2200",
+      "name": "잠수장",
+      "latitude": 37.5210286,
+      "longitude": 126.9968312
+    },
+    {
+      "intersection_id": "22003",
+      "name": "석촌호(연등)",
+      "latitude": 37.5064557,
+      "longitude": 127.0987668
+    },
+    {
+      "intersection_id": "2201",
+      "name": "성수대교남단",
+      "latitude": 37.5291757,
+      "longitude": 127.0337776
+    },
+    {
+      "intersection_id": "2203",
+      "name": "논현역",
+      "latitude": 37.5111134,
+      "longitude": 127.0213298
+    },
+    {
+      "intersection_id": "22043",
+      "name": "등촌아이파크아파트(연등)",
+      "latitude": 37.5454727,
+      "longitude": 126.8624377
+    },
+    {
+      "intersection_id": "2205",
+      "name": "압구정한양아파트",
+      "latitude": 37.5287979,
+      "longitude": 127.0369339
+    },
+    {
+      "intersection_id": "22050",
+      "name": "청파동삼거리(연등)",
+      "latitude": 37.5491753,
+      "longitude": 126.9699649
+    },
+    {
+      "intersection_id": "22054",
+      "name": "국립중앙박물관(연등)",
+      "latitude": 37.5209852,
+      "longitude": 126.9789042
+    },
+    {
+      "intersection_id": "2206",
+      "name": "대우증권",
+      "latitude": 37.5611514,
+      "longitude": 127.0667354
+    },
+    {
+      "intersection_id": "22068",
+      "name": "KT한강로빌딩(연등)",
+      "latitude": 37.5319975,
+      "longitude": 126.9706774
+    },
+    {
+      "intersection_id": "2207",
+      "name": "국기원입구",
+      "latitude": 37.4990121,
+      "longitude": 127.0310323
+    },
+    {
+      "intersection_id": "22078",
+      "name": "소화아동병원(연등)",
+      "latitude": 37.552701,
+      "longitude": 126.9691341
+    },
+    {
+      "intersection_id": "2208",
+      "name": "가양역",
+      "latitude": 37.5610715,
+      "longitude": 126.8551562
+    },
+    {
+      "intersection_id": "22080",
+      "name": "숙명여대입구(연등)",
+      "latitude": 37.5442044,
+      "longitude": 126.9707322
+    },
+    {
+      "intersection_id": "22081",
+      "name": "숙대입구역7번출구(연등)",
+      "latitude": 37.5437531,
+      "longitude": 126.9723859
+    },
+    {
+      "intersection_id": "22086",
+      "name": "효창공원앞역(연등)",
+      "latitude": 37.5402204,
+      "longitude": 126.9617725
+    },
+    {
+      "intersection_id": "22092",
+      "name": "용산역(연등)",
+      "latitude": 37.5278632,
+      "longitude": 126.9666092
+    },
+    {
+      "intersection_id": "22095",
+      "name": "원효로2가(연등)",
+      "latitude": 37.5344108,
+      "longitude": 126.9622516
+    },
+    {
+      "intersection_id": "22102",
+      "name": "이태원(연등)",
+      "latitude": 37.5343799,
+      "longitude": 126.9920451
+    },
+    {
+      "intersection_id": "22104",
+      "name": "전자랜드(연등)",
+      "latitude": 37.5332743,
+      "longitude": 126.9598693
+    },
+    {
+      "intersection_id": "2211",
+      "name": "학동역",
+      "latitude": 37.5139972,
+      "longitude": 127.0307459
+    },
+    {
+      "intersection_id": "22111",
+      "name": "철도정비창(연등)1",
+      "latitude": 37.5330222,
+      "longitude": 126.9587805
+    },
+    {
+      "intersection_id": "22114",
+      "name": "한강중교앞(연등)",
+      "latitude": 37.5252949,
+      "longitude": 126.9916305
+    },
+    {
+      "intersection_id": "2212",
+      "name": "선릉역",
+      "latitude": 37.5044875,
+      "longitude": 127.0490277
+    },
+    {
+      "intersection_id": "22129",
+      "name": "잠실대교남단삼거리(연등)",
+      "latitude": 37.5168178,
+      "longitude": 127.0977784
+    },
+    {
+      "intersection_id": "22134",
+      "name": "송파사거리(연등)",
+      "latitude": 37.5004529,
+      "longitude": 127.1115332
+    },
+    {
+      "intersection_id": "2214",
+      "name": "포스코사거리",
+      "latitude": 37.5068692,
+      "longitude": 127.0566375
+    },
+    {
+      "intersection_id": "22144",
+      "name": "한강자이에클라트(연등)",
+      "latitude": 37.5323143,
+      "longitude": 126.9551013
+    },
+    {
+      "intersection_id": "2215",
+      "name": "현대백화점무역센터",
+      "latitude": 37.507738,
+      "longitude": 127.0594374
+    },
+    {
+      "intersection_id": "22155",
+      "name": "용두공원(연등)",
+      "latitude": 37.5735061,
+      "longitude": 127.0402186
+    },
+    {
+      "intersection_id": "2216",
+      "name": "원혜빌딩",
+      "latitude": 37.5084538,
+      "longitude": 127.0557904
+    },
+    {
+      "intersection_id": "22162",
+      "name": "복정역(연등)",
+      "latitude": 37.4707865,
+      "longitude": 127.1276468
+    },
+    {
+      "intersection_id": "22168",
+      "name": "봉화지구대(연등)1",
+      "latitude": 37.6148818,
+      "longitude": 127.0950241
+    },
+    {
+      "intersection_id": "2217",
+      "name": "역삼역",
+      "latitude": 37.500825,
+      "longitude": 127.0369311
+    },
+    {
+      "intersection_id": "22179",
+      "name": "신정이펜하우스3단지(연등)",
+      "latitude": 37.5137479,
+      "longitude": 126.8272498
+    },
+    {
+      "intersection_id": "2218",
+      "name": "송파경찰서",
+      "latitude": 37.501996,
+      "longitude": 127.1281388
+    },
+    {
+      "intersection_id": "2219",
+      "name": "르네상스호텔",
+      "latitude": 37.5026162,
+      "longitude": 127.0427921
+    },
+    {
+      "intersection_id": "22199",
+      "name": "압구정역(연등)1",
+      "latitude": 37.5282008,
+      "longitude": 127.0283022
+    },
+    {
+      "intersection_id": "222",
+      "name": "KT노원지사",
+      "latitude": 37.654824,
+      "longitude": 127.0631036
+    },
+    {
+      "intersection_id": "2220",
+      "name": "상계11.13단지",
+      "latitude": 37.6673249,
+      "longitude": 127.0571024
+    },
+    {
+      "intersection_id": "22203",
+      "name": "논현역(연등)",
+      "latitude": 37.5115284,
+      "longitude": 127.022753
+    },
+    {
+      "intersection_id": "22205",
+      "name": "압구정한양아파트(연등)1",
+      "latitude": 37.528651,
+      "longitude": 127.0374066
+    },
+    {
+      "intersection_id": "22207",
+      "name": "국기원입구(연등)",
+      "latitude": 37.4996489,
+      "longitude": 127.0331074
+    },
+    {
+      "intersection_id": "22212",
+      "name": "선릉역(연등)",
+      "latitude": 37.5058405,
+      "longitude": 127.0483914
+    },
+    {
+      "intersection_id": "22214",
+      "name": "포스코사거리(연등)",
+      "latitude": 37.5054421,
+      "longitude": 127.057395
+    },
+    {
+      "intersection_id": "22218",
+      "name": "송파경찰서(연등)1",
+      "latitude": 37.5014741,
+      "longitude": 127.1276784
+    },
+    {
+      "intersection_id": "22227",
+      "name": "서강대정문(연등)",
+      "latitude": 37.5512844,
+      "longitude": 126.9377063
+    },
+    {
+      "intersection_id": "22237",
+      "name": "잠실학원사거리(연등)",
+      "latitude": 37.506129,
+      "longitude": 127.0895728
+    },
+    {
+      "intersection_id": "2224",
+      "name": "장미아파트앞",
+      "latitude": 37.5434516,
+      "longitude": 127.0446802
+    },
+    {
+      "intersection_id": "22246",
+      "name": "모래내고가하부(연등)",
+      "latitude": 37.5665233,
+      "longitude": 126.9220848
+    },
+    {
+      "intersection_id": "22262",
+      "name": "안국동사거리(연등)",
+      "latitude": 37.5760636,
+      "longitude": 126.9844131
+    },
+    {
+      "intersection_id": "22268",
+      "name": "구로디지털단지역(연등)",
+      "latitude": 37.4847394,
+      "longitude": 126.9018838
+    },
+    {
+      "intersection_id": "22269",
+      "name": "유통상가정문(연등)",
+      "latitude": 37.4426047,
+      "longitude": 126.9036351
+    },
+    {
+      "intersection_id": "2227",
+      "name": "서강대정문",
+      "latitude": 37.5515557,
+      "longitude": 126.9376038
+    },
+    {
+      "intersection_id": "22270",
+      "name": "강남을지병원(연등)",
+      "latitude": 37.5189172,
+      "longitude": 127.0262219
+    },
+    {
+      "intersection_id": "22276",
+      "name": "방화2단지(연등)1",
+      "latitude": 37.5739746,
+      "longitude": 126.8204927
+    },
+    {
+      "intersection_id": "22287",
+      "name": "베네치아호텔(연등)",
+      "latitude": 37.5048762,
+      "longitude": 127.0350431
+    },
+    {
+      "intersection_id": "2229",
+      "name": "서교동사거리",
+      "latitude": 37.5527275,
+      "longitude": 126.9182087
+    },
+    {
+      "intersection_id": "2230",
+      "name": "방학사거리",
+      "latitude": 37.6628359,
+      "longitude": 127.0424394
+    },
+    {
+      "intersection_id": "22300",
+      "name": "한국폴리텍대학입구(연등)",
+      "latitude": 37.5454855,
+      "longitude": 126.8446686
+    },
+    {
+      "intersection_id": "22302",
+      "name": "증미역(연등)1",
+      "latitude": 37.5577694,
+      "longitude": 126.8639654
+    },
+    {
+      "intersection_id": "2231",
+      "name": "월드컵파크207동",
+      "latitude": 37.5759707,
+      "longitude": 126.8911531
+    },
+    {
+      "intersection_id": "22312",
+      "name": "잠실토끼굴(연등)",
+      "latitude": 37.5166309,
+      "longitude": 127.0773758
+    },
+    {
+      "intersection_id": "22313",
+      "name": "선일농원(연등)",
+      "latitude": 37.5112095,
+      "longitude": 127.1414543
+    },
+    {
+      "intersection_id": "2232",
+      "name": "잠실지구대",
+      "latitude": 37.5117329,
+      "longitude": 127.0825154
+    },
+    {
+      "intersection_id": "22321",
+      "name": "광성상가(연등)1",
+      "latitude": 37.5817306,
+      "longitude": 127.0385564
+    },
+    {
+      "intersection_id": "2233",
+      "name": "KT앞삼거리",
+      "latitude": 37.51375,
+      "longitude": 127.1073962
+    },
+    {
+      "intersection_id": "22336",
+      "name": "보석빌딩(연등)",
+      "latitude": 37.4841624,
+      "longitude": 127.045061
+    },
+    {
+      "intersection_id": "22341",
+      "name": "장안지구대앞(연등)",
+      "latitude": 37.5742213,
+      "longitude": 127.0719183
+    },
+    {
+      "intersection_id": "22349",
+      "name": "떡전교사거리(연등)",
+      "latitude": 37.5862687,
+      "longitude": 127.0520015
+    },
+    {
+      "intersection_id": "2235",
+      "name": "압구정현대아파트",
+      "latitude": 37.5281165,
+      "longitude": 127.0302283
+    },
+    {
+      "intersection_id": "22356",
+      "name": "용두4교(연등)",
+      "latitude": 37.5740635,
+      "longitude": 127.0360228
+    },
+    {
+      "intersection_id": "22358",
+      "name": "우리은행중화(연등)",
+      "latitude": 37.6064612,
+      "longitude": 127.0785712
+    },
+    {
+      "intersection_id": "22360",
+      "name": "장안지하차도(연등)",
+      "latitude": 37.5798188,
+      "longitude": 127.0747783
+    },
+    {
+      "intersection_id": "22362",
+      "name": "이문파출소(연등)1",
+      "latitude": 37.5987418,
+      "longitude": 127.0677393
+    },
+    {
+      "intersection_id": "22369",
+      "name": "장안아파트입구(연등)",
+      "latitude": 37.5722124,
+      "longitude": 127.0737475
+    },
+    {
+      "intersection_id": "2237",
+      "name": "잠실학원사거리",
+      "latitude": 37.5075459,
+      "longitude": 127.0907385
+    },
+    {
+      "intersection_id": "22377",
+      "name": "장안동근린공원(연등)",
+      "latitude": 37.5762714,
+      "longitude": 127.0720479
+    },
+    {
+      "intersection_id": "22379",
+      "name": "청량리역(연등)1",
+      "latitude": 37.5806031,
+      "longitude": 127.0458983
+    },
+    {
+      "intersection_id": "2238",
+      "name": "한성백제박물관",
+      "latitude": 37.5150149,
+      "longitude": 127.1197509
+    },
+    {
+      "intersection_id": "2241",
+      "name": "남2문",
+      "latitude": 37.5139248,
+      "longitude": 127.1228409
+    },
+    {
+      "intersection_id": "22415",
+      "name": "가좌삼거리(연등)",
+      "latitude": 37.569886,
+      "longitude": 126.9135727
+    },
+    {
+      "intersection_id": "22419",
+      "name": "독립문삼호아파트(연등)",
+      "latitude": 37.5716157,
+      "longitude": 126.9590177
+    },
+    {
+      "intersection_id": "2242",
+      "name": "과학수사연구소",
+      "latitude": 37.5209746,
+      "longitude": 126.837666
+    },
+    {
+      "intersection_id": "22421",
+      "name": "동교동삼거리(연등)",
+      "latitude": 37.5583715,
+      "longitude": 126.9257768
+    },
+    {
+      "intersection_id": "22449",
+      "name": "신촌기차역(연등)1",
+      "latitude": 37.5591279,
+      "longitude": 126.9421012
+    },
+    {
+      "intersection_id": "22458",
+      "name": "연대녹지대앞(연등)",
+      "latitude": 37.5601697,
+      "longitude": 126.93455
+    },
+    {
+      "intersection_id": "22459",
+      "name": "연세대(연등)",
+      "latitude": 37.5600824,
+      "longitude": 126.9379651
+    },
+    {
+      "intersection_id": "2246",
+      "name": "모래내고가하부",
+      "latitude": 37.5665233,
+      "longitude": 126.9220848
+    },
+    {
+      "intersection_id": "22464",
+      "name": "연희IC(연등)",
+      "latitude": 37.564288,
+      "longitude": 126.9289894
+    },
+    {
+      "intersection_id": "22471",
+      "name": "인왕아파트(연등)",
+      "latitude": 37.5850229,
+      "longitude": 126.9482172
+    },
+    {
+      "intersection_id": "22476",
+      "name": "충정로역(연등)",
+      "latitude": 37.5593389,
+      "longitude": 126.9635945
+    },
+    {
+      "intersection_id": "22477",
+      "name": "국민연금북부(연등)",
+      "latitude": 37.5621272,
+      "longitude": 126.9640753
+    },
+    {
+      "intersection_id": "22481",
+      "name": "독립공원(연등)",
+      "latitude": 37.5759207,
+      "longitude": 126.9562014
+    },
+    {
+      "intersection_id": "22499",
+      "name": "에쓰오일(연등)",
+      "latitude": 37.4500755,
+      "longitude": 126.9033161
+    },
+    {
+      "intersection_id": "22500",
+      "name": "굴다리입구(연등)",
+      "latitude": 37.5598846,
+      "longitude": 126.9403916
+    },
+    {
+      "intersection_id": "2251",
+      "name": "서울문화고교",
+      "latitude": 37.6627132,
+      "longitude": 127.0466201
+    },
+    {
+      "intersection_id": "22517",
+      "name": "독산사거리(연등)",
+      "latitude": 37.4715094,
+      "longitude": 126.8972828
+    },
+    {
+      "intersection_id": "2252",
+      "name": "남부주유소",
+      "latitude": 37.5195416,
+      "longitude": 126.838351
+    },
+    {
+      "intersection_id": "22524",
+      "name": "말미사거리(연등)",
+      "latitude": 37.466488,
+      "longitude": 126.8986489
+    },
+    {
+      "intersection_id": "22525",
+      "name": "독산고개(연등)",
+      "latitude": 37.4736929,
+      "longitude": 126.8984349
+    },
+    {
+      "intersection_id": "2253",
+      "name": "신정2단지입구",
+      "latitude": 37.514553,
+      "longitude": 126.8312365
+    },
+    {
+      "intersection_id": "22533",
+      "name": "벽산밸리5차(연등)",
+      "latitude": 37.4779976,
+      "longitude": 126.884524
+    },
+    {
+      "intersection_id": "22538",
+      "name": "시흥사거리(연등)1",
+      "latitude": 37.454802,
+      "longitude": 126.9015452
+    },
+    {
+      "intersection_id": "22539",
+      "name": "금천구청입구(연등)",
+      "latitude": 37.4570207,
+      "longitude": 126.8987726
+    },
+    {
+      "intersection_id": "22564",
+      "name": "휘경여중고(연등)",
+      "latitude": 37.5848443,
+      "longitude": 127.0677552
+    },
+    {
+      "intersection_id": "22571",
+      "name": "상왕십리역(연등)1",
+      "latitude": 37.5654427,
+      "longitude": 127.0300867
+    },
+    {
+      "intersection_id": "22580",
+      "name": "기독회관(연등)1",
+      "latitude": 37.5746963,
+      "longitude": 127.0021239
+    },
+    {
+      "intersection_id": "22581",
+      "name": "장안LPG(연등)",
+      "latitude": 37.5754099,
+      "longitude": 127.0673956
+    },
+    {
+      "intersection_id": "22585",
+      "name": "오류IC(연등)",
+      "latitude": 37.4968106,
+      "longitude": 126.8457168
+    },
+    {
+      "intersection_id": "22588",
+      "name": "서울대병원앞(연등)",
+      "latitude": 37.5799989,
+      "longitude": 127.0021641
+    },
+    {
+      "intersection_id": "2259",
+      "name": "신수천주교회",
+      "latitude": 37.5474106,
+      "longitude": 126.9343399
+    },
+    {
+      "intersection_id": "226",
+      "name": "을지병원",
+      "latitude": 37.6372008,
+      "longitude": 127.0703423
+    },
+    {
+      "intersection_id": "22603",
+      "name": "노원주유소앞(연등)",
+      "latitude": 37.6210119,
+      "longitude": 127.0745401
+    },
+    {
+      "intersection_id": "2261",
+      "name": "신촌현대백화점",
+      "latitude": 37.5560943,
+      "longitude": 126.9342876
+    },
+    {
+      "intersection_id": "2262",
+      "name": "안국동사거리",
+      "latitude": 37.5756094,
+      "longitude": 126.9830054
+    },
+    {
+      "intersection_id": "22624",
+      "name": "효자동삼거리(연등)",
+      "latitude": 37.5830205,
+      "longitude": 126.9736602
+    },
+    {
+      "intersection_id": "22628",
+      "name": "봉림교(연등)",
+      "latitude": 37.483901,
+      "longitude": 126.9269293
+    },
+    {
+      "intersection_id": "2263",
+      "name": "상봉2동",
+      "latitude": 37.5931815,
+      "longitude": 127.0886405
+    },
+    {
+      "intersection_id": "2264",
+      "name": "동부시장",
+      "latitude": 37.5942133,
+      "longitude": 127.077249
+    },
+    {
+      "intersection_id": "22650",
+      "name": "촬영소사거리(연등)1",
+      "latitude": 37.573801,
+      "longitude": 127.0668931
+    },
+    {
+      "intersection_id": "22654",
+      "name": "대방대림아파트(연등)",
+      "latitude": 37.5088097,
+      "longitude": 126.9252245
+    },
+    {
+      "intersection_id": "22661",
+      "name": "ASEM입구(연등)",
+      "latitude": 37.5104913,
+      "longitude": 127.0579539
+    },
+    {
+      "intersection_id": "22669",
+      "name": "래미안아트힐(연등)",
+      "latitude": 37.4782522,
+      "longitude": 127.0066479
+    },
+    {
+      "intersection_id": "2267",
+      "name": "오금고정문앞",
+      "latitude": 37.5034946,
+      "longitude": 127.1296384
+    },
+    {
+      "intersection_id": "22678",
+      "name": "갈현우남아파트(연등)",
+      "latitude": 37.6184464,
+      "longitude": 126.9060692
+    },
+    {
+      "intersection_id": "2268",
+      "name": "구로디지털단지역",
+      "latitude": 37.4844914,
+      "longitude": 126.9027856
+    },
+    {
+      "intersection_id": "2269",
+      "name": "유통상가정문",
+      "latitude": 37.4437887,
+      "longitude": 126.9037745
+    },
+    {
+      "intersection_id": "2270",
+      "name": "강남을지병원",
+      "latitude": 37.5197164,
+      "longitude": 127.0281168
+    },
+    {
+      "intersection_id": "22705",
+      "name": "성신여대입구역(연등)1",
+      "latitude": 37.5935387,
+      "longitude": 127.0179452
+    },
+    {
+      "intersection_id": "2271",
+      "name": "유니세프앞",
+      "latitude": 37.5811263,
+      "longitude": 126.9736898
+    },
+    {
+      "intersection_id": "22711",
+      "name": "한강진역(연등)",
+      "latitude": 37.5404007,
+      "longitude": 127.0018024
+    },
+    {
+      "intersection_id": "22713",
+      "name": "송정역(연등)",
+      "latitude": 37.5613596,
+      "longitude": 126.810778
+    },
+    {
+      "intersection_id": "2273",
+      "name": "마포고정문",
+      "latitude": 37.5593194,
+      "longitude": 126.854226
+    },
+    {
+      "intersection_id": "2276",
+      "name": "방화2단지",
+      "latitude": 37.5733203,
+      "longitude": 126.8205065
+    },
+    {
+      "intersection_id": "2277",
+      "name": "서남물재생센터",
+      "latitude": 37.5729567,
+      "longitude": 126.8258234
+    },
+    {
+      "intersection_id": "22770",
+      "name": "송정건영아파트(연등)",
+      "latitude": 37.5565345,
+      "longitude": 127.0721278
+    },
+    {
+      "intersection_id": "22803",
+      "name": "강서교육지원청입구(연등)",
+      "latitude": 37.5395774,
+      "longitude": 126.8325221
+    },
+    {
+      "intersection_id": "22804",
+      "name": "목마공원(연등)1",
+      "latitude": 37.5373497,
+      "longitude": 126.885489
+    },
+    {
+      "intersection_id": "22805",
+      "name": "양정고(연등)",
+      "latitude": 37.5334207,
+      "longitude": 126.8876623
+    },
+    {
+      "intersection_id": "22806",
+      "name": "구파발역정류장(연등)",
+      "latitude": 37.6364566,
+      "longitude": 126.9169092
+    },
+    {
+      "intersection_id": "22821",
+      "name": "엠버서더호텔(연등)",
+      "latitude": 37.55973,
+      "longitude": 127.0028805
+    },
+    {
+      "intersection_id": "22823",
+      "name": "동대문역사문화공원(연등)",
+      "latitude": 37.5662673,
+      "longitude": 127.00678
+    },
+    {
+      "intersection_id": "22855",
+      "name": "약수역(연등)",
+      "latitude": 37.5538378,
+      "longitude": 127.0115438
+    },
+    {
+      "intersection_id": "22864",
+      "name": "을지로4가(연등)1",
+      "latitude": 37.5673779,
+      "longitude": 126.9980969
+    },
+    {
+      "intersection_id": "22865",
+      "name": "을지로5가(연등1)",
+      "latitude": 37.5668,
+      "longitude": 127.00028
+    },
+    {
+      "intersection_id": "22866",
+      "name": "청계5가(연등)",
+      "latitude": 37.5698376,
+      "longitude": 127.0020403
+    },
+    {
+      "intersection_id": "2287",
+      "name": "베네치아호텔",
+      "latitude": 37.5060268,
+      "longitude": 127.0344866
+    },
+    {
+      "intersection_id": "22870",
+      "name": "퇴계로4가(연등)",
+      "latitude": 37.5630092,
+      "longitude": 126.9984635
+    },
+    {
+      "intersection_id": "22871",
+      "name": "충무로역(연등)",
+      "latitude": 37.5611248,
+      "longitude": 126.9926403
+    },
+    {
+      "intersection_id": "22899",
+      "name": "숭례문정류장(연등)",
+      "latitude": 37.5582468,
+      "longitude": 126.9735227
+    },
+    {
+      "intersection_id": "2290",
+      "name": "선릉공원앞",
+      "latitude": 37.5070125,
+      "longitude": 127.0471447
+    },
+    {
+      "intersection_id": "22902",
+      "name": "삼선빌딩(연등1)",
+      "latitude": 37.5580674,
+      "longitude": 126.9777238
+    },
+    {
+      "intersection_id": "22903",
+      "name": "조선호텔앞(연등)",
+      "latitude": 37.5636844,
+      "longitude": 126.9797199
+    },
+    {
+      "intersection_id": "22904",
+      "name": "시청(연등)",
+      "latitude": 37.5638418,
+      "longitude": 126.9778649
+    },
+    {
+      "intersection_id": "22905",
+      "name": "시청역2호선(연등)",
+      "latitude": 37.5633687,
+      "longitude": 126.9748938
+    },
+    {
+      "intersection_id": "22932",
+      "name": "화곡사거리(연등)",
+      "latitude": 37.529616,
+      "longitude": 126.8479608
+    },
+    {
+      "intersection_id": "22938",
+      "name": "방화2동(연등)",
+      "latitude": 37.5676747,
+      "longitude": 126.8127782
+    },
+    {
+      "intersection_id": "22939",
+      "name": "화곡터널남단(연등)",
+      "latitude": 37.533703,
+      "longitude": 126.8462964
+    },
+    {
+      "intersection_id": "22946",
+      "name": "강남세브란스(연등)1",
+      "latitude": 37.4936563,
+      "longitude": 127.0449672
+    },
+    {
+      "intersection_id": "22947",
+      "name": "대치우성아파트(연등)",
+      "latitude": 37.5013512,
+      "longitude": 127.068591
+    },
+    {
+      "intersection_id": "22952",
+      "name": "청실종합(연등)1",
+      "latitude": 37.4935611,
+      "longitude": 127.0611541
+    },
+    {
+      "intersection_id": "22953",
+      "name": "도곡역(연등)1",
+      "latitude": 37.4898661,
+      "longitude": 127.053075
+    },
+    {
+      "intersection_id": "22957",
+      "name": "수도방위사령부(연등)",
+      "latitude": 37.468401,
+      "longitude": 126.986574
+    },
+    {
+      "intersection_id": "22958",
+      "name": "서초구민회관(연등)",
+      "latitude": 37.4825733,
+      "longitude": 127.036105
+    },
+    {
+      "intersection_id": "2296",
+      "name": "세곡보금자리삼거리",
+      "latitude": 37.4650307,
+      "longitude": 127.0953614
+    },
+    {
+      "intersection_id": "22960",
+      "name": "영동1교(연등)",
+      "latitude": 37.4717982,
+      "longitude": 127.0386554
+    },
+    {
+      "intersection_id": "22966",
+      "name": "휘문고교(연등)",
+      "latitude": 37.5048324,
+      "longitude": 127.0638745
+    },
+    {
+      "intersection_id": "22969",
+      "name": "국민은행역삼(연등)",
+      "latitude": 37.4955975,
+      "longitude": 127.0287826
+    },
+    {
+      "intersection_id": "22979",
+      "name": "씨티극장(연등)",
+      "latitude": 37.501005,
+      "longitude": 127.0261437
+    },
+    {
+      "intersection_id": "22984",
+      "name": "논현경복아파트(연등)1",
+      "latitude": 37.5105844,
+      "longitude": 127.0366663
+    },
+    {
+      "intersection_id": "22985",
+      "name": "영동시장(연등)",
+      "latitude": 37.5064642,
+      "longitude": 127.0235206
+    },
+    {
+      "intersection_id": "22996",
+      "name": "역삼119안전센터(연등)",
+      "latitude": 37.4978924,
+      "longitude": 127.043397
+    },
+    {
+      "intersection_id": "23",
+      "name": "강남프라자",
+      "latitude": 37.513094,
+      "longitude": 127.0354353
+    },
+    {
+      "intersection_id": "2300",
+      "name": "한국폴리텍대학입구",
+      "latitude": 37.5464597,
+      "longitude": 126.8453003
+    },
+    {
+      "intersection_id": "23000",
+      "name": "영동2교북단(연등)",
+      "latitude": 37.4809275,
+      "longitude": 127.0420243
+    },
+    {
+      "intersection_id": "23005",
+      "name": "대웅제약(연등)1",
+      "latitude": 37.5150099,
+      "longitude": 127.0643429
+    },
+    {
+      "intersection_id": "23006",
+      "name": "서이초교(연등)1",
+      "latitude": 37.4914932,
+      "longitude": 127.0249087
+    },
+    {
+      "intersection_id": "23007",
+      "name": "역삼초교(연등)",
+      "latitude": 37.493584,
+      "longitude": 127.0317641
+    },
+    {
+      "intersection_id": "23009",
+      "name": "도성초교사거리(연등)1",
+      "latitude": 37.50154,
+      "longitude": 127.0538682
+    },
+    {
+      "intersection_id": "23013",
+      "name": "싸리고개공원사거리(연등)1",
+      "latitude": 37.4899793,
+      "longitude": 127.0330263
+    },
+    {
+      "intersection_id": "23014",
+      "name": "포이사거리(연등)",
+      "latitude": 37.4770288,
+      "longitude": 127.0452883
+    },
+    {
+      "intersection_id": "23016",
+      "name": "강남경찰서(연등)",
+      "latitude": 37.5100418,
+      "longitude": 127.0673772
+    },
+    {
+      "intersection_id": "23019",
+      "name": "도곡1동주민센타(연등)",
+      "latitude": 37.4928793,
+      "longitude": 127.0424368
+    },
+    {
+      "intersection_id": "2302",
+      "name": "증미역",
+      "latitude": 37.5568464,
+      "longitude": 126.8631096
+    },
+    {
+      "intersection_id": "23021",
+      "name": "한티역(연등)",
+      "latitude": 37.4951276,
+      "longitude": 127.0534337
+    },
+    {
+      "intersection_id": "23023",
+      "name": "대치은마아파트(연등)",
+      "latitude": 37.4959019,
+      "longitude": 127.0625127
+    },
+    {
+      "intersection_id": "23024",
+      "name": "우성2차201동앞(연등)",
+      "latitude": 37.4994392,
+      "longitude": 127.0625795
+    },
+    {
+      "intersection_id": "23027",
+      "name": "우리은행포이(연등)",
+      "latitude": 37.4789812,
+      "longitude": 127.0490829
+    },
+    {
+      "intersection_id": "23028",
+      "name": "개포우성3차아파트(연등)1",
+      "latitude": 37.4822523,
+      "longitude": 127.0553883
+    },
+    {
+      "intersection_id": "23031",
+      "name": "수도공고(연등)",
+      "latitude": 37.4878263,
+      "longitude": 127.0629598
+    },
+    {
+      "intersection_id": "23033",
+      "name": "개포2동주민센터(연등)",
+      "latitude": 37.4893697,
+      "longitude": 127.0677771
+    },
+    {
+      "intersection_id": "23039",
+      "name": "트럭터미널(연등)",
+      "latitude": 37.4615786,
+      "longitude": 127.0372473
+    },
+    {
+      "intersection_id": "2304",
+      "name": "여의2교",
+      "latitude": 37.5257387,
+      "longitude": 126.9109904
+    },
+    {
+      "intersection_id": "23045",
+      "name": "역삼영동아파트(연등)",
+      "latitude": 37.4976195,
+      "longitude": 127.052279
+    },
+    {
+      "intersection_id": "23047",
+      "name": "휘문고정문(연등)",
+      "latitude": 37.5038915,
+      "longitude": 127.0611079
+    },
+    {
+      "intersection_id": "23048",
+      "name": "대치사거리(연등)",
+      "latitude": 37.5045022,
+      "longitude": 127.0578997
+    },
+    {
+      "intersection_id": "23049",
+      "name": "(구)역삼세무서(연등)1",
+      "latitude": 37.4964708,
+      "longitude": 127.0405227
+    },
+    {
+      "intersection_id": "23050",
+      "name": "역삼세무서(연등)1",
+      "latitude": 37.4946158,
+      "longitude": 127.0351974
+    },
+    {
+      "intersection_id": "23054",
+      "name": "진흥아파트(연등)",
+      "latitude": 37.4976156,
+      "longitude": 127.0239094
+    },
+    {
+      "intersection_id": "23055",
+      "name": "서초초교(연등)",
+      "latitude": 37.4992017,
+      "longitude": 127.0231408
+    },
+    {
+      "intersection_id": "23056",
+      "name": "강남제일병원(연등)",
+      "latitude": 37.502316,
+      "longitude": 127.0362534
+    },
+    {
+      "intersection_id": "23068",
+      "name": "충신시장(연등)",
+      "latitude": 37.573919,
+      "longitude": 127.0066491
+    },
+    {
+      "intersection_id": "23069",
+      "name": "방죽마을사거리(연등)1",
+      "latitude": 37.4715302,
+      "longitude": 127.1065652
+    }
+  ]
+}

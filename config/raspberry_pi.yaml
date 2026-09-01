@@ -143,11 +143,13 @@ crosswalk_controller:
     # Empty files keep the node in readiness-monitor mode without crashing.
     crosswalk_file: ''
     api_key_file: ''
-    # Optional tested override; otherwise the V2X map API supplies itstId.
+    # Optional bench fallback. Live GPS/V2X matching takes priority.
     intersection_id: ''
     intersection_map_page_size: 100
     intersection_map_max_pages: 30
     intersection_map_retry_s: 60.0
+    intersection_map_file: ''
+    intersection_map_cache_file: ~/.cache/safestride/v2x_intersections.json
     maximum_intersection_distance_m: 120.0
     update_rate_hz: 5.0
     gps_timeout_s: 2.0

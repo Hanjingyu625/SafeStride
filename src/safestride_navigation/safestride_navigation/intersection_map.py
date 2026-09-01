@@ -5,6 +5,7 @@ import math
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional
 
 from .crosswalk_data import haversine_m, number
@@ -19,7 +20,10 @@ Intersection = Dict[str, Any]
 
 def _records(document: Any) -> Iterable[Mapping[str, Any]]:
     if isinstance(document, dict):
-        if document.get('itstId') not in (None, ''):
+        if (
+            document.get('itstId') not in (None, '')
+            or document.get('intersection_id') not in (None, '')
+        ):
             yield document
         for value in document.values():
             yield from _records(value)
@@ -31,9 +35,15 @@ def _records(document: Any) -> Iterable[Mapping[str, Any]]:
 def normalize_intersections(document: Any) -> List[Intersection]:
     result: Dict[str, Intersection] = {}
     for record in _records(document):
-        identifier = str(record.get('itstId', '')).strip()
-        latitude = number(record.get('mapCtptIntLat'))
-        longitude = number(record.get('mapCtptIntLot'))
+        identifier = str(
+            record.get('itstId', record.get('intersection_id', ''))
+        ).strip()
+        latitude = number(
+            record.get('mapCtptIntLat', record.get('latitude'))
+        )
+        longitude = number(
+            record.get('mapCtptIntLot', record.get('longitude'))
+        )
         if (
             not identifier
             or latitude is None
@@ -44,11 +54,67 @@ def normalize_intersections(document: Any) -> List[Intersection]:
             continue
         result[identifier] = {
             'intersection_id': identifier,
-            'name': str(record.get('itstNm', '')).strip(),
+            'name': str(record.get('itstNm', record.get('name', ''))).strip(),
             'latitude': latitude,
             'longitude': longitude,
         }
     return list(result.values())
+
+
+def load_intersection_map(path: Path) -> List[Intersection]:
+    document = json.loads(path.read_text(encoding='utf-8'))
+    intersections = normalize_intersections(document)
+    if not intersections:
+        raise ValueError('cached intersection map contains no usable records')
+    return intersections
+
+
+def save_intersection_map(
+    path: Path,
+    intersections: Iterable[Mapping[str, Any]],
+) -> None:
+    normalized = normalize_intersections(list(intersections))
+    if not normalized:
+        raise ValueError('refusing to cache an empty intersection map')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + '.tmp')
+    temporary.write_text(
+        json.dumps(
+            {'intersections': normalized},
+            ensure_ascii=False,
+            indent=2,
+        ) + '\n',
+        encoding='utf-8',
+    )
+    temporary.replace(path)
+
+
+def select_intersection_id(
+    *,
+    locked_id: Any,
+    crosswalk: Optional[Mapping[str, Any]],
+    nearest: Optional[Mapping[str, Any]],
+    configured_id: Any,
+) -> tuple[str, str, str]:
+    choices = (
+        ('locked', locked_id, ''),
+        (
+            'crosswalk_data',
+            (crosswalk or {}).get('intersection_id', ''),
+            '',
+        ),
+        (
+            'v2x_nearest',
+            (nearest or {}).get('intersection_id', ''),
+            (nearest or {}).get('name', ''),
+        ),
+        ('configured_fallback', configured_id, ''),
+    )
+    for source, identifier, name in choices:
+        normalized = str(identifier or '').strip()
+        if normalized:
+            return normalized, source, str(name or '').strip()
+    return '', 'none', ''
 
 
 def request_intersection_map(
@@ -140,7 +206,10 @@ def nearest_intersection(
 
 __all__ = [
     'DEFAULT_INTERSECTION_MAP_URL',
+    'load_intersection_map',
     'nearest_intersection',
     'normalize_intersections',
     'request_intersection_map',
+    'save_intersection_map',
+    'select_intersection_id',
 ]
