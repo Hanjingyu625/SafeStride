@@ -47,14 +47,18 @@ the Drive MCU, Terrain MCU and ROS bridge must be updated together.
 
 For unattended startup, first review `config/raspberry_pi.yaml`, install the
 udev rules, build successfully, and then run `bash scripts/install_service.sh`.
-The deployed config uses dead-man direct drive. While both pressure channels
-are active and the Drive link has no MCU fault, the bridge streams a fixed
-0.10 m/s forward target without waiting for `/cmd_vel_safe`. Releasing either
-pressure input immediately sends a disabled stop. Set
-`command.deadman_direct_drive` to `false` to restore supervised velocity input.
-Drive firmware also keeps Hall feedback telemetry-only while
-`DEADMAN_DIRECT_DRIVE=true`; it does not delay re-arming or latch a Hall fault.
-Keep the wheels lifted during initial tests.
+The deployed config consumes `/cmd_vel_safe` and closes the wheel-speed loop
+with the single installed Hall sensor. A fresh supervised command plus valid
+link, Hall/TOF and both pressure inputs automatically arms the Drive MCU; no
+initial `/walker/set_enabled true` call is required. A normal pressure release
+ramps the applied wheel target to zero over 0.6 s. E-stop, command/session
+watchdog and hardware faults retain immediate-stop behavior. Keep the wheels
+lifted during initial tests.
+
+Slope control uses `TerrainStatus.pitch_rad`, not accel Z alone. The default
+polarity treats positive pitch as uphill; set `uphill_pitch_sign: -1.0` if the
+stationary front-raised check reports negative pitch. A 5 degree enter, 3
+degree exit and 0.5 s confirmation window reject brief body acceleration.
 
 Put the supplied shapefile in `data/external/crosswalk_shp/` and converted JSON
 in `data/generated/`. Store YOLO weights in GitHub Releases or an artifact store
@@ -140,15 +144,14 @@ the manifest's test macro F1, every class recall, artifact hash, model size and
 CPU latency on the Pi. The exported input contract remains RGB 224x224 with
 ImageNet normalization, matching the ROS perception node.
 
-The surface scale multiplies the ROS velocity command; it is not raw Arduino
-PWM. With the measured 0.115 m wheel radius, the 0.08 m/s default request is
-about 696 mrad/s. Open-loop firmware maps that non-zero target to PWM 92, above the
-tested PWM 90 motor dead zone. Because the temporary open-loop range is only
-PWM 90 through 100, the current 0.4x through 1.2x surface scales produce only a
-small electrical-output difference around the default cruise speed. Reliable
-surface-dependent physical speed requires encoder feedback or a separately
-validated wider PWM range; do not lower the start threshold merely to make the
-numbers look farther apart.
+The surface and slope scales modify the ROS velocity target; neither is a raw
+Arduino PWM command. With the measured 0.115 m wheel radius, the 0.08 m/s
+default request is about 696 mrad/s. Firmware compares that target with the Hall
+measurement and changes the shared motor output through the PID. The tested
+minimum active PWM is still 80, so low-speed regulation may switch between
+minimum drive and zero/brake rather than vary smoothly. Tune the Hall scale,
+PID and dead zone from lifted-wheel and loaded logs before claiming accurate
+physical speed.
 
 The GitHub workflow builds Jazzy on Ubuntu 24.04 amd64. It catches ROS API and
 packaging errors; final arm64 performance and device tests still run on the Pi.

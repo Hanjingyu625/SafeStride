@@ -31,10 +31,13 @@ constexpr int32_t MAX_DECEL_MRAD_S2 = 2500L;
 constexpr int32_t ARM_MAX_MEASURED_SPEED_MRAD_S = 100L;
 constexpr uint16_t ARM_STATIONARY_DWELL_MS = 250U;
 
-// Current deployment mode: both pressure channels are the motion level.
-// Hall telemetry remains available, but Hall dwell/stall checks do not gate
-// motor output. Set this false when closed-loop Hall safety is commissioned.
-constexpr bool DEADMAN_DIRECT_DRIVE = true;
+// Normal deployment follows the supervised ROS velocity target and closes the
+// speed loop with the single installed Hall sensor. The pressure inputs remain
+// the physical motion level, but no longer replace /cmd_vel_safe.
+constexpr bool DEADMAN_DIRECT_DRIVE = false;
+// A normal pressure release ramps the current wheel target to zero over this
+// interval. E-stop, watchdog and hardware faults still call immediateStop().
+constexpr uint16_t DEADMAN_RELEASE_RAMP_MS = 600U;
 
 // WSH135 is a linear analogue Hall sensor on the LEFT wheel. At 5 V its
 // no-field output is near 2.5 V. A3 is sampled around that boot-time baseline;
@@ -160,6 +163,9 @@ static_assert(
 static_assert(
     MOTOR_MIN_ACTIVE_PWM > 0U && MOTOR_MIN_ACTIVE_PWM <= MAX_PWM,
     "minimum active motor PWM must be positive and no higher than MAX_PWM");
+static_assert(
+    DEADMAN_RELEASE_RAMP_MS > 0U && DEADMAN_RELEASE_RAMP_MS <= 5000U,
+    "dead-man release ramp must be between 1 and 5000 ms");
 static_assert(
     MAGNET_BENCH_PWM > 0U && MAGNET_BENCH_PWM <= MAX_PWM,
     "magnet bench PWM must be positive and no higher than MAX_PWM");

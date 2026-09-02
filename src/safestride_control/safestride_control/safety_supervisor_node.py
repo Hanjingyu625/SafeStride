@@ -21,7 +21,11 @@ from safestride_interfaces.msg import (
     TerrainStatus,
     WalkerStatus,
 )
-from .safety_logic import finite_parameter
+from .safety_logic import (
+    SlopeSpeedPolicy,
+    combine_speed_scales,
+    finite_parameter,
+)
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -48,6 +52,7 @@ class SafetySupervisor(Node):
         self.declare_parameter('require_range_sensors', True)
         self.declare_parameter('require_surface_condition', False)
         self.declare_parameter('require_deadman', True)
+        self.declare_parameter('slope_control_enabled', True)
 
         self.declare_parameter('max_forward_velocity', 0.15)
         self.declare_parameter('max_reverse_velocity', 0.08)
@@ -57,6 +62,14 @@ class SafetySupervisor(Node):
         self.declare_parameter('max_linear_deceleration', 0.50)
         self.declare_parameter('max_angular_acceleration', 0.50)
         self.declare_parameter('max_angular_deceleration', 1.00)
+        self.declare_parameter('slope_enter_angle_rad', math.radians(5.0))
+        self.declare_parameter('slope_exit_angle_rad', math.radians(3.0))
+        self.declare_parameter('slope_confirmation_time_s', 0.50)
+        self.declare_parameter('uphill_pitch_sign', 1.0)
+        self.declare_parameter('pitch_offset_rad', 0.0)
+        self.declare_parameter('downhill_speed_scale', 0.60)
+        self.declare_parameter('uphill_speed_scale', 1.25)
+        self.declare_parameter('max_combined_speed_scale', 1.25)
 
         self.declare_parameter('stop_distance', 0.35)
         self.declare_parameter('slow_distance', 0.80)
@@ -131,6 +144,9 @@ class SafetySupervisor(Node):
         self._require_deadman = bool(
             self.get_parameter('require_deadman').value
         )
+        self._slope_control_enabled = bool(
+            self.get_parameter('slope_control_enabled').value
+        )
         self._max_forward = finite_parameter(
             'max_forward_velocity',
             self.get_parameter('max_forward_velocity').value,
@@ -180,6 +196,66 @@ class SafetySupervisor(Node):
             minimum=0.0,
             maximum=50.0,
             minimum_inclusive=False,
+        )
+        slope_enter_angle = finite_parameter(
+            'slope_enter_angle_rad',
+            self.get_parameter('slope_enter_angle_rad').value,
+            minimum=0.0,
+            maximum=0.7854,
+            minimum_inclusive=False,
+        )
+        slope_exit_angle = finite_parameter(
+            'slope_exit_angle_rad',
+            self.get_parameter('slope_exit_angle_rad').value,
+            minimum=0.0,
+            maximum=0.7854,
+        )
+        slope_confirmation_time = finite_parameter(
+            'slope_confirmation_time_s',
+            self.get_parameter('slope_confirmation_time_s').value,
+            minimum=0.0,
+            maximum=10.0,
+        )
+        uphill_pitch_sign = finite_parameter(
+            'uphill_pitch_sign',
+            self.get_parameter('uphill_pitch_sign').value,
+            minimum=-1.0,
+            maximum=1.0,
+        )
+        if uphill_pitch_sign not in (-1.0, 1.0):
+            raise ValueError('uphill_pitch_sign must be +1.0 or -1.0')
+        pitch_offset = finite_parameter(
+            'pitch_offset_rad',
+            self.get_parameter('pitch_offset_rad').value,
+            minimum=-math.pi,
+            maximum=math.pi,
+        )
+        downhill_speed_scale = finite_parameter(
+            'downhill_speed_scale',
+            self.get_parameter('downhill_speed_scale').value,
+            minimum=0.0,
+            maximum=1.0,
+        )
+        uphill_speed_scale = finite_parameter(
+            'uphill_speed_scale',
+            self.get_parameter('uphill_speed_scale').value,
+            minimum=1.0,
+            maximum=2.0,
+        )
+        self._max_combined_speed_scale = finite_parameter(
+            'max_combined_speed_scale',
+            self.get_parameter('max_combined_speed_scale').value,
+            minimum=1.0,
+            maximum=2.0,
+        )
+        self._slope_policy = SlopeSpeedPolicy(
+            enter_angle_rad=slope_enter_angle,
+            exit_angle_rad=slope_exit_angle,
+            confirmation_time_s=slope_confirmation_time,
+            uphill_pitch_sign=uphill_pitch_sign,
+            pitch_offset_rad=pitch_offset,
+            downhill_speed_scale=downhill_speed_scale,
+            uphill_speed_scale=uphill_speed_scale,
         )
 
         self._stop_distance = finite_parameter(
@@ -293,11 +369,12 @@ class SafetySupervisor(Node):
 
         self.get_logger().info(
             'Safety supervisor ready at %.1f Hz; terrain TOF is %s and '
-            'surface perception is %s'
+            'surface perception is %s; slope control is %s'
             % (
                 self._publish_rate,
                 'required' if self._require_ranges else 'optional',
                 'required' if self._require_surface else 'optional',
+                'enabled' if self._slope_control_enabled else 'disabled',
             )
         )
 
@@ -450,6 +527,36 @@ class SafetySupervisor(Node):
             reasons.append('terrain_tof_fault')
         return reasons
 
+    def _slope_state(
+        self, now: float
+    ) -> Tuple[float, str, float]:
+        if not self._slope_control_enabled:
+            self._slope_policy.reset()
+            return 1.0, 'disabled', math.nan
+
+        terrain = self._last_terrain
+        sample_valid = bool(
+            terrain is not None
+            and self._age(now, self._last_terrain_time)
+            <= self._range_timeout
+            and terrain.mpu_valid
+            and not (
+                terrain.fault_bits & TerrainStatus.FAULT_MPU_INVALID
+            )
+            and math.isfinite(float(terrain.pitch_rad))
+        )
+        pitch_rad = (
+            float(terrain.pitch_rad) if terrain is not None else math.nan
+        )
+        scale, state, normalized_pitch = self._slope_policy.update(
+            pitch_rad=pitch_rad,
+            sample_valid=sample_valid,
+            now_s=now,
+        )
+        if not sample_valid:
+            state = 'unavailable'
+        return scale, state, normalized_pitch
+
     def _range_scale(self, distance: float) -> float:
         if distance <= self._stop_distance:
             return 0.0
@@ -541,6 +648,8 @@ class SafetySupervisor(Node):
         self,
         range_scales: Dict[str, float],
         surface_scale: float,
+        slope_scale: float,
+        slope_state: str,
     ) -> Tuple[float, float, List[str]]:
         assert self._last_command is not None
         requested_linear = float(self._last_command.twist.linear.x)
@@ -576,8 +685,16 @@ class SafetySupervisor(Node):
             )
             angular *= turn_scale
 
-        linear *= surface_scale
-        angular *= surface_scale
+        # Pitch sign is defined in the forward vehicle frame. Do not interpret
+        # an uphill chassis attitude as assist while commanding reverse.
+        effective_slope_scale = slope_scale if requested_linear > 0.0 else 1.0
+        combined_speed_scale = combine_speed_scales(
+            surface_scale,
+            effective_slope_scale,
+            self._max_combined_speed_scale,
+        )
+        linear *= combined_speed_scale
+        angular *= combined_speed_scale
         linear = _clamp(linear, -self._max_reverse, self._max_forward)
         angular = _clamp(angular, -self._max_angular, self._max_angular)
 
@@ -600,6 +717,20 @@ class SafetySupervisor(Node):
             notes.append('surface_slowdown')
         elif surface_scale > 1.0:
             notes.append('surface_speedup')
+        if (
+            slope_state == SlopeSpeedPolicy.DOWNHILL
+            and requested_linear > 0.0
+        ):
+            notes.append('downhill_slowdown')
+        elif (
+            slope_state == SlopeSpeedPolicy.UPHILL
+            and requested_linear > 0.0
+        ):
+            notes.append(
+                'uphill_assist'
+                if combined_speed_scale > 1.0
+                else 'uphill_assist_limited'
+            )
 
         return linear, angular, notes
 
@@ -622,6 +753,12 @@ class SafetySupervisor(Node):
             surface_confidence,
         ) = self._surface_state(now)
         hard_stop_reasons.extend(surface_reasons)
+        slope_scale, slope_state, normalized_pitch = self._slope_state(now)
+        combined_speed_scale = combine_speed_scales(
+            surface_scale,
+            slope_scale,
+            self._max_combined_speed_scale,
+        )
         motion_stop_reasons = [
             reason for reason in hard_stop_reasons
             if reason != 'disarmed'
@@ -634,7 +771,12 @@ class SafetySupervisor(Node):
             self._output_angular = 0.0
         else:
             desired_linear, desired_angular, operating_notes = (
-                self._desired_command(range_scales, surface_scale)
+                self._desired_command(
+                    range_scales,
+                    surface_scale,
+                    slope_scale,
+                    slope_state,
+                )
             )
             if (
                 'obstacle_stop' in operating_notes
@@ -661,7 +803,7 @@ class SafetySupervisor(Node):
                 )
 
         # Keep forwarding a valid supervised command while DISARMED so the
-        # level-triggered bridge can activate the controller as soon as the
+        # automatic bridge can activate the controller as soon as the
         # physical dead-man input is active. Other invalid or stale inputs
         # publish one immediate zero and then go silent, forcing the bridge
         # timeout to disarm the MCU.
@@ -699,6 +841,10 @@ class SafetySupervisor(Node):
                 surface_scale,
                 surface_classification,
                 surface_confidence,
+                slope_scale,
+                slope_state,
+                normalized_pitch,
+                combined_speed_scale,
             )
             self._last_diagnostic_time = now
 
@@ -712,6 +858,10 @@ class SafetySupervisor(Node):
         surface_scale: float,
         surface_classification: int,
         surface_confidence: float,
+        slope_scale: float,
+        slope_state: str,
+        normalized_pitch: float,
+        combined_speed_scale: float,
     ) -> None:
         diagnostic = DiagnosticStatus()
         diagnostic.name = 'SafeStride/Safety Supervisor'
@@ -814,6 +964,27 @@ class SafetySupervisor(Node):
             KeyValue(
                 key='surface_speed_scale',
                 value='%.3f' % surface_scale,
+            ),
+            KeyValue(
+                key='slope_control_enabled',
+                value=_bool_text(self._slope_control_enabled),
+            ),
+            KeyValue(key='slope_state', value=slope_state),
+            KeyValue(
+                key='slope_pitch_rad',
+                value=(
+                    'unavailable'
+                    if not math.isfinite(normalized_pitch)
+                    else '%.4f' % normalized_pitch
+                ),
+            ),
+            KeyValue(
+                key='slope_speed_scale',
+                value='%.3f' % slope_scale,
+            ),
+            KeyValue(
+                key='combined_forward_speed_scale',
+                value='%.3f' % combined_speed_scale,
             ),
             KeyValue(
                 key='output_linear_mps',

@@ -21,7 +21,9 @@ class DriveController {
       const HallSample& right_hall,
       int32_t requested_mrad_s,
       bool output_allowed,
-      bool enforce_hall_faults = true);
+      bool enforce_hall_faults = true,
+      uint32_t deceleration_mrad_s2 = 0UL,
+      bool fade_pwm_during_deceleration = false);
   void updateMagnetBench(
       uint32_t elapsed_us,
       const HallSample& left_hall,
@@ -61,6 +63,9 @@ class DriveController {
   float filtered_left_mrad_s_;
   float filtered_right_mrad_s_;
   float applied_target_mrad_s_;
+  float last_commanded_pwm_;
+  float release_start_pwm_;
+  bool release_pwm_fade_active_;
   PidState motor_pid_;
   HallMonitorState left_hall_monitor_;
   HallMonitorState right_hall_monitor_;
@@ -69,7 +74,8 @@ class DriveController {
   static float rampTarget(
       float current,
       float requested,
-      float dt_seconds);
+      float dt_seconds,
+      uint32_t deceleration_mrad_s2);
   static float calculatePid(
       float target_mrad_s,
       float measured_mrad_s,
@@ -79,7 +85,7 @@ class DriveController {
       float controller_pwm,
       float target_mrad_s);
   static float openLoopPwm(float target_mrad_s);
-  static void writeMotor(float pwm);
+  void writeMotor(float pwm);
   static float hallSpeedMagnitude(
       const HallSample& sample,
       uint32_t pulse_delta,

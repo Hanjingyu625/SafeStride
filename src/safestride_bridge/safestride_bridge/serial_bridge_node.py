@@ -108,9 +108,10 @@ class SerialBridgeNode(Node):
         self._session_started = False
         self._tx_sequence = 0
 
-        # Never allow pressure-level motion immediately after process start.
-        # An operator must explicitly call /walker/set_enabled true.
-        self._level_enable_blocked = True
+        # A fresh supervised command and all remote/physical interlocks are
+        # sufficient to arm. The service remains available as a manual inhibit
+        # but no initial `set_enabled true` call is required.
+        self._level_enable_blocked = False
         self._last_command_time: Optional[float] = None
         self._target_linear = 0.0
         self._command_timed_out = True
@@ -183,7 +184,7 @@ class SerialBridgeNode(Node):
             'dead-man direct drive is active at '
             f'{self._deadman_forward_velocity:.3f} m/s'
             if self._deadman_direct_drive
-            else 'level-triggered enable is active'
+            else 'automatic supervised enable is active'
         )
         self.get_logger().info(
             f'configured serial bridge for {self._port} at '
@@ -550,10 +551,31 @@ class SerialBridgeNode(Node):
             and firmware_state in (FW_DISARMED, FW_ARMED)
         )
 
+    def _remote_allows_deadman_ramp(
+        self, telemetry: TelemetryPayload
+    ) -> bool:
+        """Allow only zero/enable frames during the MCU release ramp."""
+
+        return (
+            not self._level_enable_blocked
+            and not self._magnet_bench_mode_active(telemetry)
+            and self._firmware_status_consistent(telemetry)
+            and bool(telemetry.status_bits & STATUS_SESSION)
+            and not bool(telemetry.status_bits & STATUS_DEADMAN)
+            and bool(telemetry.status_bits & STATUS_HALL_CALIBRATED)
+            and bool(self._capabilities & CAP_SINGLE_LEFT_HALL)
+            and not bool(telemetry.status_bits & STATUS_ESTOP)
+            and not bool(
+                telemetry.status_bits & STATUS_WATCHDOG_TIMEOUT
+            )
+            and telemetry.fault_bits == 0
+            and self._firmware_state(telemetry) == FW_ARMED
+        )
+
     def _reset_link_state(self) -> None:
-        # A serial disconnect or controller reset invalidates prior operator
-        # authorization. Reconnection must not resume motion by itself.
-        self._level_enable_blocked = True
+        # Keep any explicit manual inhibit across a serial disconnect. Normal
+        # startup is unblocked, so reconnect does not require a true service
+        # call unless an operator previously requested a manual stop.
         self._session_id = 0
         self._boot_id = 0
         self._capabilities = 0
@@ -712,7 +734,6 @@ class SerialBridgeNode(Node):
             or self._last_telemetry_time is not None
         )
         if new_session:
-            self._level_enable_blocked = True
             session_id = secrets.randbits(32)
             if session_id == 0 or session_id == self._session_id:
                 session_id = (self._session_id + 1) & 0xFFFFFFFF
@@ -844,11 +865,16 @@ class SerialBridgeNode(Node):
         now = self._now_monotonic()
         link_ok = self._link_ok(now)
         telemetry = self._last_telemetry
-        remote_safe = (
-            telemetry is not None
-            and self._remote_allows_enable(telemetry)
-        )
-        if not link_ok or not remote_safe:
+        if not link_ok or telemetry is None:
+            self._send_command(0, False)
+            return
+        if self._remote_allows_deadman_ramp(telemetry):
+            # Keep the MCU watchdog alive, but never forward a non-zero target
+            # after the physical handle has been released.
+            self._send_command(0, True)
+            return
+        remote_safe = self._remote_allows_enable(telemetry)
+        if not remote_safe:
             self._send_command(0, False)
             return
 
@@ -1371,7 +1397,7 @@ class SerialBridgeNode(Node):
                 value=(
                     'deadman_level_triggered'
                     if self._deadman_direct_drive
-                    else 'command_level_triggered'
+                    else 'automatic_command_level'
                 ),
             ),
             KeyValue(

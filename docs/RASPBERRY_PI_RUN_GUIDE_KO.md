@@ -205,9 +205,10 @@ bash scripts/run.sh
 ```
 
 `run.sh`는 `/dev/safestride-drive`, `/dev/safestride-terrain`, `/dev/serial0`의
-존재를 확인하고 두 Uno의 serial 역할도 검증한다. 이
-실행은 `/walker/set_enabled`를 자동 호출하지 않으므로 Drive MCU는 disarmed
-상태여야 한다.
+존재를 확인하고 두 Uno의 serial 역할도 검증한다. 이 예시는 cruise 명령을
+끄므로 Drive MCU는 disarmed 상태여야 한다. 이후 정상 `/cmd_vel_safe`, 링크,
+Hall/TOF와 양손 압력이 갖춰지면 별도의 `/walker/set_enabled true` 없이
+자동 arm된다.
 
 ## 6. 두 번째 SSH 터미널에서 topic 확인
 
@@ -263,7 +264,10 @@ ros2 topic hz /terrain/imu
 - TOF 정상 기준면: `tof_alert: 0`, `terrain_hazard: false`
 - 물체를 가까이 유지: raised 후보 후 `tof_alert: 3`
 - 바닥을 멀리 이동: drop 후보 후 `tof_alert: 4`
-- MPU6050 미연결은 진단 WARN이지만 TOF 시험 자체는 가능함
+- 보행기 앞쪽을 정지 상태에서 들어 올려 `pitch_rad` 부호를 확인한다. 값이
+  음수면 `uphill_pitch_sign: -1.0`, 양수면 기본 `1.0`을 유지한다.
+- MPU6050 미연결은 진단 WARN이고 경사 보정은 1.0으로 중립화되지만 TOF 시험
+  자체는 가능함
 - GPS 노드가 `/dev/serial0`을 직접 열며, 유효한 NMEA no-fix 문장은
   `/gps/fix`의 NO_FIX 상태로 발행됨
 - 지도·API 미설정 횡단보도 노드는 readiness WARN만 발행하며 모터 명령을 내지 않음
@@ -306,9 +310,11 @@ cd ~/SafeStride
 bash scripts/test_drive_pi.sh --enable-motor 5
 ```
 
-이 스크립트는 `/cmd_vel`을 먼저 발행하고 안전 감독 출력이 양수인지 확인한 뒤에만
-Drive를 활성화한다. 종료·오류·`Ctrl+C` 시 `/walker/set_enabled false`를 호출한다.
-왼쪽 Hall pulse가 없거나 TOF hazard·dead-man 해제가 발생하면 정지해야 한다.
+이 스크립트는 0.08 m/s `/cmd_vel`을 20 Hz로 발행한다. 안전 조건과 양손 압력이
+유효하면 service true 없이 자동 arm되며, 종료·오류·`Ctrl+C` 시 0 명령을
+발행하고 수동 inhibit도 설정한다. 왼쪽 Hall pulse가 없거나 TOF hazard가
+발생하면 즉시 정지해야 하고, 정상 dead-man 해제는 약 0.6초 ramp 뒤
+정지해야 한다.
 
 수동으로 비활성화해야 할 때:
 
@@ -316,6 +322,9 @@ Drive를 활성화한다. 종료·오류·`Ctrl+C` 시 `/walker/set_enabled fals
 ros2 service call /walker/set_enabled \
   std_srvs/srv/SetBool "{data: false}"
 ```
+
+이 수동 inhibit를 사용한 같은 ROS 실행 세션에서 다시 움직이려는 경우에만
+`{data: true}`로 inhibit를 해제한다. 일반적인 ROS 시작에는 true 호출이 필요 없다.
 
 센서 확인만 끝낸 경우 `true` 요청을 보낼 필요가 없다.
 

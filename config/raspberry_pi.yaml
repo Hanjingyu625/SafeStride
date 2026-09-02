@@ -11,7 +11,8 @@ serial_bridge:
       publish_rate_hz: 50.0
       timeout_s: 0.20
       ttl_ms: 200
-      deadman_direct_drive: true
+      # Use /cmd_vel_safe and the Hall-speed PID instead of fixed PWM drive.
+      deadman_direct_drive: false
       deadman_forward_velocity_m_s: 0.10
       max_abs_angular_z_rad_s: 0.0
       allow_magnet_bench_mode: false
@@ -74,6 +75,7 @@ safety_supervisor:
     # This now requires the downward TOF terrain status, not front-facing range.
     require_range_sensors: true
     require_deadman: true
+    slope_control_enabled: true
     max_forward_velocity: 0.15
     max_reverse_velocity: 0.08
     max_angular_velocity: 0.0
@@ -81,6 +83,17 @@ safety_supervisor:
     max_linear_deceleration: 0.50
     max_angular_acceleration: 0.50
     max_angular_deceleration: 1.00
+    # pitch_rad is used because accel Z alone has no uphill/downhill sign.
+    # If lifting the walker front makes pitch_rad negative, change only this
+    # value to -1.0 after the first stationary orientation check.
+    uphill_pitch_sign: 1.0
+    pitch_offset_rad: 0.0
+    slope_enter_angle_rad: 0.0872665  # 5 deg
+    slope_exit_angle_rad: 0.0523599   # 3 deg
+    slope_confirmation_time_s: 0.50
+    downhill_speed_scale: 0.60
+    uphill_speed_scale: 1.25
+    max_combined_speed_scale: 1.25
     stop_distance: 0.35
     slow_distance: 0.80
     command_topic: /cmd_vel

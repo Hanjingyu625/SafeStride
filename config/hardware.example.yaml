@@ -15,7 +15,7 @@ crosswalk:
   intersection_id: CHANGE_ME_ITST_ID
   motion_output_enabled: false
 drive:
-  requires_explicit_ros_enable: true
+  requires_explicit_ros_enable: false
   wheel_radius_m: 0.115
   wheel_separation_m: 0.55
   # Current six-magnet left-wheel preset. Use 5 here and in both runtime

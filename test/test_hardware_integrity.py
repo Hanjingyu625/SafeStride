@@ -150,13 +150,20 @@ class TestHardwareIntegrity(unittest.TestCase):
             self.assertIn("require_deadman: true", text)
             self.assertIn("require_range_sensors: true", text)
 
-    def test_drive_enable_is_level_triggered(self):
-        self.assertIn("_level_enable_blocked = True", self.bridge)
-        self.assertGreaterEqual(
-            self.bridge.count("self._level_enable_blocked = True"), 3
+    def test_drive_uses_supervised_automatic_enable(self):
+        self.assertIn("self._level_enable_blocked = False", self.bridge)
+        self.assertEqual(
+            self.bridge.count("self._level_enable_blocked = True"), 1
         )
         self.assertIn("key='enable_mode'", self.bridge)
-        self.assertIn("'deadman_level_triggered'", self.bridge)
+        self.assertIn("'automatic_command_level'", self.bridge)
+        self.assertIn("_remote_allows_deadman_ramp", self.bridge)
+        self.assertIn(
+            "not self._level_enable_blocked\n"
+            "            and not self._magnet_bench_mode_active",
+            self.bridge,
+        )
+        self.assertIn("self._send_command(0, True)", self.bridge)
         self.assertIn("('command.deadman_direct_drive', False)", self.bridge)
         self.assertIn(
             "('command.deadman_forward_velocity_m_s', 0.10)",
@@ -167,16 +174,23 @@ class TestHardwareIntegrity(unittest.TestCase):
         )
         for path in ROS_CONFIGS:
             text = path.read_text(encoding="utf-8")
-            self.assertIn("deadman_direct_drive: true", text)
+            self.assertIn("deadman_direct_drive: false", text)
             self.assertIn("deadman_forward_velocity_m_s: 0.10", text)
+            self.assertIn("slope_control_enabled: true", text)
+            self.assertIn("uphill_pitch_sign: 1.0", text)
         self.assertNotIn("_enabled_requested", self.bridge)
         self.assertNotIn("_arm_confirmed", self.bridge)
         self.assertNotIn("_clear_enable_request", self.bridge)
         self.assertEqual(
             constant_expression(self.config, "DEADMAN_DIRECT_DRIVE"),
-            "true",
+            "false",
+        )
+        self.assertEqual(
+            constant_expression(self.config, "DEADMAN_RELEASE_RAMP_MS"),
+            "600U",
         )
         self.assertIn("!cfg::DEADMAN_DIRECT_DRIVE", self.drive)
+        self.assertIn("beginDeadmanReleaseRamp()", self.drive)
 
     def test_terrain_uses_i2c_without_gpio_actuator_outputs(self):
         self.assertIn("Wire.begin()", self.terrain)

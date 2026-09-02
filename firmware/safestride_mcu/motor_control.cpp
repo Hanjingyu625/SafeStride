@@ -78,6 +78,9 @@ DriveController::DriveController()
       filtered_left_mrad_s_(0.0F),
       filtered_right_mrad_s_(0.0F),
       applied_target_mrad_s_(0.0F),
+      last_commanded_pwm_(0.0F),
+      release_start_pwm_(0.0F),
+      release_pwm_fade_active_(false),
       motor_pid_{0.0F, 0.0F},
       left_hall_monitor_{false, 0UL, 0UL, 0UL},
       right_hall_monitor_{false, 0UL, 0UL, 0UL},
@@ -91,6 +94,9 @@ void DriveController::begin() {
   pinMode(cfg::MOTOR_IN1_PIN, OUTPUT);
   pinMode(cfg::MOTOR_IN2_PIN, OUTPUT);
   analogWrite(cfg::MOTOR_PWM_PIN, 0);
+  last_commanded_pwm_ = 0.0F;
+  release_start_pwm_ = 0.0F;
+  release_pwm_fade_active_ = false;
 }
 
 void DriveController::disableImmediately() {
@@ -98,19 +104,26 @@ void DriveController::disableImmediately() {
   digitalWrite(cfg::MOTOR_IN1_PIN, LOW);
   digitalWrite(cfg::MOTOR_IN2_PIN, LOW);
   applied_target_mrad_s_ = 0.0F;
+  last_commanded_pwm_ = 0.0F;
+  release_start_pwm_ = 0.0F;
+  release_pwm_fade_active_ = false;
   motor_pid_ = {0.0F, 0.0F};
 }
 
 float DriveController::rampTarget(
     float current,
     float requested,
-    float dt_seconds) {
+    float dt_seconds,
+    uint32_t deceleration_mrad_s2) {
   const bool increasing_magnitude =
       current == 0.0F ||
       (current * requested > 0.0F && fabsf(requested) > fabsf(current));
   const float rate = increasing_magnitude
       ? static_cast<float>(cfg::MAX_ACCEL_MRAD_S2)
-      : static_cast<float>(cfg::MAX_DECEL_MRAD_S2);
+      : static_cast<float>(
+            deceleration_mrad_s2 == 0UL
+                ? cfg::MAX_DECEL_MRAD_S2
+                : deceleration_mrad_s2);
   const float maximum_step = rate * dt_seconds;
   return current + clampFloat(
       requested - current, -maximum_step, maximum_step);
@@ -154,8 +167,9 @@ float DriveController::compensateMotorDeadzone(
     return 0.0F;
   }
 
-  // Never reverse merely to correct a small overspeed. The current shared
-  // driver should coast until the requested direction needs positive torque.
+  // Never command reverse torque merely to correct overspeed. Zero PWM with
+  // IN1=IN2=LOW selects the installed DRI0042 driver's dynamic-brake state;
+  // braking strength therefore still falls with wheel speed.
   if (target_mrad_s > 0.0F) {
     if (controller_pwm <= 0.0F) {
       return 0.0F;
@@ -190,11 +204,13 @@ float DriveController::openLoopPwm(float target_mrad_s) {
 }
 
 void DriveController::writeMotor(float pwm) {
-  float signed_pwm = pwm * static_cast<float>(cfg::MOTOR_SIGN);
-  signed_pwm = clampFloat(
-      signed_pwm,
+  const float logical_pwm = clampFloat(
+      pwm,
       -static_cast<float>(cfg::MAX_PWM),
       static_cast<float>(cfg::MAX_PWM));
+  last_commanded_pwm_ = logical_pwm;
+  const float signed_pwm =
+      logical_pwm * static_cast<float>(cfg::MOTOR_SIGN);
   const uint8_t magnitude = static_cast<uint8_t>(
       lroundf(fabsf(signed_pwm)));
   if (signed_pwm > 0.0F) {
@@ -292,7 +308,9 @@ void DriveController::update(
     const HallSample& right_hall,
     int32_t requested_mrad_s,
     bool output_allowed,
-    bool enforce_hall_faults) {
+    bool enforce_hall_faults,
+    uint32_t deceleration_mrad_s2,
+    bool fade_pwm_during_deceleration) {
   if (elapsed_us == 0UL) {
     return;
   }
@@ -311,7 +329,19 @@ void DriveController::update(
       -static_cast<float>(cfg::MAX_WHEEL_TARGET_MRAD_S),
       static_cast<float>(cfg::MAX_WHEEL_TARGET_MRAD_S));
   applied_target_mrad_s_ = rampTarget(
-      applied_target_mrad_s_, limited_target, dt_seconds);
+      applied_target_mrad_s_,
+      limited_target,
+      dt_seconds,
+      deceleration_mrad_s2);
+  if (fade_pwm_during_deceleration) {
+    if (!release_pwm_fade_active_) {
+      release_start_pwm_ = last_commanded_pwm_;
+      release_pwm_fade_active_ = true;
+    }
+  } else {
+    release_start_pwm_ = 0.0F;
+    release_pwm_fade_active_ = false;
+  }
 
   if (enforce_hall_faults) {
     updateHallPlausibility(
@@ -325,7 +355,27 @@ void DriveController::update(
     left_hall_monitor_ = {false, 0UL, 0UL, 0UL};
     right_hall_monitor_ = {false, 0UL, 0UL, 0UL};
     motor_pid_ = {0.0F, 0.0F};
-    writeMotor(openLoopPwm(applied_target_mrad_s_));
+    if (!fade_pwm_during_deceleration) {
+      writeMotor(openLoopPwm(applied_target_mrad_s_));
+      return;
+    }
+  }
+
+  if (fade_pwm_during_deceleration) {
+    // Fade from the actual preceding drive command, never from a newly forced
+    // PWM floor. If PID was already braking (last PWM zero), release cannot
+    // accidentally add forward torque before the final dynamic brake.
+    motor_pid_ = {0.0F, 0.0F};
+    const float starting_magnitude =
+        static_cast<float>(deceleration_mrad_s2) *
+        static_cast<float>(cfg::DEADMAN_RELEASE_RAMP_MS) / 1000.0F;
+    const float remaining_ratio = starting_magnitude > 0.0F
+        ? clampFloat(
+              fabsf(applied_target_mrad_s_) / starting_magnitude,
+              0.0F,
+              1.0F)
+        : 0.0F;
+    writeMotor(release_start_pwm_ * remaining_ratio);
     return;
   }
 

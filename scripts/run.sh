@@ -147,8 +147,9 @@ unset ROS_LOCALHOST_ONLY
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
 export ROS_AUTOMATIC_DISCOVERY_RANGE="${ROS_AUTOMATIC_DISCOVERY_RANGE:-SUBNET}"
 
-# The deployed config drives forward while the pressure dead-man is held.
-# /walker/set_enabled false remains a manual stop until true clears the block.
+# The deployed config follows fresh supervised velocity commands and arms
+# automatically when link, terrain, Hall and pressure inputs are all valid.
+# /walker/set_enabled false remains an optional manual inhibit.
 launch_args=(
   "config_file:=${config}"
   "wheel_radius:=${SAFESTRIDE_WHEEL_RADIUS_M:-0.115}"

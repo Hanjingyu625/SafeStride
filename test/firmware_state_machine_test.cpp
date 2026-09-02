@@ -150,17 +150,54 @@ int main() {
   assert(g_state == ControllerState::ARMED);
   assert(g_requested_mrad_s == 500L);
 
-  // Direct dead-man mode must re-arm after a complete release/press cycle
-  // without waiting for Hall stationary dwell.
+  // Let the applied target reach the requested speed before releasing the
+  // pressure dead-man. Periodic accepted commands keep the watchdog fresh.
+  uint16_t next_sequence = 16U;
+  g_last_control_us = g_test_millis * 1000UL;
+  for (int i = 0; i < 100; ++i) {
+    g_test_millis += 5UL;
+    if (i % 20 == 0) {
+      motion_enable_command.sequence = next_sequence++;
+      assert(handleCommand(motion_enable_command));
+    }
+    runControlLoop(g_test_millis * 1000UL);
+  }
+  assert(g_drive.appliedTargetMradS() == 500L);
+
+  // A normal pressure release stays ARMED only while the MCU ramps the target
+  // to zero. The bridge is allowed to refresh the watchdog with enabled zero
+  // commands, but a non-zero command cannot resume motion mid-ramp.
   g_pressure_adc = 0;
   g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
   g_pressure.update(g_test_millis);
   refreshPhysicalSafety();
   assert(!deadmanActive());
+  assert(g_state == ControllerState::ARMED);
+  assert(g_deadman_release_ramp_active);
+  assert(g_requested_mrad_s == 0L);
+  assert(g_deadman_release_decel_mrad_s2 == 834UL);
+
+  proto::writeI32(command_payload + 0U, 500L);
+  motion_enable_command.sequence = next_sequence++;
+  assert(!handleCommand(motion_enable_command));
+  proto::writeI32(command_payload + 0U, 0L);
+  g_last_control_us = g_test_millis * 1000UL;
+  for (int i = 0; i < 120; ++i) {
+    g_test_millis += 5UL;
+    if (i % 20 == 0) {
+      motion_enable_command.sequence = next_sequence++;
+      assert(handleCommand(motion_enable_command));
+    }
+    runControlLoop(g_test_millis * 1000UL);
+    if (i < 119) {
+      assert(g_state == ControllerState::ARMED);
+    }
+  }
+  assert(!g_deadman_release_ramp_active);
   assert(g_state == ControllerState::SAFE_STOP);
 
   command_payload[6U] = 0U;
-  disable_command.sequence = 16U;
+  disable_command.sequence = next_sequence++;
   assert(handleCommand(disable_command));
   assert(g_state == ControllerState::DISARMED);
 
@@ -168,9 +205,12 @@ int main() {
   g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
   g_pressure.update(g_test_millis);
   assert(deadmanActive());
-  g_stationary_tracking = false;
+  g_stationary_tracking = true;
+  g_stationary_since_ms =
+      g_test_millis - cfg::ARM_STATIONARY_DWELL_MS;
   command_payload[6U] = 1U;
-  motion_enable_command.sequence = 17U;
+  proto::writeI32(command_payload + 0U, 500L);
+  motion_enable_command.sequence = next_sequence++;
   assert(handleCommand(motion_enable_command));
   assert(g_state == ControllerState::ARMED);
 

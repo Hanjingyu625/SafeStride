@@ -100,6 +100,46 @@ int main() {
     drive.begin();
     primeFeedback(drive);
     const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
+    for (int i = 0; i < 100; ++i) {
+      drive.update(5000UL, stopped, stopped, 500L, true, true);
+    }
+    assert(drive.appliedTargetMradS() == 500L);
+    for (int i = 0; i < 60; ++i) {
+      drive.update(
+          5000UL, stopped, stopped, 0L, true, true, 834UL, true);
+    }
+    assert(g_motor_pwm >= 39);
+    assert(g_motor_pwm <= 41);
+    for (int i = 60; i < 119; ++i) {
+      drive.update(
+          5000UL, stopped, stopped, 0L, true, true, 834UL, true);
+    }
+    assert(drive.appliedTargetMradS() > 0L);
+    drive.update(
+        5000UL, stopped, stopped, 0L, true, true, 834UL, true);
+    assert(drive.appliedTargetMradS() == 0L);
+    assert(g_motor_pwm == 0);
+  }
+
+  {
+    DriveController drive;
+    drive.begin();
+    primeFeedback(drive);
+    const HallSample overspeed = sample(1UL, 500000UL);
+    drive.update(5000UL, overspeed, overspeed, 500L, true, true);
+    assert(g_motor_pwm == 0);
+    drive.update(
+        5000UL, overspeed, overspeed, 0L, true, true, 10UL, true);
+    // Releasing the dead-man while PID is already braking must not inject a
+    // new positive PWM command merely to create a visible ramp.
+    assert(g_motor_pwm == 0);
+  }
+
+  {
+    DriveController drive;
+    drive.begin();
+    primeFeedback(drive);
+    const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
     for (int i = 0; i < 720; ++i) {
       drive.update(5000UL, stopped, stopped, 667L, true, false);
     }

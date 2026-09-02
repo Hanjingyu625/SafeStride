@@ -69,6 +69,9 @@ bool g_stationary_tracking = false;
 uint32_t g_stationary_since_ms = 0UL;
 
 int32_t g_requested_mrad_s = 0L;
+bool g_deadman_release_ramp_active = false;
+uint32_t g_deadman_release_decel_mrad_s2 =
+    cfg::MAX_DECEL_MRAD_S2;
 
 uint32_t g_last_control_us = 0UL;
 uint32_t g_last_telemetry_ms = 0UL;
@@ -145,9 +148,26 @@ uint32_t makeBootId() {
 
 void immediateStop(ControllerState state, bool watchdog_timeout) {
   g_requested_mrad_s = 0L;
+  g_deadman_release_ramp_active = false;
+  g_deadman_release_decel_mrad_s2 = cfg::MAX_DECEL_MRAD_S2;
   g_watchdog_timed_out = watchdog_timeout;
   g_state = state;
   g_drive.disableImmediately();
+}
+
+void beginDeadmanReleaseRamp() {
+  const int32_t applied_target = g_drive.appliedTargetMradS();
+  const uint32_t magnitude = static_cast<uint32_t>(
+      applied_target < 0L ? -applied_target : applied_target);
+  const uint32_t numerator =
+      magnitude * 1000UL + cfg::DEADMAN_RELEASE_RAMP_MS - 1UL;
+  g_deadman_release_decel_mrad_s2 =
+      numerator / cfg::DEADMAN_RELEASE_RAMP_MS;
+  if (g_deadman_release_decel_mrad_s2 == 0UL) {
+    g_deadman_release_decel_mrad_s2 = 1UL;
+  }
+  g_requested_mrad_s = 0L;
+  g_deadman_release_ramp_active = true;
 }
 
 void clearSession() {
@@ -191,8 +211,9 @@ void refreshPhysicalSafety() {
     return;
   }
 
-  if (g_state == ControllerState::ARMED && !motionDeadmanSatisfied()) {
-    immediateStop(ControllerState::SAFE_STOP, false);
+  if (g_state == ControllerState::ARMED && !motionDeadmanSatisfied() &&
+      !g_deadman_release_ramp_active) {
+    beginDeadmanReleaseRamp();
   }
 }
 
@@ -457,9 +478,21 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
     return true;
   }
 
-  // An enable command is not accepted while a hardware interlock or a latched
-  // stop state is active. Releasing the input alone never restarts motion; the
-  // host must first send a disabled command and explicitly arm again.
+  // Once the physical dead-man is released, only enabled zero commands may
+  // refresh the watchdog while the MCU completes its local ramp. Re-grasping
+  // the handle cannot resume the previous non-zero target mid-ramp.
+  if (g_deadman_release_ramp_active) {
+    if (g_state != ControllerState::ARMED || target != 0L) {
+      return false;
+    }
+    markAcceptedCommand(frame, ttl_ms);
+    g_requested_mrad_s = 0L;
+    return true;
+  }
+
+  // An enable command is not accepted while a hardware interlock or latched
+  // stop state is active. The bridge first clears a stop with a disabled frame;
+  // a later fresh supervised command may then arm automatically.
   if ((!cfg::MAGNET_BENCH_MODE && !cfg::HALL_CALIBRATED) ||
       estopActive() || !motionDeadmanSatisfied() || g_watchdog_timed_out ||
       g_fault_bits != 0U ||
@@ -540,7 +573,7 @@ void runControlLoop(uint32_t now_us) {
       g_session_active &&
       g_state == ControllerState::ARMED &&
       !estopActive() &&
-      motionDeadmanSatisfied() &&
+      (motionDeadmanSatisfied() || g_deadman_release_ramp_active) &&
       g_fault_bits == 0U;
   if (cfg::MAGNET_BENCH_MODE) {
     const uint32_t pulse_hold_us =
@@ -559,7 +592,11 @@ void runControlLoop(uint32_t now_us) {
         right_hall,
         g_requested_mrad_s,
         output_allowed,
-        !cfg::DEADMAN_DIRECT_DRIVE);
+        !cfg::DEADMAN_DIRECT_DRIVE,
+        g_deadman_release_ramp_active
+            ? g_deadman_release_decel_mrad_s2
+            : cfg::MAX_DECEL_MRAD_S2,
+        g_deadman_release_ramp_active);
   }
   const uint8_t hall_faults = g_drive.hallFaultMask();
   if (hall_faults != 0U) {
@@ -567,6 +604,13 @@ void runControlLoop(uint32_t now_us) {
       g_fault_bits |= FAULT_LEFT_HALL;
     }
     immediateStop(ControllerState::FAULT, false);
+    g_stationary_tracking = false;
+    return;
+  }
+
+  if (g_deadman_release_ramp_active &&
+      g_drive.appliedTargetMradS() == 0L) {
+    immediateStop(ControllerState::SAFE_STOP, false);
     g_stationary_tracking = false;
     return;
   }

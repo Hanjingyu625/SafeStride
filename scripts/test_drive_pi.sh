@@ -33,21 +33,24 @@ unset ROS_LOCALHOST_ONLY
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
 export ROS_AUTOMATIC_DISCOVERY_RANGE="${ROS_AUTOMATIC_DISCOVERY_RANGE:-SUBNET}"
 
+command_pid=""
 cleanup() {
   set +e
-  timeout 3s ros2 service call /walker/set_enabled std_srvs/srv/SetBool \
-    "{data: false}" >/dev/null 2>&1
+  if [[ -n "${command_pid}" ]]; then
+    kill "${command_pid}" >/dev/null 2>&1
+    wait "${command_pid}" >/dev/null 2>&1
+  fi
+  timeout 3s ros2 topic pub --once /cmd_vel \
+    geometry_msgs/msg/TwistStamped \
+    "{twist: {linear: {x: 0.0}, angular: {z: 0.0}}}" \
+    >/dev/null 2>&1
+  timeout 3s ros2 service call /walker/set_enabled \
+    std_srvs/srv/SetBool "{data: false}" >/dev/null 2>&1
 }
 trap cleanup EXIT INT TERM
 
 if [[ ! -e /dev/safestride-drive ]]; then
   echo "/dev/safestride-drive is missing" >&2
-  exit 1
-fi
-
-if ! timeout 10s ros2 service type /walker/set_enabled \
-    | grep -qx 'std_srvs/srv/SetBool'; then
-  echo "/walker/set_enabled is unavailable; start scripts/run.sh first" >&2
   exit 1
 fi
 
@@ -66,18 +69,22 @@ if grep -Eq 'fault_bits: [1-9][0-9]*' <<<"${status}"; then
   exit 1
 fi
 
-response="$(
-  ros2 service call /walker/set_enabled std_srvs/srv/SetBool \
-    "{data: true}"
-)"
-echo "${response}"
-if ! grep -Eq 'success(=|: )[Tt]rue' <<<"${response}"; then
-  echo "Drive level-enable request was rejected" >&2
-  exit 1
+echo "Publishing a supervised 0.08 m/s command for ${duration}s."
+echo "Hold both pressure sensors; no set_enabled true call is required."
+echo "Releasing either side requests the 0.6 s dead-man stop ramp."
+echo "The left A3 WSH135 Hall sensor closes the shared motor speed loop."
+timeout --signal=INT "${duration}s" ros2 topic pub --rate 20 /cmd_vel \
+  geometry_msgs/msg/TwistStamped \
+  "{twist: {linear: {x: 0.08}, angular: {z: 0.0}}}" \
+  >/dev/null &
+command_pid=$!
+set +e
+wait "${command_pid}"
+publisher_status=$?
+set -e
+command_pid=""
+if (( publisher_status != 0 && publisher_status != 124 )); then
+  echo "Command publisher failed with status ${publisher_status}" >&2
+  exit "${publisher_status}"
 fi
-
-echo "Dead-man direct drive allowed for ${duration}s at 0.10 m/s."
-echo "Hold the pressure dead-man; releasing it disables motor output."
-echo "The left A3 WSH135 Hall sensor remains telemetry-only in this mode."
-sleep "${duration}"
-echo "Test complete; sending disable command."
+echo "Test complete; publishing zero and setting the manual inhibit."

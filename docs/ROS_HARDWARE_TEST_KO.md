@@ -49,13 +49,17 @@ bash scripts/hil_smoke_test.sh
 - 바닥을 멀리 이동: `TOF_CANDIDATE_DROP` 후 `TOF_DROP`
 
 확정 상태에서 `/cmd_vel_safe`는 0이 된 뒤 송신이 억제되고 Drive Uno가
-disarmed 상태로 전환되어야 한다. 장애물을 제거해도 자동 재시작하지 않는다.
+disarmed 상태로 전환되어야 한다. cruise가 꺼져 있으면 장애물을 제거해도
+정지 상태를 유지하고, fresh 명령과 양손 압력이 다시 들어오면 자동 arm된다.
 
 ## 4. 최종 체크
 
 - `MAGNET_BENCH_MODE=false`, `ENABLE_ESTOP=false`
 - `HALL_CALIBRATED=true`, `PRESSURE_THRESHOLDS_CALIBRATED=true`
 - 두 ROS YAML에서 `require_range_sensors=true`, `require_deadman=true`
+- 두 ROS YAML과 Drive 펌웨어에서 `deadman_direct_drive=false`
+- 앞쪽을 들었을 때 `/terrain/status.pitch_rad`가 음수면
+  `uphill_pitch_sign=-1.0`, 양수면 `1.0`
 - protocol v4/schema `0x0401`/release `20260826`
 - 지도/API가 없을 때 crosswalk 진단은 WARN이고 `/cmd_vel` 발행자는 아니다.
 - 시험 종료 후 `/walker/set_enabled false`와 물리 모터 전원 차단 완료
