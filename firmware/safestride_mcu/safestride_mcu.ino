@@ -211,9 +211,17 @@ void refreshPhysicalSafety() {
     return;
   }
 
-  if (g_state == ControllerState::ARMED && !motionDeadmanSatisfied() &&
-      !g_deadman_release_ramp_active) {
-    beginDeadmanReleaseRamp();
+  if (g_state == ControllerState::ARMED) {
+    if (!motionDeadmanSatisfied() && !g_deadman_release_ramp_active) {
+      beginDeadmanReleaseRamp();
+    } else if (motionDeadmanSatisfied() &&
+               g_deadman_release_ramp_active) {
+      // Dead-man is level-triggered. If a confirmed release is followed by a
+      // new grasp before the local ramp finishes, accept the next fresh ROS
+      // command instead of rejecting it until the command watchdog expires.
+      g_deadman_release_ramp_active = false;
+      g_deadman_release_decel_mrad_s2 = cfg::MAX_DECEL_MRAD_S2;
+    }
   }
 }
 
@@ -468,9 +476,14 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
         estopActive() ? ControllerState::ESTOP
                       : ControllerState::DISARMED,
         false);
-    if (!driverFaultActive()) {
-      // Only currently implemented motor-driver fault bits are resettable.
-      g_fault_bits &= static_cast<uint16_t>(~FAULT_MOTOR_DRIVER);
+    const bool physical_reset_safe =
+        !estopActive() && (!cfg::REQUIRE_DEADMAN || !deadmanActive());
+    if (physical_reset_safe) {
+      if (!driverFaultActive()) {
+        g_fault_bits &= static_cast<uint16_t>(~FAULT_MOTOR_DRIVER);
+      }
+      g_drive.clearRecoverableFaults();
+      g_fault_bits &= static_cast<uint16_t>(~FAULT_LEFT_HALL);
     }
     if (g_fault_bits != 0U) {
       g_state = ControllerState::FAULT;
@@ -478,9 +491,9 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
     return true;
   }
 
-  // Once the physical dead-man is released, only enabled zero commands may
-  // refresh the watchdog while the MCU completes its local ramp. Re-grasping
-  // the handle cannot resume the previous non-zero target mid-ramp.
+  // While the physical dead-man remains released, only enabled zero commands
+  // may refresh the watchdog as the MCU completes its local ramp. A new grasp
+  // cancels this state in refreshPhysicalSafety() before serial processing.
   if (g_deadman_release_ramp_active) {
     if (g_state != ControllerState::ARMED || target != 0L) {
       return false;
@@ -493,7 +506,9 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   // An enable command is not accepted while a hardware interlock or latched
   // stop state is active. The bridge first clears a stop with a disabled frame;
   // a later fresh supervised command may then arm automatically.
-  if ((!cfg::MAGNET_BENCH_MODE && !cfg::HALL_CALIBRATED) ||
+  if ((!cfg::MAGNET_BENCH_MODE &&
+       cfg::REQUIRE_HALL_CALIBRATION_FOR_ARM &&
+       !cfg::HALL_CALIBRATED) ||
       estopActive() || !motionDeadmanSatisfied() || g_watchdog_timed_out ||
       g_fault_bits != 0U ||
       g_state == ControllerState::ESTOP ||

@@ -31,6 +31,7 @@ class DriveController {
       int32_t requested_mrad_s,
       bool output_allowed);
   void disableImmediately();
+  void clearRecoverableFaults();
 
   int32_t leftVelocityMradS() const;
   int32_t rightVelocityMradS() const;
@@ -96,7 +97,8 @@ class DriveController {
       int32_t target_mrad_s,
       int32_t measured_mrad_s,
       uint32_t elapsed_us,
-      bool output_allowed);
+      bool output_allowed,
+      bool motor_output_active);
   void updateHallFeedback(
       uint32_t elapsed_us,
       const HallSample& left_hall,

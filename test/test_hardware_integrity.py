@@ -148,7 +148,46 @@ class TestHardwareIntegrity(unittest.TestCase):
             self.assertIn("allow_magnet_bench_mode: false", text)
             self.assertIn("auto_arm_magnet_bench_mode: false", text)
             self.assertIn("require_deadman: true", text)
-            self.assertIn("require_range_sensors: true", text)
+            self.assertIn("require_range_sensors: false", text)
+            self.assertIn("require_surface_condition: false", text)
+
+    def test_tof_interlock_can_be_disabled_without_disabling_mpu(self):
+        supervisor = (
+            ROOT
+            / "src"
+            / "safestride_control"
+            / "safestride_control"
+            / "safety_supervisor_node.py"
+        ).read_text(encoding="utf-8")
+        launch = (
+            ROOT
+            / "src"
+            / "safestride_bringup"
+            / "launch"
+            / "safestride.launch.py"
+        ).read_text(encoding="utf-8")
+        run_script = (ROOT / "scripts" / "run.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "if not self._require_ranges:\n            return []",
+            supervisor,
+        )
+        self.assertIn("require_terrain_tof", launch)
+        self.assertIn("'require_range_sensors': ParameterValue(", launch)
+        self.assertIn("SAFESTRIDE_REQUIRE_TERRAIN_TOF", run_script)
+        self.assertIn(
+            'SAFESTRIDE_REQUIRE_TERRAIN_TOF:-false', run_script
+        )
+        self.assertIn(
+            'SAFESTRIDE_REQUIRE_SURFACE_CONDITION:-false', run_script
+        )
+        self.assertIn('require_surface_condition', launch)
+        self.assertNotIn(
+            "'require_surface_condition': ParameterValue(\n"
+            "                            enable_perception,",
+            launch,
+        )
 
     def test_drive_uses_supervised_automatic_enable(self):
         self.assertIn("self._level_enable_blocked = False", self.bridge)
@@ -176,6 +215,8 @@ class TestHardwareIntegrity(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             self.assertIn("deadman_direct_drive: false", text)
             self.assertIn("deadman_forward_velocity_m_s: 0.10", text)
+            self.assertIn("require_hall_calibration: false", text)
+            self.assertIn("timeout_s: 0.50", text)
             self.assertIn("slope_control_enabled: true", text)
             self.assertIn("uphill_pitch_sign: 1.0", text)
         self.assertNotIn("_enabled_requested", self.bridge)
@@ -189,6 +230,13 @@ class TestHardwareIntegrity(unittest.TestCase):
             constant_expression(self.config, "DEADMAN_RELEASE_RAMP_MS"),
             "600U",
         )
+        self.assertEqual(
+            constant_expression(
+                self.config, "REQUIRE_HALL_CALIBRATION_FOR_ARM"
+            ),
+            "false",
+        )
+        self.assertIn("or not self._require_hall_calibration", self.bridge)
         self.assertIn("!cfg::DEADMAN_DIRECT_DRIVE", self.drive)
         self.assertIn("beginDeadmanReleaseRamp()", self.drive)
 

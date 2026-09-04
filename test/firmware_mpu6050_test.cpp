@@ -22,6 +22,12 @@ uint8_t g_register_values[256] = {0U};
 uint8_t g_sample[14U] = {
     0x00U, 0x00U, 0x00U, 0x00U, 0x40U, 0x00U, 0x00U,
     0x00U, 0x00U, 0x83U, 0xFEU, 0xFAU, 0x00U, 0x00U};
+
+void setSampleI16(uint8_t offset, int16_t value) {
+  const uint16_t bits = static_cast<uint16_t>(value);
+  g_sample[offset] = static_cast<uint8_t>(bits >> 8U);
+  g_sample[offset + 1U] = static_cast<uint8_t>(bits & 0xFFU);
+}
 }
 
 void pinMode(uint8_t, uint8_t) {}
@@ -117,6 +123,35 @@ int main() {
   mpu.update(g_now_ms);
   assert(mpu.valid());
   assert(mpu.rollMrad() >= 1569 && mpu.rollMrad() <= 1572);
+
+  // With +X forward and +Z up, a 30 degree nose-up pose has -0.5 g on X
+  // and +0.866 g on Z. The filtered pitch must converge to +30 degrees.
+  setSampleI16(0U, -8192);
+  setSampleI16(2U, 0);
+  setSampleI16(4U, 14189);
+  setSampleI16(8U, 0);
+  setSampleI16(10U, 0);
+  setSampleI16(12U, 0);
+  for (uint8_t index = 0U; index < 40U; ++index) {
+    g_now_ms += cfg::MPU6050_SAMPLE_PERIOD_MS;
+    mpu.update(g_now_ms);
+  }
+  assert(mpu.pitchMrad() >= 522 && mpu.pitchMrad() <= 524);
+  assert(mpu.rollMrad() >= -2 && mpu.rollMrad() <= 2);
+
+  // Crossing the roll representation boundary from +179 to -179 degrees is
+  // a two-degree change, not a 358-degree jump through level.
+  setSampleI16(0U, 0);
+  setSampleI16(2U, 286);
+  setSampleI16(4U, -16381);
+  Mpu6050Sensor wrap_mpu;
+  wrap_mpu.begin(g_now_ms);
+  wrap_mpu.update(g_now_ms);
+  assert(wrap_mpu.rollMrad() > 3100);
+  setSampleI16(2U, -286);
+  g_now_ms += cfg::MPU6050_SAMPLE_PERIOD_MS;
+  wrap_mpu.update(g_now_ms);
+  assert(wrap_mpu.rollMrad() > 3100 || wrap_mpu.rollMrad() < -3100);
   printf("firmware MPU6050 tests: OK\n");
   return 0;
 }

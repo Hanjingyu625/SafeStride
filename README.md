@@ -49,6 +49,16 @@ bash scripts/test.sh
 SAFESTRIDE_ENABLE_CRUISE=false bash scripts/run.sh
 ```
 
+현재 하드웨어에서는 TOF가 기본적으로 모터 차단 조건에서 제외되며 Terrain
+Uno의 MPU 경사 토픽은 계속 유지된다. TOF interlock을 다시 시험할 때만 다음처럼
+명시한다.
+
+```bash
+SAFESTRIDE_ENABLE_TERRAIN=true \
+SAFESTRIDE_REQUIRE_TERRAIN_TOF=true \
+bash scripts/run.sh
+```
+
 운영 직렬 장치는 `/dev/safestride-drive`, `/dev/safestride-terrain`, GPIO UART
 `/dev/serial0` 또는 `/dev/ttyS0`이다. `scripts/run.sh`가 GPS UART를 자동으로
 선택하며 `SAFESTRIDE_GPS_PORT`로 덮어쓸 수 있다. 펌웨어는

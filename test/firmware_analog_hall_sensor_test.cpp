@@ -68,6 +68,19 @@ int main() {
   hall.update(now_us);
   assert(!hall.magnetPresent());
 
+  // A threshold retrigger shortly after the first magnet is analogue chatter,
+  // not a second wheel magnet. It must not change count or measured period.
+  g_hall_adc = 350U;
+  now_us += cfg::HALL_SAMPLE_PERIOD_US;
+  hall.update(now_us);
+  assert(hall.pulseCount() == 1UL);
+  assert(hall.periodUs() == 0UL);
+
+  g_hall_adc = 512U;
+  now_us += cfg::HALL_SAMPLE_PERIOD_US;
+  hall.update(now_us);
+  assert(!hall.magnetPresent());
+
   g_hall_adc = 350U;
   now_us += cfg::HALL_MIN_PULSE_INTERVAL_US;
   hall.update(now_us);

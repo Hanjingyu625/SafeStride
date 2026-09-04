@@ -44,12 +44,12 @@ class SafetySupervisor(Node):
 
         self.declare_parameter('publish_rate', 20.0)
         self.declare_parameter('diagnostic_rate', 2.0)
-        self.declare_parameter('command_timeout', 0.25)
+        self.declare_parameter('command_timeout', 0.50)
         self.declare_parameter('status_timeout', 0.50)
         self.declare_parameter('max_telemetry_age', 0.50)
         self.declare_parameter('range_timeout', 0.35)
         self.declare_parameter('surface_timeout', 2.5)
-        self.declare_parameter('require_range_sensors', True)
+        self.declare_parameter('require_range_sensors', False)
         self.declare_parameter('require_surface_condition', False)
         self.declare_parameter('require_deadman', True)
         self.declare_parameter('slope_control_enabled', True)
@@ -494,10 +494,14 @@ class SafetySupervisor(Node):
         return []
 
     def _terrain_reasons(self, now: float) -> List[str]:
+        # The Terrain bridge may remain active for MPU slope assistance when
+        # the downward TOF is intentionally excluded from motor interlocks.
+        if not self._require_ranges:
+            return []
         if self._last_terrain is None:
-            return ['terrain_status_missing'] if self._require_ranges else []
+            return ['terrain_status_missing']
         if self._age(now, self._last_terrain_time) > self._range_timeout:
-            return ['terrain_status_stale'] if self._require_ranges else []
+            return ['terrain_status_stale']
 
         terrain = self._last_terrain
         reasons: List[str] = []
@@ -1068,11 +1072,14 @@ def main(args=None) -> None:
     except KeyboardInterrupt:
         pass
     finally:
-        # Publish a final best-effort zero before tearing down the publisher.
-        stop = TwistStamped()
-        stop.header.stamp = node.get_clock().now().to_msg()
-        stop.header.frame_id = node._output_frame_id
-        node._command_publisher.publish(stop)
+        # A launch SIGINT may already have invalidated the ROS context before
+        # spin returns. Publish the final zero only while the publisher can
+        # still be used; the serial bridge independently stops on shutdown.
+        if rclpy.ok():
+            stop = TwistStamped()
+            stop.header.stamp = node.get_clock().now().to_msg()
+            stop.header.frame_id = node._output_frame_id
+            node._command_publisher.publish(stop)
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()

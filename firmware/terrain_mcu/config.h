@@ -37,6 +37,8 @@ constexpr uint16_t MPU6050_SAMPLE_PERIOD_MS = 50U;
 constexpr uint8_t MPU6050_SAMPLE_RATE_DIVIDER = 49U;
 constexpr uint16_t MPU6050_RECONNECT_PERIOD_MS = 1000U;
 constexpr uint8_t MPU6050_MAX_CONSECUTIVE_ERRORS = 3U;
+// Mounting convention used by the attitude equations: +X forward, +Y left,
+// +Z up. The runtime pitch offset and sign are calibrated on the Pi.
 constexpr float MPU6050_ATTITUDE_ALPHA = 0.15F;
 
 static_assert(
@@ -65,5 +67,8 @@ static_assert(
             MPU6050_SAMPLE_PERIOD_MS ==
         1000UL,
     "MPU6050 output and firmware sample periods must match");
+static_assert(
+    MPU6050_ATTITUDE_ALPHA > 0.0F && MPU6050_ATTITUDE_ALPHA <= 1.0F,
+    "MPU6050 attitude alpha must be in (0, 1]");
 
 }  // namespace safestride_terrain_config

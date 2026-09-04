@@ -17,6 +17,7 @@ constexpr uint8_t REG_ACCEL_XOUT_H = 0x3BU;
 constexpr uint8_t REG_PWR_MGMT_1 = 0x6BU;
 constexpr uint8_t REG_WHO_AM_I = 0x75U;
 constexpr uint8_t WHO_AM_I_MPU6050 = 0x68U;
+constexpr float PI_MRAD = static_cast<float>(PI) * 1000.0F;
 
 int16_t readBigEndianI16(const uint8_t* bytes) {
   return static_cast<int16_t>(
@@ -32,6 +33,18 @@ int16_t roundedI16(float value) {
     return static_cast<int16_t>(-32768);
   }
   return static_cast<int16_t>(value >= 0.0F ? value + 0.5F : value - 0.5F);
+}
+
+float shortestAngleDeltaMrad(float target, float current) {
+  float delta = target - current;
+  const float full_turn = 2.0F * PI_MRAD;
+  while (delta > PI_MRAD) {
+    delta -= full_turn;
+  }
+  while (delta < -PI_MRAD) {
+    delta += full_turn;
+  }
+  return delta;
 }
 
 }  // namespace
@@ -110,6 +123,8 @@ void Mpu6050Sensor::update(uint32_t now_ms) {
   const float ax = static_cast<float>(raw_ax);
   const float ay = static_cast<float>(raw_ay);
   const float az = static_cast<float>(raw_az);
+  // Board/body convention: +X forward, +Y left, +Z up. Acceleration due to
+  // gravity therefore makes nose-up pitch positive through the -X component.
   const float roll = atan2f(ay, az) * 1000.0F;
   const float pitch = atan2f(-ax, sqrtf(ay * ay + az * az)) * 1000.0F;
   if (!attitude_initialized_) {
@@ -117,7 +132,15 @@ void Mpu6050Sensor::update(uint32_t now_ms) {
     pitch_mrad_ = pitch;
     attitude_initialized_ = true;
   } else {
-    roll_mrad_ += cfg::MPU6050_ATTITUDE_ALPHA * (roll - roll_mrad_);
+    // Roll crosses from +pi to -pi when the board is close to upside down.
+    // Filter the shortest angular difference instead of jumping through zero.
+    roll_mrad_ += cfg::MPU6050_ATTITUDE_ALPHA *
+        shortestAngleDeltaMrad(roll, roll_mrad_);
+    if (roll_mrad_ > PI_MRAD) {
+      roll_mrad_ -= 2.0F * PI_MRAD;
+    } else if (roll_mrad_ < -PI_MRAD) {
+      roll_mrad_ += 2.0F * PI_MRAD;
+    }
     pitch_mrad_ += cfg::MPU6050_ATTITUDE_ALPHA * (pitch - pitch_mrad_);
   }
 

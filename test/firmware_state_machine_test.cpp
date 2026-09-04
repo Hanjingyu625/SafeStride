@@ -165,9 +165,15 @@ int main() {
   assert(g_drive.appliedTargetMradS() == 500L);
 
   // A normal pressure release stays ARMED only while the MCU ramps the target
-  // to zero. The bridge is allowed to refresh the watchdog with enabled zero
-  // commands, but a non-zero command cannot resume motion mid-ramp.
+  // to zero. The bridge may refresh the watchdog with enabled zero commands,
+  // but a non-zero command is rejected while the level remains released.
   g_pressure_adc = 0;
+  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  g_pressure.update(g_test_millis);
+  refreshPhysicalSafety();
+  assert(deadmanActive());
+  assert(g_state == ControllerState::ARMED);
+  assert(!g_deadman_release_ramp_active);
   g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
   g_pressure.update(g_test_millis);
   refreshPhysicalSafety();
@@ -180,6 +186,32 @@ int main() {
   proto::writeI32(command_payload + 0U, 500L);
   motion_enable_command.sequence = next_sequence++;
   assert(!handleCommand(motion_enable_command));
+
+  // The dead-man is level-triggered. Reacquiring both pressure channels before
+  // the ramp finishes cancels the release state, and the next fresh command
+  // resumes closed-loop motion without waiting for a watchdog/session reset.
+  g_pressure_adc = 200;
+  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  g_pressure.update(g_test_millis);
+  refreshPhysicalSafety();
+  assert(deadmanActive());
+  assert(!g_deadman_release_ramp_active);
+  motion_enable_command.sequence = next_sequence++;
+  assert(handleCommand(motion_enable_command));
+  assert(g_state == ControllerState::ARMED);
+  assert(g_requested_mrad_s == 500L);
+
+  // A release that remains active still completes the controlled stop.
+  g_pressure_adc = 0;
+  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  g_pressure.update(g_test_millis);
+  refreshPhysicalSafety();
+  assert(deadmanActive());
+  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  g_pressure.update(g_test_millis);
+  refreshPhysicalSafety();
+  assert(!deadmanActive());
+  assert(g_deadman_release_ramp_active);
   proto::writeI32(command_payload + 0U, 0L);
   g_last_control_us = g_test_millis * 1000UL;
   for (int i = 0; i < 120; ++i) {
@@ -210,6 +242,41 @@ int main() {
       g_test_millis - cfg::ARM_STATIONARY_DWELL_MS;
   command_payload[6U] = 1U;
   proto::writeI32(command_payload + 0U, 500L);
+  motion_enable_command.sequence = next_sequence++;
+  assert(handleCommand(motion_enable_command));
+  assert(g_state == ControllerState::ARMED);
+
+  // Recoverable faults stay latched while the handle is held. Releasing the
+  // dead-man and receiving a disabled command clears the fault; after the
+  // stationary dwell, a fresh level-triggered grasp may arm again.
+  g_fault_bits = FAULT_LEFT_HALL;
+  immediateStop(ControllerState::FAULT, false);
+  command_payload[6U] = 0U;
+  disable_command.sequence = next_sequence++;
+  assert(handleCommand(disable_command));
+  assert(g_state == ControllerState::FAULT);
+  assert(g_fault_bits == FAULT_LEFT_HALL);
+
+  g_pressure_adc = 0;
+  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  g_pressure.update(g_test_millis);
+  assert(deadmanActive());
+  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  g_pressure.update(g_test_millis);
+  assert(!deadmanActive());
+  disable_command.sequence = next_sequence++;
+  assert(handleCommand(disable_command));
+  assert(g_state == ControllerState::DISARMED);
+  assert(g_fault_bits == 0U);
+
+  g_pressure_adc = 200;
+  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  g_pressure.update(g_test_millis);
+  assert(deadmanActive());
+  g_stationary_tracking = true;
+  g_stationary_since_ms =
+      g_test_millis - cfg::ARM_STATIONARY_DWELL_MS;
+  command_payload[6U] = 1U;
   motion_enable_command.sequence = next_sequence++;
   assert(handleCommand(motion_enable_command));
   assert(g_state == ControllerState::ARMED);

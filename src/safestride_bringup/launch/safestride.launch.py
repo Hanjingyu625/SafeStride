@@ -36,7 +36,11 @@ def generate_launch_description() -> LaunchDescription:
     enable_foxglove = LaunchConfiguration('enable_foxglove')
     enable_cruise = LaunchConfiguration('enable_cruise')
     enable_terrain = LaunchConfiguration('enable_terrain')
+    require_terrain_tof = LaunchConfiguration('require_terrain_tof')
     enable_perception = LaunchConfiguration('enable_perception')
+    require_surface_condition = LaunchConfiguration(
+        'require_surface_condition'
+    )
     perception_model_path = LaunchConfiguration('perception_model_path')
     perception_classes_path = LaunchConfiguration('perception_classes_path')
     perception_camera_index = LaunchConfiguration('perception_camera_index')
@@ -87,9 +91,25 @@ def generate_launch_description() -> LaunchDescription:
                 description='Start the Terrain Uno serial sensor bridge.',
             ),
             DeclareLaunchArgument(
+                'require_terrain_tof',
+                default_value='false',
+                description=(
+                    'Use Terrain TOF validity and hazards as motor '
+                    'interlocks while keeping MPU telemetry independent.'
+                ),
+            ),
+            DeclareLaunchArgument(
                 'enable_perception',
                 default_value='false',
                 description='Start fail-safe road-surface perception.',
+            ),
+            DeclareLaunchArgument(
+                'require_surface_condition',
+                default_value='false',
+                description=(
+                    'Use surface classification validity as a motor '
+                    'interlock. Perception can run independently.'
+                ),
             ),
             DeclareLaunchArgument(
                 'perception_model_path',
@@ -201,8 +221,12 @@ def generate_launch_description() -> LaunchDescription:
                 parameters=[
                     config_file,
                     {
+                        'require_range_sensors': ParameterValue(
+                            require_terrain_tof,
+                            value_type=bool,
+                        ),
                         'require_surface_condition': ParameterValue(
-                            enable_perception,
+                            require_surface_condition,
                             value_type=bool,
                         ),
                     },

@@ -15,7 +15,7 @@ constexpr uint32_t SERIAL_BAUD = 115200UL;
 
 // Scheduler.
 constexpr uint32_t CONTROL_PERIOD_US = 5000UL;   // 200 Hz
-constexpr uint16_t TELEMETRY_PERIOD_MS = 10U;    // 100 Hz
+constexpr uint16_t TELEMETRY_PERIOD_MS = 20U;    // 50 Hz
 constexpr uint16_t HELLO_PERIOD_MS = 500U;
 constexpr uint16_t SESSION_LOSS_TIMEOUT_MS = 1000U;
 
@@ -51,10 +51,17 @@ constexpr uint16_t HALL_BASELINE_SAMPLE_DELAY_US = 250U;
 constexpr int32_t HALL_BASELINE_TRACK_DIVISOR = 128L;
 constexpr uint16_t HALL_TRIGGER_DELTA_ADC = 30U;
 constexpr uint16_t HALL_RELEASE_DELTA_ADC = 12U;
-constexpr uint32_t HALL_MIN_PULSE_INTERVAL_US = 20000UL;
+// The commanded wheel speed is capped at 3 rad/s. With six magnets, valid
+// pulses are at least about 349 ms apart at that limit. Reject any retrigger
+// inside 250 ms so WSH135 threshold chatter cannot become a false speed sample
+// or latch FAULT_LEFT_HALL, while retaining margin for real wheel overshoot.
+constexpr uint32_t HALL_MIN_PULSE_INTERVAL_US = 250000UL;
 constexpr uint32_t HALL_ZERO_TIMEOUT_US = 3000000UL;
 constexpr uint32_t HALL_PULSES_PER_WHEEL_REV = 6UL;
 constexpr bool HALL_CALIBRATED = true;
+// Do not prevent arming solely because calibration has not been certified.
+// Closed-loop pulse feedback and Hall stall/overspeed checks remain enabled.
+constexpr bool REQUIRE_HALL_CALIBRATION_FOR_ARM = false;
 
 // Temporary no-wheel hardware test. When enabled, either Hall input pulse
 // opens a short, low-PWM motor window after an explicit ROS arm request.
@@ -72,6 +79,10 @@ constexpr float MAGNET_BENCH_VELOCITY_FILTER_ALPHA = 1.0F;
 // Runtime Hall plausibility monitor used when DEADMAN_DIRECT_DRIVE is false.
 constexpr int32_t HALL_STALL_TARGET_MIN_MRAD_S = 300L;
 constexpr uint16_t HALL_STALL_TIMEOUT_MS = 3000U;
+// At slow walking speeds one magnet can legitimately take several seconds to
+// reach the Hall sensor. Require 2.5 expected pulse periods before declaring a
+// stall, while HALL_STALL_TIMEOUT_MS remains the absolute minimum.
+constexpr float HALL_STALL_EXPECTED_PULSE_PERIODS = 2.5F;
 constexpr int32_t HALL_MAX_PLAUSIBLE_MRAD_S = 5000L;
 constexpr uint16_t HALL_OVERSPEED_TIMEOUT_MS = 100U;
 
@@ -83,8 +94,9 @@ constexpr uint8_t MOTOR_IN2_PIN = 8U;
 constexpr int8_t MOTOR_SIGN = 1;
 constexpr uint16_t MAX_PWM = 100U;  // deliberately low for first lifted test
 // Bench testing showed that this motor/driver only starts reliably at PWM 80.
-// Apply this floor to non-zero PID output so low-speed commands do not hum,
-// fail to produce Hall pulses, and then trip the stall monitor.
+// Closed-loop control uses this as its feed-forward operating point and adds
+// signed PID correction around it, so Hall feedback reduces torque smoothly
+// instead of switching directly from PWM 80 to dynamic braking.
 constexpr uint8_t MOTOR_MIN_ACTIVE_PWM = 80U;
 
 // E-stop hardware is not implemented in the current build. Keep this false so
@@ -105,6 +117,9 @@ constexpr uint16_t PRESSURE_SAMPLE_PERIOD_MS = 100U;
 constexpr float PRESSURE_FILTER_ALPHA = 0.2F;
 constexpr uint8_t PRESSURE_ADC_SAMPLES = 8U;
 constexpr float PRESSURE_PRESENT_HYSTERESIS = 3.0F;
+// Reject one isolated 100 ms ADC dropout while a hand is held. Two
+// consecutive below-threshold samples still release the dead-man promptly.
+constexpr uint8_t PRESSURE_RELEASE_DEBOUNCE_SAMPLES = 2U;
 // Watch /handle/pressure with the motors isolated, then set each channel's
 // polarity and threshold halfway between its released and held readings.
 constexpr bool PRESSURE_LEFT_ACTIVE_HIGH = true;
@@ -164,6 +179,9 @@ static_assert(
     MOTOR_MIN_ACTIVE_PWM > 0U && MOTOR_MIN_ACTIVE_PWM <= MAX_PWM,
     "minimum active motor PWM must be positive and no higher than MAX_PWM");
 static_assert(
+    MOTOR_MIN_ACTIVE_PWM >= 80U,
+    "installed motor requires active PWM to remain at or above 80");
+static_assert(
     DEADMAN_RELEASE_RAMP_MS > 0U && DEADMAN_RELEASE_RAMP_MS <= 5000U,
     "dead-man release ramp must be between 1 and 5000 ms");
 static_assert(
@@ -217,6 +235,9 @@ static_assert(
         HALL_OVERSPEED_TIMEOUT_MS > 0U,
     "Hall plausibility timeouts must be positive");
 static_assert(
+    HALL_STALL_EXPECTED_PULSE_PERIODS >= 1.0F,
+    "Hall stall detection must allow at least one expected pulse period");
+static_assert(
     HALL_MAX_PLAUSIBLE_MRAD_S >
         MAX_WHEEL_TARGET_MRAD_S,
     "Hall plausible speed must exceed maximum target");
@@ -232,6 +253,9 @@ static_assert(
 static_assert(
     PRESSURE_ADC_SAMPLES > 0U,
     "pressure ADC averaging requires at least one sample");
+static_assert(
+    PRESSURE_RELEASE_DEBOUNCE_SAMPLES > 0U,
+    "pressure release debounce requires at least one sample");
 static_assert(
     PRESSURE_PRESENT_HYSTERESIS >= 0.0F &&
         PRESSURE_PRESENT_HYSTERESIS <

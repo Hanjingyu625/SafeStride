@@ -6,14 +6,20 @@ serial_bridge:
       read_chunk_size: 256
       max_frame_size: 160
       reconnect_period_s: 1.0
-    transport: {poll_rate_hz: 200.0}
+    # Drive telemetry is 50 Hz; polling at 100 Hz leaves serial and CPU margin.
+    transport: {poll_rate_hz: 100.0}
     command:
       publish_rate_hz: 50.0
-      timeout_s: 0.20
+      # Allow short Pi scheduling stalls without dropping the 20 Hz cruise
+      # stream. The MCU still enforces its independent 200 ms frame TTL.
+      timeout_s: 0.50
       ttl_ms: 200
       # Use /cmd_vel_safe and the Hall-speed PID instead of fixed PWM drive.
       deadman_direct_drive: false
       deadman_forward_velocity_m_s: 0.10
+      # Calibration state remains diagnostic; pulse feedback and stall checks
+      # are still active in the closed-loop firmware.
+      require_hall_calibration: false
       max_abs_angular_z_rad_s: 0.0
       allow_magnet_bench_mode: false
       auto_arm_magnet_bench_mode: false
@@ -68,12 +74,14 @@ safety_supervisor:
   ros__parameters:
     publish_rate: 20.0
     diagnostic_rate: 2.0
-    command_timeout: 0.25
+    command_timeout: 0.50
     status_timeout: 0.50
     max_telemetry_age: 0.50
     range_timeout: 0.35
-    # This now requires the downward TOF terrain status, not front-facing range.
-    require_range_sensors: true
+    # TOF is telemetry-only on the current hardware; MPU slope assistance stays
+    # active, and an invalid MPU sample falls back to a neutral speed scale.
+    require_range_sensors: false
+    require_surface_condition: false
     require_deadman: true
     slope_control_enabled: true
     max_forward_velocity: 0.15
@@ -87,7 +95,8 @@ safety_supervisor:
     # If lifting the walker front makes pitch_rad negative, change only this
     # value to -1.0 after the first stationary orientation check.
     uphill_pitch_sign: 1.0
-    pitch_offset_rad: 0.0
+    # Measured in the walker's normal level stance (2026-09-03, 146 samples).
+    pitch_offset_rad: -0.196164
     slope_enter_angle_rad: 0.0872665  # 5 deg
     slope_exit_angle_rad: 0.0523599   # 3 deg
     slope_confirmation_time_s: 0.50

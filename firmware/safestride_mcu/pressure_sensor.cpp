@@ -19,12 +19,15 @@ bool channelPresent(
     if (was_present) {
       return raw_value >= threshold - hysteresis;
     }
-    return filtered_value >= threshold;
+    // A released channel can retain a high filtered value for several
+    // samples. Require a live raw crossing as well so that filter decay
+    // cannot create a false re-grasp after the release debounce expires.
+    return raw_value >= threshold && filtered_value >= threshold;
   }
   if (was_present) {
     return raw_value <= threshold + hysteresis;
   }
-  return filtered_value <= threshold;
+  return raw_value <= threshold && filtered_value <= threshold;
 }
 
 }  // namespace
@@ -42,6 +45,8 @@ PressureSensorPair::PressureSensorPair()
       maximum_delta_(0.0F),
       left_present_(false),
       right_present_(false),
+      left_release_samples_(0U),
+      right_release_samples_(0U),
       alert_(PressureAlert::HANDS_OFF) {}
 
 void PressureSensorPair::begin(uint32_t now_ms) {
@@ -123,18 +128,44 @@ void PressureSensorPair::sample() {
 }
 
 void PressureSensorPair::updatePresence() {
-  left_present_ = channelPresent(
+  const bool left_sample_present = channelPresent(
       left_,
       static_cast<float>(left_raw_),
       left_present_,
       cfg::PRESSURE_LEFT_ACTIVE_HIGH,
       cfg::PRESSURE_LEFT_PRESENT_THRESHOLD);
-  right_present_ = channelPresent(
+  const bool right_sample_present = channelPresent(
       right_,
       static_cast<float>(right_raw_),
       right_present_,
       cfg::PRESSURE_RIGHT_ACTIVE_HIGH,
       cfg::PRESSURE_RIGHT_PRESENT_THRESHOLD);
+  updateChannelPresence(
+      left_sample_present, left_present_, left_release_samples_);
+  updateChannelPresence(
+      right_sample_present, right_present_, right_release_samples_);
+}
+
+void PressureSensorPair::updateChannelPresence(
+    bool sample_present,
+    bool& present,
+    uint8_t& release_samples) {
+  if (sample_present) {
+    present = true;
+    release_samples = 0U;
+    return;
+  }
+  if (!present) {
+    release_samples = 0U;
+    return;
+  }
+  if (release_samples < cfg::PRESSURE_RELEASE_DEBOUNCE_SAMPLES) {
+    ++release_samples;
+  }
+  if (release_samples >= cfg::PRESSURE_RELEASE_DEBOUNCE_SAMPLES) {
+    present = false;
+    release_samples = 0U;
+  }
 }
 
 bool PressureSensorPair::bothHandsPresent() const {

@@ -200,10 +200,11 @@ class SerialBridgeNode(Node):
             ('serial.reconnect_period_s', 1.0),
             ('transport.poll_rate_hz', 200.0),
             ('command.publish_rate_hz', 50.0),
-            ('command.timeout_s', 0.20),
+            ('command.timeout_s', 0.50),
             ('command.ttl_ms', 200),
             ('command.deadman_direct_drive', False),
             ('command.deadman_forward_velocity_m_s', 0.10),
+            ('command.require_hall_calibration', True),
             ('command.max_abs_angular_z_rad_s', 0.0),
             ('command.allow_magnet_bench_mode', False),
             ('command.auto_arm_magnet_bench_mode', False),
@@ -309,6 +310,9 @@ class SerialBridgeNode(Node):
             minimum=0.0,
             maximum=10.0,
             minimum_inclusive=False,
+        )
+        self._require_hall_calibration = bool(
+            self._value('command.require_hall_calibration')
         )
         self._max_abs_angular_z = finite_float(
             'command.max_abs_angular_z_rad_s',
@@ -540,6 +544,7 @@ class SerialBridgeNode(Node):
             )
             and (
                 bool(telemetry.status_bits & STATUS_HALL_CALIBRATED)
+                or not self._require_hall_calibration
                 or bench_feedback_bypass
             )
             and bool(self._capabilities & CAP_SINGLE_LEFT_HALL)
@@ -562,7 +567,10 @@ class SerialBridgeNode(Node):
             and self._firmware_status_consistent(telemetry)
             and bool(telemetry.status_bits & STATUS_SESSION)
             and not bool(telemetry.status_bits & STATUS_DEADMAN)
-            and bool(telemetry.status_bits & STATUS_HALL_CALIBRATED)
+            and (
+                bool(telemetry.status_bits & STATUS_HALL_CALIBRATED)
+                or not self._require_hall_calibration
+            )
             and bool(self._capabilities & CAP_SINGLE_LEFT_HALL)
             and not bool(telemetry.status_bits & STATUS_ESTOP)
             and not bool(
@@ -613,7 +621,11 @@ class SerialBridgeNode(Node):
                 port=self._port,
                 baudrate=self._baudrate,
                 timeout=0,
-                write_timeout=0.05,
+                # A transiently busy Pi can exceed 50 ms even though the USB
+                # link is healthy. Reopening an Uno port toggles DTR and resets
+                # the controller, so allow one command-watchdog interval of
+                # scheduling margin before treating the link as failed.
+                write_timeout=0.20,
             )
             port.reset_input_buffer()
             port.reset_output_buffer()
@@ -1411,6 +1423,10 @@ class SerialBridgeNode(Node):
             KeyValue(
                 key='deadman_forward_velocity_m_s',
                 value=f'{self._deadman_forward_velocity:.3f}',
+            ),
+            KeyValue(
+                key='require_hall_calibration',
+                value=str(self._require_hall_calibration).lower(),
             ),
             KeyValue(
                 key='magnet_bench_auto_arm',

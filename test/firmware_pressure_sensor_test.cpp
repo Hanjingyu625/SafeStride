@@ -69,18 +69,33 @@ int main() {
   g_left_raw = 0;
   g_now_ms += cfg::PRESSURE_SAMPLE_PERIOD_MS;
   pressure.update(g_now_ms);
-  // Releasing a handle is safety-critical: the averaged raw sample drops the
-  // dead-man immediately, while reacquisition still uses the filtered value.
+  // One isolated low ADC sample is rejected while the handle is held.
+  assert(pressure.bothHandsPresent());
+  g_now_ms += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  pressure.update(g_now_ms);
+  // Two consecutive low samples confirm release.
   assert(!pressure.bothHandsPresent());
   assert(pressure.alert() == PressureAlert::HANDS_OFF);
 
+  // The low-pass filter remains above the presence threshold after release.
+  // It must not re-arm the channel while the live ADC value remains low.
+  for (int i = 0; i < 6; ++i) {
+    g_now_ms += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+    pressure.update(g_now_ms);
+    assert(!pressure.leftPresent());
+    assert(!pressure.bothHandsPresent());
+  }
+
   // The published raw channel follows the ADC immediately while the filtered
-  // channel is intentionally smoothed for presence/dead-man decisions.
+  // channel is intentionally smoothed. A real raw crossing can reacquire the
+  // channel once both values are above the configured threshold.
   g_left_raw = 512;
   g_now_ms += cfg::PRESSURE_SAMPLE_PERIOD_MS;
   pressure.update(g_now_ms);
   assert(pressure.leftRaw() == 512U);
-  assert(pressure.leftFiltered() > 512.0F);
+  assert(pressure.leftFiltered() > cfg::PRESSURE_LEFT_PRESENT_THRESHOLD);
+  assert(pressure.leftPresent());
+  assert(pressure.bothHandsPresent());
 
   printf("firmware pressure-sensor tests: OK\n");
   return 0;

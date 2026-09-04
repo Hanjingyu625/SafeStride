@@ -41,9 +41,15 @@ class PressureSensorPair {
   float maximum_delta_;
   bool left_present_;
   bool right_present_;
+  uint8_t left_release_samples_;
+  uint8_t right_release_samples_;
   PressureAlert alert_;
 
   uint16_t readAveraged(uint8_t pin) const;
   void sample();
   void updatePresence();
+  static void updateChannelPresence(
+      bool sample_present,
+      bool& present,
+      uint8_t& release_samples);
 };

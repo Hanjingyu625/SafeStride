@@ -59,6 +59,24 @@ uint32_t hallZeroTimeoutUs() {
       : cfg::HALL_ZERO_TIMEOUT_US;
 }
 
+uint32_t hallStallTimeoutUs(uint32_t target_mrad_s) {
+  const uint32_t minimum_us =
+      static_cast<uint32_t>(cfg::HALL_STALL_TIMEOUT_MS) * 1000UL;
+  if (target_mrad_s == 0UL) {
+    return minimum_us;
+  }
+  const float mrad_per_pulse =
+      2000.0F * static_cast<float>(PI) /
+      static_cast<float>(cfg::HALL_PULSES_PER_WHEEL_REV);
+  const float adaptive_us =
+      mrad_per_pulse * 1000000.0F /
+      static_cast<float>(target_mrad_s) *
+      cfg::HALL_STALL_EXPECTED_PULSE_PERIODS;
+  return adaptive_us > static_cast<float>(minimum_us)
+      ? static_cast<uint32_t>(adaptive_us)
+      : minimum_us;
+}
+
 float velocityFilterAlpha() {
   return cfg::MAGNET_BENCH_MODE
       ? cfg::MAGNET_BENCH_VELOCITY_FILTER_ALPHA
@@ -107,6 +125,13 @@ void DriveController::disableImmediately() {
   last_commanded_pwm_ = 0.0F;
   release_start_pwm_ = 0.0F;
   release_pwm_fade_active_ = false;
+  motor_pid_ = {0.0F, 0.0F};
+}
+
+void DriveController::clearRecoverableFaults() {
+  hall_fault_mask_ = 0U;
+  left_hall_monitor_ = {false, 0UL, 0UL, 0UL};
+  right_hall_monitor_ = {false, 0UL, 0UL, 0UL};
   motor_pid_ = {0.0F, 0.0F};
 }
 
@@ -167,23 +192,18 @@ float DriveController::compensateMotorDeadzone(
     return 0.0F;
   }
 
-  // Never command reverse torque merely to correct overspeed. Zero PWM with
-  // IN1=IN2=LOW selects the installed DRI0042 driver's dynamic-brake state;
-  // braking strength therefore still falls with wheel speed.
+  // PWM 80 is both the measured breakaway and minimum sustaining command of
+  // the installed motor/driver. Apply PID correction around that operating
+  // point, but never emit a non-zero sub-threshold command: it reports ARMED
+  // while producing no wheel torque. A zero target still returns zero above.
   if (target_mrad_s > 0.0F) {
-    if (controller_pwm <= 0.0F) {
-      return 0.0F;
-    }
     return clampFloat(
-        controller_pwm,
+        static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM) + controller_pwm,
         static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM),
         static_cast<float>(cfg::MAX_PWM));
   }
-  if (controller_pwm >= 0.0F) {
-    return 0.0F;
-  }
   return clampFloat(
-      controller_pwm,
+      -static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM) + controller_pwm,
       -static_cast<float>(cfg::MAX_PWM),
       -static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM));
 }
@@ -230,6 +250,8 @@ float DriveController::hallSpeedMagnitude(
     const HallSample& sample,
     uint32_t pulse_delta,
     uint32_t elapsed_us) {
+  (void)pulse_delta;
+  (void)elapsed_us;
   if (sample.age_us >= hallZeroTimeoutUs()) {
     return 0.0F;
   }
@@ -240,11 +262,10 @@ float DriveController::hallSpeedMagnitude(
     return mrad_per_pulse * 1000000.0F /
         static_cast<float>(sample.period_us);
   }
-  if (pulse_delta == 0UL || elapsed_us == 0UL) {
-    return 0.0F;
-  }
-  return static_cast<float>(pulse_delta) * mrad_per_pulse * 1000000.0F /
-      static_cast<float>(elapsed_us);
+  // One pulse establishes position but not speed. A period is available only
+  // after the next magnet arrives; using the 5 ms control interval here would
+  // turn the first pulse into a false extreme-speed sample and brake the motor.
+  return 0.0F;
 }
 
 void DriveController::updateHallFeedback(
@@ -362,9 +383,9 @@ void DriveController::update(
   }
 
   if (fade_pwm_during_deceleration) {
-    // Fade from the actual preceding drive command, never from a newly forced
-    // PWM floor. If PID was already braking (last PWM zero), release cannot
-    // accidentally add forward torque before the final dynamic brake.
+    // An intentional dead-man release is the only path allowed to pass through
+    // sub-threshold PWM. Fade from the actual preceding drive command so a
+    // release cannot add torque before the final dynamic brake.
     motor_pid_ = {0.0F, 0.0F};
     const float starting_magnitude =
         static_cast<float>(deceleration_mrad_s2) *
@@ -455,7 +476,8 @@ bool DriveController::updateHallMonitor(
     int32_t target_mrad_s,
     int32_t measured_mrad_s,
     uint32_t elapsed_us,
-    bool output_allowed) {
+    bool output_allowed,
+    bool motor_output_active) {
   if (!state.initialized) {
     state.initialized = true;
     state.previous_count = pulse_count;
@@ -475,7 +497,7 @@ bool DriveController::updateHallMonitor(
       target_magnitude >= static_cast<uint32_t>(
           cfg::HALL_STALL_TARGET_MIN_MRAD_S);
   updateTimer(
-      target_requests_motion && !pulse_seen,
+      target_requests_motion && motor_output_active && !pulse_seen,
       elapsed_us,
       state.no_pulse_us);
   updateTimer(
@@ -485,8 +507,7 @@ bool DriveController::updateHallMonitor(
       state.overspeed_us);
 
   return (
-      state.no_pulse_us >=
-          static_cast<uint32_t>(cfg::HALL_STALL_TIMEOUT_MS) * 1000UL ||
+      state.no_pulse_us >= hallStallTimeoutUs(target_magnitude) ||
       state.overspeed_us >=
           static_cast<uint32_t>(cfg::HALL_OVERSPEED_TIMEOUT_MS) * 1000UL);
 }
@@ -499,13 +520,17 @@ void DriveController::updateHallPlausibility(
   if (hall_fault_mask_ != 0U) {
     return;
   }
+  const bool motor_output_active =
+      fabsf(last_commanded_pwm_) >=
+      static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM);
   if (updateHallMonitor(
           left_hall_monitor_,
           left_hall.pulse_count,
           appliedTargetMradS(),
           leftVelocityMradS(),
           elapsed_us,
-          output_allowed)) {
+          output_allowed,
+          motor_output_active)) {
     hall_fault_mask_ |= HALL_FAULT_LEFT;
   }
   (void)right_hall;
