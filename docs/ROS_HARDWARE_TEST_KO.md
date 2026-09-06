@@ -9,7 +9,7 @@ arduino-cli compile --fqbn arduino:avr:uno firmware/safestride_mcu
 arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
 ```
 
-두 Uno를 모두 protocol v4로 다시 업로드한다. ROS bridge와 Arduino 시리얼
+두 Uno를 모두 protocol v5로 다시 업로드한다. ROS bridge와 Arduino 시리얼
 모니터는 같은 포트를 동시에 열 수 없다.
 
 ## 2. 센서 단독 확인
@@ -60,6 +60,6 @@ disarmed 상태로 전환되어야 한다. cruise가 꺼져 있으면 장애물�
 - 두 ROS YAML과 Drive 펌웨어에서 `deadman_direct_drive=false`
 - 앞쪽을 들었을 때 `/terrain/status.pitch_rad`가 음수면
   `uphill_pitch_sign=-1.0`, 양수면 `1.0`
-- protocol v4/schema `0x0401`/release `20260826`
+- protocol v5/schema `0x0501`/release `20260906`
 - 지도/API가 없을 때 crosswalk 진단은 WARN이고 `/cmd_vel` 발행자는 아니다.
 - 시험 종료 후 `/walker/set_enabled false`와 물리 모터 전원 차단 완료

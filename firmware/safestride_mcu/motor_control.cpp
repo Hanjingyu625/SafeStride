@@ -72,6 +72,9 @@ uint32_t hallStallTimeoutUs(uint32_t target_mrad_s) {
       mrad_per_pulse * 1000000.0F /
       static_cast<float>(target_mrad_s) *
       cfg::HALL_STALL_EXPECTED_PULSE_PERIODS;
+  if (adaptive_us >= cfg::HALL_STALL_MAX_TIMEOUT_US) {
+    return cfg::HALL_STALL_MAX_TIMEOUT_US;
+  }
   return adaptive_us > static_cast<float>(minimum_us)
       ? static_cast<uint32_t>(adaptive_us)
       : minimum_us;
@@ -121,6 +124,9 @@ void DriveController::disableImmediately() {
   analogWrite(cfg::MOTOR_PWM_PIN, 0);
   digitalWrite(cfg::MOTOR_IN1_PIN, LOW);
   digitalWrite(cfg::MOTOR_IN2_PIN, LOW);
+  braking_ = true;
+  applied_pwm_counts_ = 0;
+  ff_pwm_ = feedback_pwm_ = 0.0F;
   applied_target_mrad_s_ = 0.0F;
   last_commanded_pwm_ = 0.0F;
   release_start_pwm_ = 0.0F;
@@ -179,8 +185,7 @@ float DriveController::calculatePid(
     return 0.0F;
   }
 
-  return cfg::MOTOR_FEEDFORWARD * target_rad_s +
-         cfg::MOTOR_PID_KP * error +
+  return cfg::MOTOR_PID_KP * error +
          cfg::MOTOR_PID_KI * state.integral +
          cfg::MOTOR_PID_KD * derivative;
 }
@@ -188,24 +193,13 @@ float DriveController::calculatePid(
 float DriveController::compensateMotorDeadzone(
     float controller_pwm,
     float target_mrad_s) {
-  if (fabsf(target_mrad_s) < 20.0F) {
+  if (!isfinite(controller_pwm) || !isfinite(target_mrad_s) ||
+      fabsf(target_mrad_s) < 20.0F) {
     return 0.0F;
   }
-
-  // PWM 80 is both the measured breakaway and minimum sustaining command of
-  // the installed motor/driver. Apply PID correction around that operating
-  // point, but never emit a non-zero sub-threshold command: it reports ARMED
-  // while producing no wheel torque. A zero target still returns zero above.
-  if (target_mrad_s > 0.0F) {
-    return clampFloat(
-        static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM) + controller_pwm,
-        static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM),
-        static_cast<float>(cfg::MAX_PWM));
-  }
-  return clampFloat(
-      -static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM) + controller_pwm,
-      -static_cast<float>(cfg::MAX_PWM),
-      -static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM));
+  return target_mrad_s > 0.0F
+      ? clampFloat(controller_pwm, 0.0F, cfg::MAX_PWM)
+      : clampFloat(controller_pwm, -cfg::MAX_PWM, 0.0F);
 }
 
 float DriveController::openLoopPwm(float target_mrad_s) {
@@ -217,9 +211,9 @@ float DriveController::openLoopPwm(float target_mrad_s) {
           static_cast<float>(cfg::MAX_WHEEL_TARGET_MRAD_S),
       0.0F,
       1.0F);
-  const float pwm = static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM) +
+  const float pwm = static_cast<float>(cfg::MOTOR_FF_BIAS_PWM) +
       normalized * static_cast<float>(
-          cfg::MAX_PWM - cfg::MOTOR_MIN_ACTIVE_PWM);
+          cfg::MAX_PWM - cfg::MOTOR_FF_BIAS_PWM);
   return target_mrad_s > 0.0F ? pwm : -pwm;
 }
 
@@ -228,22 +222,25 @@ void DriveController::writeMotor(float pwm) {
       pwm,
       -static_cast<float>(cfg::MAX_PWM),
       static_cast<float>(cfg::MAX_PWM));
-  last_commanded_pwm_ = logical_pwm;
-  const float signed_pwm =
-      logical_pwm * static_cast<float>(cfg::MOTOR_SIGN);
-  const uint8_t magnitude = static_cast<uint8_t>(
-      lroundf(fabsf(signed_pwm)));
-  if (signed_pwm > 0.0F) {
-    digitalWrite(cfg::MOTOR_IN1_PIN, HIGH);
-    digitalWrite(cfg::MOTOR_IN2_PIN, LOW);
-  } else if (signed_pwm < 0.0F) {
-    digitalWrite(cfg::MOTOR_IN1_PIN, LOW);
-    digitalWrite(cfg::MOTOR_IN2_PIN, HIGH);
-  } else {
-    digitalWrite(cfg::MOTOR_IN1_PIN, LOW);
-    digitalWrite(cfg::MOTOR_IN2_PIN, LOW);
+  const int8_t direction = logical_pwm > 0.0F ? 1 : (logical_pwm < 0.0F ? -1 : 0);
+  // DRI0042: BRAKE (00) for >0.1 s before reversing. Non-blocking.
+  if (direction != 0 && last_drive_direction_ != 0 &&
+      direction != last_drive_direction_) {
+    reversal_remaining_us_ = cfg::MOTOR_REVERSAL_BRAKE_US;
+    last_drive_direction_ = direction;
   }
+  const float applied = reversal_remaining_us_ > 0UL ? 0.0F : logical_pwm;
+  const float signed_pwm = applied * static_cast<float>(cfg::MOTOR_SIGN);
+  const uint8_t magnitude = static_cast<uint8_t>(lroundf(fabsf(signed_pwm)));
+  last_commanded_pwm_ = applied;
+  braking_ = magnitude == 0U;
+  applied_pwm_counts_ = direction * static_cast<int16_t>(magnitude);
+  // Remove PWM before changing pins; 00 holds BRAKE, never 11 (vacant).
+  analogWrite(cfg::MOTOR_PWM_PIN, 0);
+  digitalWrite(cfg::MOTOR_IN1_PIN, magnitude && signed_pwm > 0.0F ? HIGH : LOW);
+  digitalWrite(cfg::MOTOR_IN2_PIN, magnitude && signed_pwm < 0.0F ? HIGH : LOW);
   analogWrite(cfg::MOTOR_PWM_PIN, magnitude);
+  if (magnitude) last_drive_direction_ = direction;
 }
 
 float DriveController::hallSpeedMagnitude(
@@ -298,6 +295,11 @@ void DriveController::updateHallFeedback(
     right_position_bits_ -= right_delta;
   }
 
+  new_pulse_ = left_delta != 0UL;
+  speed_age_us_ = left_hall.age_us;
+  speed_valid_ = left_hall.age_us < hallZeroTimeoutUs() &&
+      left_hall.period_us >= cfg::HALL_MIN_PULSE_INTERVAL_US &&
+      left_hall.period_us < hallZeroTimeoutUs();
   const float direction = static_cast<float>(feedback_direction_);
   const float raw_left = direction * hallSpeedMagnitude(
       left_hall, left_delta, elapsed_us);
@@ -308,13 +310,13 @@ void DriveController::updateHallFeedback(
 
   if (left_hall.age_us >= hallZeroTimeoutUs()) {
     filtered_left_mrad_s_ = 0.0F;
-  } else {
+  } else if (new_pulse_ && speed_valid_) {
     filtered_left_mrad_s_ +=
         alpha * (raw_left - filtered_left_mrad_s_);
   }
   if (right_hall.age_us >= hallZeroTimeoutUs()) {
     filtered_right_mrad_s_ = 0.0F;
-  } else {
+  } else if (right_delta != 0UL && speed_valid_) {
     filtered_right_mrad_s_ +=
         alpha * (raw_right - filtered_right_mrad_s_);
   }
@@ -331,16 +333,44 @@ void DriveController::update(
     bool output_allowed,
     bool enforce_hall_faults,
     uint32_t deceleration_mrad_s2,
-    bool fade_pwm_during_deceleration) {
+    bool fade_pwm_during_deceleration,
+    int16_t slope_ff_pwm,
+    uint8_t pwm_cap,
+    bool brake_requested) {
   if (elapsed_us == 0UL) {
     return;
   }
   const float dt_seconds = static_cast<float>(elapsed_us) / 1000000.0F;
+  reversal_remaining_us_ = elapsed_us >= reversal_remaining_us_
+      ? 0UL : reversal_remaining_us_ - elapsed_us;
   updateHallFeedback(elapsed_us, left_hall, right_hall);
 
   if (!output_allowed) {
     updateHallPlausibility(
         left_hall, right_hall, elapsed_us, false);
+    disableImmediately();
+    return;
+  }
+
+  // Relative and absolute overspeed are brake conditions, not latched faults.
+  const float measured = fabsf(filtered_left_mrad_s_);
+  const float requested = fabsf(static_cast<float>(requested_mrad_s));
+  const float raw_speed = hallSpeedMagnitude(left_hall, 0UL, elapsed_us);
+  const float observed_speed = fmaxf(measured, raw_speed);
+  updateTimer(speed_valid_ &&
+      (observed_speed > requested + cfg::SPEED_BRAKE_MARGIN_MRAD_S ||
+       observed_speed > cfg::SPEED_BRAKE_ABSOLUTE_MRAD_S),
+      elapsed_us, speed_brake_dwell_us_);
+  if (speed_brake_dwell_us_ >= cfg::SPEED_BRAKE_DWELL_US) speed_brake_ = true;
+  if (speed_brake_ &&
+      ((speed_valid_ && observed_speed < requested + cfg::SPEED_BRAKE_RELEASE_MARGIN_MRAD_S &&
+        observed_speed < cfg::SPEED_BRAKE_RELEASE_MRAD_S) ||
+       left_hall.age_us >= cfg::HALL_ZERO_TIMEOUT_US)) {
+    speed_brake_ = false;
+  }
+  if (brake_requested || speed_brake_ ||
+      (requested_mrad_s == 0L && !fade_pwm_during_deceleration)) {
+    updateHallPlausibility(left_hall, right_hall, elapsed_us, false);
     disableImmediately();
     return;
   }
@@ -383,8 +413,7 @@ void DriveController::update(
   }
 
   if (fade_pwm_during_deceleration) {
-    // An intentional dead-man release is the only path allowed to pass through
-    // sub-threshold PWM. Fade from the actual preceding drive command so a
+    // Fade from the actual preceding drive command so a
     // release cannot add torque before the final dynamic brake.
     motor_pid_ = {0.0F, 0.0F};
     const float starting_magnitude =
@@ -400,12 +429,29 @@ void DriveController::update(
     return;
   }
 
-  const float measured_average =
-      0.5F * (filtered_left_mrad_s_ + filtered_right_mrad_s_);
-  const float controller_pwm = calculatePid(
-      applied_target_mrad_s_, measured_average, dt_seconds, motor_pid_);
-  writeMotor(compensateMotorDeadzone(
-      controller_pwm, applied_target_mrad_s_));
+  const float target = applied_target_mrad_s_;
+  const float direction = target >= 0.0F ? 1.0F : -1.0F;
+  ff_pwm_ = fabsf(target) < 20.0F ? 0.0F : direction *
+      (cfg::MOTOR_FF_BIAS_PWM +
+       (cfg::MOTOR_FF_NOMINAL_PWM - cfg::MOTOR_FF_BIAS_PWM) *
+       fabsf(target) / cfg::MOTOR_NOMINAL_MRAD_S);
+  // Slope assistance is forward only. No positive correction from invalid
+  // Hall data: bounded FF starts the wheel while the pulse monitor runs.
+  if (target > 20.0F) ff_pwm_ += clampFloat(slope_ff_pwm, -60.0F, 30.0F);
+  feedback_pwm_ = speed_valid_ ? calculatePid(
+      target, filtered_left_mrad_s_, dt_seconds, motor_pid_) : 0.0F;
+  float output = compensateMotorDeadzone(ff_pwm_ + feedback_pwm_, target);
+  const float cap = fminf(pwm_cap, cfg::MAX_PWM);
+  output = clampFloat(output, -cap, cap);
+  if (!speed_valid_) output = clampFloat(output,
+      -cfg::MOTOR_FF_NOMINAL_PWM, cfg::MOTOR_FF_NOMINAL_PWM);
+  const float rate = fabsf(output) > fabsf(last_commanded_pwm_)
+      ? cfg::MOTOR_PWM_RISE_PER_S : cfg::MOTOR_PWM_FALL_PER_S;
+  output = last_commanded_pwm_ + clampFloat(output - last_commanded_pwm_,
+      -rate * dt_seconds, rate * dt_seconds);
+  // A new cap and the requested direction apply even while slewing.
+  output = clampFloat(compensateMotorDeadzone(output, target), -cap, cap);
+  writeMotor(output);
 }
 
 void DriveController::updateMagnetBench(
@@ -521,8 +567,7 @@ void DriveController::updateHallPlausibility(
     return;
   }
   const bool motor_output_active =
-      fabsf(last_commanded_pwm_) >=
-      static_cast<float>(cfg::MOTOR_MIN_ACTIVE_PWM);
+      fabsf(last_commanded_pwm_) >= 0.5F;
   if (updateHallMonitor(
           left_hall_monitor_,
           left_hall.pulse_count,
