@@ -365,8 +365,7 @@ class SafetySupervisor(Node):
             status_qos,
         )
         self.create_subscription(
-            DriveCommand,
-    SurfaceCondition,
+            SurfaceCondition,
             str(self.get_parameter('surface_topic').value),
             self._surface_callback,
             qos_profile_sensor_data,

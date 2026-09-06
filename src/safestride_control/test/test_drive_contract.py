@@ -53,13 +53,13 @@ class FakeNode:
         return NS(now=lambda: NS(nanoseconds=int(self.now * 1e9),
                                 to_msg=lambda: NS(sec=int(self.now), nanosec=0)))
 
-    def create_publisher(self, *args):
+    def create_publisher(self, message_type, topic, qos):
         return Publisher()
 
-    def create_subscription(self, *args):
+    def create_subscription(self, message_type, topic, callback, qos):
         pass
 
-    def create_timer(self, *args):
+    def create_timer(self, period, callback):
         pass
 
     def get_logger(self):
