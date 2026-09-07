@@ -76,6 +76,7 @@ int main() {
   // Two consecutive low samples confirm release.
   assert(!pressure.bothHandsPresent());
   assert(pressure.alert() == PressureAlert::HANDS_OFF);
+  assert(pressure.leftFiltered() == 0.0F);
 
   // The low-pass filter remains above the presence threshold after release.
   // It must not re-arm the channel while the live ADC value remains low.
