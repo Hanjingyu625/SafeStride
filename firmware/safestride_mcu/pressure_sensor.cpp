@@ -30,6 +30,28 @@ bool channelPresent(
   return raw_value <= threshold && filtered_value <= threshold;
 }
 
+float filterChannel(
+    float raw_value,
+    float previous_filtered_value,
+    bool was_present,
+    bool active_high,
+    float threshold) {
+  const float alpha = cfg::PRESSURE_FILTER_ALPHA;
+  const float filtered_value =
+      alpha * raw_value + (1.0F - alpha) * previous_filtered_value;
+  if (!was_present) {
+    return filtered_value;
+  }
+
+  const float hysteresis = cfg::PRESSURE_PRESENT_HYSTERESIS;
+  const bool released = active_high
+      ? raw_value < threshold - hysteresis
+      : raw_value > threshold + hysteresis;
+  // Dropping the dead-man is safety-critical. Reset stale EMA state on a
+  // confirmed release so reacquisition starts from the released reading.
+  return released ? raw_value : filtered_value;
+}
+
 }  // namespace
 
 PressureSensorPair::PressureSensorPair()
@@ -102,10 +124,19 @@ void PressureSensorPair::sample() {
   right_raw_ = readAveraged(cfg::PRESSURE_RIGHT_PIN);
   const float raw_left = static_cast<float>(left_raw_);
   const float raw_right = static_cast<float>(right_raw_);
-  const float alpha = cfg::PRESSURE_FILTER_ALPHA;
 
-  left_ = alpha * raw_left + (1.0F - alpha) * left_;
-  right_ = alpha * raw_right + (1.0F - alpha) * right_;
+  left_ = filterChannel(
+      raw_left,
+      left_,
+      left_present_,
+      cfg::PRESSURE_LEFT_ACTIVE_HIGH,
+      cfg::PRESSURE_LEFT_PRESENT_THRESHOLD);
+  right_ = filterChannel(
+      raw_right,
+      right_,
+      right_present_,
+      cfg::PRESSURE_RIGHT_ACTIVE_HIGH,
+      cfg::PRESSURE_RIGHT_PRESENT_THRESHOLD);
 
   const float left_delta = fabsf(left_ - previous_left_);
   const float right_delta = fabsf(right_ - previous_right_);

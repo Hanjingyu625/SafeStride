@@ -191,10 +191,14 @@ int main() {
   // The dead-man is level-triggered. Reacquiring both pressure channels before
   // the ramp finishes cancels the release state, and the next fresh command
   // resumes closed-loop motion without waiting for a watchdog/session reset.
+  // A confirmed release resets the stale EMA value, so allow the live held
+  // samples to raise the filtered value back across the presence threshold.
   g_pressure_adc = 200;
-  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
-  g_pressure.update(g_test_millis);
-  refreshPhysicalSafety();
+  for (int i = 0; i < 3 && !deadmanActive(); ++i) {
+    g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+    g_pressure.update(g_test_millis);
+    refreshPhysicalSafety();
+  }
   assert(deadmanActive());
   assert(!g_deadman_release_ramp_active);
   motion_enable_command.sequence = next_sequence++;
@@ -235,8 +239,10 @@ int main() {
   assert(g_state == ControllerState::DISARMED);
 
   g_pressure_adc = 200;
-  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
-  g_pressure.update(g_test_millis);
+  for (int i = 0; i < 3 && !deadmanActive(); ++i) {
+    g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+    g_pressure.update(g_test_millis);
+  }
   assert(deadmanActive());
   g_stationary_tracking = true;
   g_stationary_since_ms =
@@ -271,8 +277,10 @@ int main() {
   assert(g_fault_bits == 0U);
 
   g_pressure_adc = 200;
-  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
-  g_pressure.update(g_test_millis);
+  for (int i = 0; i < 3 && !deadmanActive(); ++i) {
+    g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+    g_pressure.update(g_test_millis);
+  }
   assert(deadmanActive());
   g_stationary_tracking = true;
   g_stationary_since_ms =
