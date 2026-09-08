@@ -21,17 +21,38 @@ def test_hazard_never_requests_motion():
     assert speed_scale('hole', 0.99) == 0.0
 
 
-def test_deployed_model_labels_have_conservative_limits():
+def test_deployed_model_labels_have_driveable_limits():
     expected = {
-        'smooth_paved': 1.20,
-        'rough_paved': 0.70,
-        'block_paved': 0.65,
-        'gravel': 0.55,
-        'mud_dirt': 0.40,
-        'unpaved_mixed': 0.50,
-        'wet_paved': 0.50,
-        'wet_unpaved': 0.40,
-        'snow_ice': 0.0,
+        'smooth_paved': 1.00,
+        'rough_paved': 1.00,
+        'block_paved': 0.95,
+        'gravel': 0.95,
+        'mud_dirt': 1.00,
+        'unpaved_mixed': 1.00,
+        'wet_paved': 0.85,
+        'wet_unpaved': 0.85,
+        'snow_ice': 0.75,
     }
     for label, scale in expected.items():
         assert speed_scale(label, 0.99) == scale
+
+
+def test_dry_paved_confusion_does_not_change_speed():
+    assert speed_scale('smooth_paved', 0.99) == speed_scale(
+        'rough_paved', 0.99
+    )
+
+
+def test_traversable_surfaces_keep_a_usable_velocity_target():
+    for label in (
+        'smooth_paved',
+        'rough_paved',
+        'block_paved',
+        'gravel',
+        'mud_dirt',
+        'unpaved_mixed',
+        'wet_paved',
+        'wet_unpaved',
+        'snow_ice',
+    ):
+        assert 0.75 <= speed_scale(label, 0.99) <= 1.00

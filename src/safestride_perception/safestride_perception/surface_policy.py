@@ -3,18 +3,20 @@
 import math
 
 SCALES = {
-    'smooth': 1.20,
-    'smooth_paved': 1.20,
-    'rough': 0.70,
-    'rough_paved': 0.70,
-    'block_paved': 0.65,
-    'wet': 0.50,
-    'wet_paved': 0.50,
-    'wet_unpaved': 0.40,
-    'gravel': 0.55,
-    'mud_dirt': 0.40,
-    'unpaved_mixed': 0.50,
-    'snow_ice': 0.0,
+    # The classifier retains both labels for diagnostics, but their dominant
+    # mutual confusion must not make the commanded speed oscillate.
+    'smooth': 1.00,
+    'smooth_paved': 1.00,
+    'rough': 1.00,
+    'rough_paved': 1.00,
+    'block_paved': 0.95,
+    'wet': 0.85,
+    'wet_paved': 0.85,
+    'wet_unpaved': 0.85,
+    'gravel': 0.95,
+    'mud_dirt': 1.00,
+    'unpaved_mixed': 1.00,
+    'snow_ice': 0.75,
     'step': 0.0,
     'hole': 0.0,
 }
