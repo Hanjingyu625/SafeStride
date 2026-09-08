@@ -86,9 +86,14 @@ Set `SAFESTRIDE_PERCEPTION_CAMERA_INDEX` if the camera is not `/dev/video0`.
 The perception node publishes `/perception/surface_condition`; when enabled,
 the safety supervisor requires a fresh valid message and applies its speed
 scale before `/cmd_vel_safe` reaches the Drive serial bridge. Smooth pavement
-may request up to 1.20x, but the final command remains clamped by the absolute
-0.15 m/s limit. Camera failures,
-low confidence and stale inference therefore inhibit motion. Benchmark
+and rough pavement retain separate diagnostic labels but both request the 1.00x
+base-speed scale, preventing classification swaps from changing drive speed.
+Dry mud or mixed unpaved surfaces also retain 1.00x, block paving and gravel use
+0.95x, wet surfaces use 0.85x, and snow or ice uses 0.75x. These scales adjust
+target velocity, not motor torque; wheel-speed feedback remains responsible for
+adding PWM when the measured speed falls below the target. Step and hole labels
+request a stop. The final command remains clamped by the absolute 0.15 m/s limit.
+Camera failures, low confidence and stale inference therefore inhibit motion. Benchmark
 worst-case latency and classification errors on the Pi before loaded tests.
 
 ### Retraining the surface model
