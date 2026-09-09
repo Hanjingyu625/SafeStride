@@ -14,11 +14,6 @@ int g_motor_pwm = 0;
 uint8_t g_motor_in1_level = LOW;
 uint8_t g_motor_in2_level = LOW;
 
-HallSample sample(uint32_t pulses, uint32_t period_us = 6283185UL) {
-  HallSample value = {pulses, period_us, 0UL};
-  return value;
-}
-
 void primeFeedback(DriveController& drive) {
   const HallSample stopped = {0UL, 0UL, 0xFFFFFFFFUL};
   drive.update(5000UL, stopped, stopped, 0L, false);
@@ -76,37 +71,59 @@ void run(DriveController& d, int ticks, int32_t target, uint32_t period,
 }
 
 int main() {
+  // Twelve magnets: one second per pulse is pi/6 rad/s, not pi/3.
+  DriveController calibrated; calibrated.begin(); primeFeedback(calibrated);
+  run(calibrated,100,696,1000000UL);
+  assert(calibrated.leftVelocityMradS() >= 523 &&
+         calibrated.leftVelocityMradS() <= 524);
+
+  // Threshold boundary: 27.5 ms is 7.88 km/h, 26.5 ms is 8.18 km/h.
+  // A single high observation cannot brake; its successor must brake at once.
+  DriveController boundary; boundary.begin(); primeFeedback(boundary);
+  run(boundary,100,696,27500UL);
+  assert(boundary.appliedTargetMradS()>0 && boundary.hallFaultMask()==0);
+  run(boundary,1,696,26500UL);
+  assert(boundary.appliedTargetMradS()>0 && boundary.hallFaultMask()==0);
+  run(boundary,1,696,26500UL);
+  assert(boundary.braking() && boundary.appliedTargetMradS()==0 &&
+         boundary.hallFaultMask()==0);
+  run(boundary,1,696,30000UL); // 7.23 km/h: stay braked.
+  assert(boundary.braking() && boundary.appliedTargetMradS()==0);
+  run(boundary,1,696,32000UL); // 6.77 km/h: release and begin PWM slew.
+  run(boundary,20,696,32000UL);
+  assert(boundary.appliedTargetMradS()>0);
+
   // Feed-forward replaces the old FF10 plus hard minimum 80.
   DriveController d; d.begin(); primeFeedback(d);
-  run(d,800,696,1504595UL);
+  run(d,800,696,752297UL);
   assert(g_motor_pwm >= 59 && g_motor_pwm <= 61);
-  run(d,400,696,1504595UL,8);
+  run(d,400,696,752297UL,8);
   assert(g_motor_pwm >= 67 && g_motor_pwm <= 69);
-  run(d,400,696,1504595UL,-45);
+  run(d,400,696,752297UL,-45);
   assert(g_motor_pwm >= 14 && g_motor_pwm <= 16);
-  run(d,400,696,1504595UL,-60);
+  run(d,400,696,752297UL,-60);
   assert(g_motor_pwm <= 1); // Can reduce all the way to BRAKE without reverse.
-  run(d,800,696,1504595UL,30,40);
+  run(d,800,696,752297UL,30,40);
   assert(g_motor_pwm == 40);
-  run(d,1,0,1504595UL,0,100,true);
+  run(d,1,0,752297UL,0,100,true);
   assert(g_motor_pwm==0 && g_motor_in1_level==LOW && g_motor_in2_level==LOW);
-  run(d,800,696,1504595UL);
+  run(d,800,696,752297UL);
   assert(g_motor_pwm >= 59); // No restart latch.
   d.disableImmediately(); assert(g_motor_pwm==0);
 
   // Output slew, zero target, fault/explicit brake bypass normal ramp.
   DriveController slew; slew.begin(); primeFeedback(slew);
-  run(slew,100,696,1504595UL);
+  run(slew,100,696,752297UL);
   assert(g_motor_pwm <= 10);
   int before=g_motor_pwm;
-  HallSample h={2000,1504595UL,0};
+  HallSample h={2000,752297UL,0};
   slew.update(5000,h,h,0,true,true,1160,true);
   assert(g_motor_pwm<=before);
-  run(slew,1,0,1504595UL); assert(g_motor_pwm==0);
+  run(slew,1,0,752297UL); assert(g_motor_pwm==0);
 
-  // A 3.76-second period remains valid through 4.99 seconds of age.
+  // A 1.88-second period remains valid through 4.99 seconds of age.
   DriveController slow; slow.begin(); primeFeedback(slow);
-  HallSample low={1,3760000UL,0};
+  HallSample low={1,1880000UL,0};
   slow.update(5000,low,low,278,true);
   low.age_us=4990000UL;
   slow.update(5000,low,low,278,true);
@@ -126,18 +143,55 @@ int main() {
   assert(startup.hallFaultMask()==DriveController::HALL_FAULT_LEFT);
   assert(g_motor_pwm==0);
 
-  // Independent overspeed BRAKE and automatic recovery with valid low speed.
+  // A single above-target period is normal closed-loop error, not a hard
+  // BRAKE. Replaying that stale measurement at 200 Hz must not turn it into
+  // false evidence of sustained overspeed.
   DriveController fast; fast.begin(); primeFeedback(fast);
-  run(fast,800,696,1504595UL);
-  run(fast,45,696,500000UL);
+  run(fast,800,696,752297UL);
+
+  // 0.15 m/s is above the former target+0.05 m/s trip point but below the
+  // absolute 8 km/h safety limit. PID correction must continue driving.
+  run(fast,100,696,400000UL);
+  assert(g_motor_pwm>0 && !fast.braking());
+
+  HallSample one_fast_period={10000,25000UL,0}; // 8.67 km/h, absolute overspeed.
+  fast.update(5000,one_fast_period,one_fast_period,696,true);
+  for(int i=0;i<100;++i) {
+    one_fast_period.age_us+=5000UL;
+    fast.update(5000,one_fast_period,one_fast_period,696,true);
+  }
+  assert(g_motor_pwm>0 && !fast.braking());
+
+  // A second independent absolute-overspeed period confirms the condition.
+  one_fast_period.pulse_count++;
+  one_fast_period.age_us=0;
+  fast.update(5000,one_fast_period,one_fast_period,696,true);
   assert(g_motor_pwm==0 && fast.braking());
   assert(fast.hallFaultMask()==0);
-  run(fast,900,696,1504595UL);
+
+  // A newly observed low-speed period releases the transient BRAKE.
+  HallSample recovered={one_fast_period.pulse_count+1,752297UL,0};
+  fast.update(5000,recovered,recovered,696,true);
+  for(int i=0;i<900;++i) {
+    recovered.pulse_count++;
+    fast.update(5000,recovered,recovered,696,true);
+  }
   assert(g_motor_pwm>=59);
+
+  // One physically impossible Hall period must not become a latched fault
+  // merely because the 200 Hz loop sees that cached value repeatedly.
+  DriveController noisy; noisy.begin(); primeFeedback(noisy);
+  HallSample impossible={20000,20000UL,0};
+  noisy.update(5000,impossible,impossible,696,true);
+  for(int i=0;i<100;++i) {
+    impossible.age_us+=5000UL;
+    noisy.update(5000,impossible,impossible,696,true);
+  }
+  assert(noisy.hallFaultMask()==0);
 
   // Direction changes pass through at least 150 ms of BRAKE.
   DriveController reverse; reverse.begin(); primeFeedback(reverse);
-  run(reverse,800,696,1504595UL);
+  run(reverse,800,696,752297UL);
   bool saw_brake=false; int brake_ticks=0;
   for(int i=0;i<600;++i){
     HallSample stopped={static_cast<uint32_t>(3000+i),0,0};

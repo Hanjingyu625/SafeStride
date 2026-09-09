@@ -26,7 +26,7 @@ serial_bridge:
     telemetry: {timeout_s: 0.30}
     diagnostics: {publish_rate_hz: 1.0}
     base:
-      hall_pulses_per_revolution: 6
+      hall_pulses_per_revolution: 12
       max_wheel_speed_rad_s: 3.0
     range: {min_m: 0.02, max_m: 4.0, field_of_view_rad: 0.35}
     # Nominal pack voltage is known, but no battery-to-ADC divider is fitted.
@@ -239,7 +239,7 @@ foxglove_bridge:
     topic_whitelist:
       - ^/(diagnostics|walker/status|wheel/hall|handle/pressure|battery_state)$
       - ^/terrain/(tof|imu|status)$
-      - ^/(gps/fix|gps/speed|gps/speed_raw|gps/course|crosswalk/status|odom|tf|tf_static|robot_description)$
+      - ^/(gps/fix|gps/speed|gps/speed_kmh|gps/speed_raw|gps/speed_raw_kmh|gps/course|crosswalk/status|odom|odom_kmh|cmd_vel_kmh|cmd_vel_safe_kmh|tf|tf_static|robot_description)$
       - ^/perception/surface_condition$
       - ^/camera/image/compressed$
     service_whitelist: ['(?!)']

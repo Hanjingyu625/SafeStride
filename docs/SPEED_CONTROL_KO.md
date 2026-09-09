@@ -15,7 +15,7 @@ Terrain Uno MPU6050 → USB → terrain bridge → /terrain/status
                                    ↓ USB protocol v5
 Drive Uno: 목표 ramp → FF + Hall P → 방향/상한 제한 → PWM slew → 모터드라이버
                 ↑                                       ↓
-          A3 WSH135, 6 pulse/rev                   모터 두 개 공통 구동
+          A3 WSH135, 12 pulse/rev                   모터 두 개 공통 구동
 ```
 
 `/cmd_vel_safe`는 감독된 목표속도를 관찰하기 위한 `TwistStamped`로 유지한다.
@@ -101,14 +101,15 @@ PWM 핀은 0으로 두지만 보드 전원은 유지하고 BRAKE 핀 상태를 �
 |---|---|
 | 정규화 pitch ≤ -10° | 즉시 BRAKE. -7° 이상이 유효하게 0.5초 유지되면 자동 DRIVE 복귀 |
 | MPU invalid, fault, nonfinite 또는 stale | BRAKE 명령 스트림 유지. 유효 복구 조건에서 자동 재개 |
-| 실제 속도 추정 > 요청 +0.05 m/s 또는 >0.18 m/s가 0.2초 지속 | MCU BRAKE |
-| 과속 후 속도 추정 < 요청 +0.02 m/s이고 <0.15 m/s | 자동 복귀 |
+| 새 Hall 구간속도 >8 km/h가 2회 연속 관측 | MCU BRAKE |
+| 과속 후 새 Hall 구간속도 <7 km/h | 자동 복귀 |
 | 과속 후 새 pulse가 5초간 없음 | 무펄스 복구 조건으로 자동 복귀 가능. 물리 정지를 증명하지 않음 |
 | 요청속도 0 | BRAKE. 정상 손 해제 ramp는 아래 예외 |
 
-MCU 과속 판정은 pulse-period 원시 속도와 필터 속도 중 큰 크기를 사용한다.
-각도와 독립적인 조건이며 Pi가 실시간으로 새 속도를 받는다는 가정에 의존하지 않는다.
-다만 6 pulse/rev의 관측 지연 때문에 즉각적인 과속 감지는 불가능하다.
+목표 대비 일반 속도 오차는 Hall P 제어가 PWM을 낮춰 보정한다. MCU의 독립적인
+하드 BRAKE는 절대속도 8 km/h를 넘는 새 pulse-period가 2회 연속 관측될 때만
+작동한다. 같은 저해상도 측정값을 200Hz 제어 주기마다 반복해 지속 과속으로
+오인하지 않는다. 12 pulse/rev의 관측 지연 때문에 즉각적인 과속 감지는 불가능하다.
 
 **기존** 양손 dead-man, 통신 watchdog, 하드웨어 fault, 수동 inhibit는 유지했다.
 정상 손 해제는 기존 600ms 동안 직전 출력부터 단조 감소시킨다. E-stop 설정은
@@ -120,14 +121,14 @@ MCU 과속 판정은 pulse-period 원시 속도와 필터 속도 중 큰 크기�
 
 ## 5. Hall 5초 설정과 측정의 의미
 
-한 pulse 이동거리는 `2π × 0.115 / 6 ≈ 0.1204 m`다.
+한 pulse 이동거리는 `2π × 0.115 / 12 ≈ 0.0602 m`다.
 
 | 실제 속도 | pulse 간격 |
 |---:|---:|
-| 0.08 m/s | 1.51초 |
-| 0.048 m/s | 2.51초 |
-| 0.04 m/s | 3.01초 |
-| 0.032 m/s | 3.76초 |
+| 0.08 m/s | 0.75초 |
+| 0.048 m/s | 1.25초 |
+| 0.04 m/s | 1.51초 |
+| 0.032 m/s | 1.88초 |
 
 `HALL_ZERO_TIMEOUT_US=5000000`으로 연장했다. 유효 speed는 pulse period가
 20ms 이상·5초 미만이고 마지막 pulse age도 5초 미만인 경우다. 첫 pulse만으로는
@@ -137,15 +138,36 @@ MCU 과속 판정은 pulse-period 원시 속도와 필터 속도 중 큰 크기�
 초기/무효 측정에서는 P=0, FF 요구를 최대 60으로 제한한다. 이미 더 큰 출력으로
 주행했다면 정상 하강 slew로 줄어든다. 무펄스 구동 감시는 30 미만 출력도 포함하며
 `max(5초, 예상 pulse 간격 × 2.5)`를 쓰되 최대 10초로 제한했다. 따라서 0.032 m/s에서
-약 9.4초, 0.08 m/s에서는 최소 5초를 기준으로 스톨을 감시한다.
+최소 5초, 0.08 m/s에서는 최소 5초를 기준으로 스톨을 감시한다.
 5초는 속도 age timeout이며 스톨 timeout과 같지 않다.
 
-기존 250ms pulse 무시 구간은 약 4.19 rad/s 이상을 표현하지 못해 5 rad/s 이상
-검사와 충돌했다. 이를 20ms로 줄였으며 ADC 30/12 히스테리시스는 유지했다.
+12자석에서 8 km/h의 펄스 간격은 약 27.1ms다. 20ms pulse 무시 구간은
+이 속도를 검출할 수 있다. ADC 30/12 히스테리시스는 유지했다.
 빠른 ADC pulse를 실제 입력 검출 경로로 통과시키는 회귀 테스트를 추가했다.
 노이즈·자석 폭·배선 EMI에 따른 오검출은 실물 튜닝이 필요하다.
 
 ## 6. 진단과 업데이트
+
+2026-09-09 설정: 자석 12개, 과속 BRAKE 진입 8 km/h 초과의 새 구간속도
+2회 연속 확인, 해제 7 km/h 미만. 두 번째 확인 즉시 PWM 0을 적용한다.
+Hall 물리 상한은 25 rad/s(10.35 km/h)로 높여 8 km/h 전에 fault가 걸리지
+않게 했다. 주행 목표속도와 PWM 상한은 별도 설정이다.
+
+ROS 제어·표준 메시지 단위는 m/s, rad/s를 유지하고 다음 km/h 표시를 제공한다.
+
+| 토픽 | km/h 값 |
+|---|---|
+| `/wheel/hall` | `left_speed_kmh`, `right_speed_kmh` |
+| `/walker/status` | `measured_speed_kmh` |
+| `/drive/command` | `target_speed_kmh` (표시용) |
+| `/crosswalk/status` | `target_speed_kmh` |
+| `/gps/speed_kmh`, `/gps/speed_raw_kmh` | `data` |
+| `/odom_kmh`, `/cmd_vel_kmh`, `/cmd_vel_safe_kmh` | `data` (전후진 선속도) |
+
+마지막 두 행은 launch에서 시작하는 `speed_display`가 원본 메시지 수신 시
+발행한다. 원본이 끊기면 표시 토픽도 발행을 멈춘다. Foxglove Speed 축도 km/h다.
+메시지 정의가 추가됐으므로 Pi에서 인터페이스와 관련 ROS 패키지를 함께 재빌드하고
+노드를 재시작해야 한다. Drive Uno에는 12자석 설정 펌웨어를 업로드해야 한다.
 
 `/walker/status`에 `ff_pwm`, `feedback_pwm`, `applied_pwm`, `measured_speed_m_s`,
 `speed_age`, `speed_valid`, `new_pulse`, `braking`, `direction_valid`가 있다.
@@ -184,15 +206,3 @@ Python 62개(bridge/프로토콜 36, 감독 명령 7, 경사 정책 6, 설정 �
 최종 Drive 빌드는 flash 15,230/32,256 bytes, 전역 RAM 988/2,048 bytes,
 Terrain은 flash 10,648 bytes, 전역 RAM 1,065 bytes다.
 이 검사는 실제 DDS 통신, Pi에서의 ROS 실행, USB 연결, 모터 부하 시험을 대체하지 않는다.
-
-실물 시험은 다음 순서로 기록한다.
-
-1. 바퀴를 든 상태에서 LOW/LOW BRAKE와 방향을 확인한다. 평지 장착 pitch의
-   offset·sign, 양손 압력, 5초 Hall age를 함께 확인한다.
-2. PWM 30/40/60에서 기동과 회전 유지 조건을 각각 측정하고 `v_nom`과 FF를 보정한다.
-3. +5°/-5°/-8°에서 목표속도·slope FF·applied PWM을 기록한다. -10° BRAKE와
-   -7° 복구, MPU 분리/복구를 시험한다. 조건 해소 시 자동 재개됨에 유의한다.
-4. Hall 3.76초 간격에서 false stop이 없는지, 센서 누락 시 출력이 계속 증가하지
-   않는지 확인한다. 손 해제 출력이 증가하지 않아야 한다.
-5. 제한된 부하에서 두 모터 합산 전류·드라이버 온도·12V/5V 전압·제동거리·미끄러짐을
-   측정한다. 속도/각도/전류 한계와 실제 정지 유지 수단은 이 결과로 결정한다.

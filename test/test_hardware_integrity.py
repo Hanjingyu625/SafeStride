@@ -320,11 +320,11 @@ class TestHardwareIntegrity(unittest.TestCase):
         self.assertNotIn("attachInterrupt(", self.drive)
         self.assertEqual(
             constant_expression(self.config, "HALL_PULSES_PER_WHEEL_REV"),
-            "6UL",
+            "12UL",
         )
         for path in ROS_CONFIGS:
             text = path.read_text(encoding="utf-8")
-            self.assertRegex(text, r"hall_pulses_per_revolution:\s*6\b")
+            self.assertRegex(text, r"hall_pulses_per_revolution:\s*12\b")
         self.assertEqual(
             constant_expression(self.config, "HALL_CALIBRATED"), "true"
         )

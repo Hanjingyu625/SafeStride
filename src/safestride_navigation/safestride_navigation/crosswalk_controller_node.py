@@ -634,6 +634,7 @@ class CrosswalkController(Node):
         status.required_entry_s = _finite_or_nan(required_entry_s)
         status.crossing_eta_s = _finite_or_nan(crossing_eta_s)
         status.target_speed_mps = target_speed_mps
+        status.target_speed_kmh = target_speed_mps * 3.6
         status.command_mode = str(command['mode'])
         status.reason = self._controller.reason
         status.intersection_id = intersection_id
@@ -828,6 +829,9 @@ class CrosswalkController(Node):
                 ),
             ),
             KeyValue(key='measured_speed_source', value=speed_source),
+            KeyValue(key='effective_speed_kmh', value=str(effective_speed_mps * 3.6)),
+            KeyValue(key='measured_speed_kmh', value=str(
+                measured_speed * 3.6 if measured_speed is not None else math.nan)),
             KeyValue(
                 key='motion_confirmed',
                 value=str(motion_confirmed).lower(),

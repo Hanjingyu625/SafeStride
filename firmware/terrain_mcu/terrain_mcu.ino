@@ -1,3 +1,6 @@
+// Terrain Uno 진입점: ToF 거리와 MPU 자세를 읽어 Pi에 전송한다. 모터를 직접 제어하지 않는다.
+// Pi가 여기서 받은 pitch/유효성으로 경사 제한과 BRAKE를 결정하여 Drive Uno로 보낸다.
+
 #include <Arduino.h>
 #include <Wire.h>
 
@@ -33,6 +36,7 @@ uint16_t g_tx_sequence = 0U;
 uint32_t g_last_hello_ms = 0UL;
 uint32_t g_last_telemetry_ms = 0UL;
 
+// 재부팅마다 바뀌는 식별자로 이전 부팅의 세션 시작 요청을 걸러낸다.
 uint32_t makeBootId() {
   uint32_t value = 0UL;
 #if defined(ARDUINO_ARCH_AVR)
@@ -78,6 +82,7 @@ int16_t roundedSigned16(float value) {
       value >= 0.0F ? value + 0.5F : value - 0.5F);
 }
 
+// Terrain 역할과 ToF/MPU 지원 여부를 Pi에 알린다.
 void sendHello() {
   uint8_t payload[proto::HELLO_PAYLOAD_SIZE];
   proto::writeU32(payload + 0U, g_boot_id);
@@ -100,6 +105,8 @@ void sendHello() {
       sizeof(payload));
 }
 
+// 거리(mm), 가속도(mg), 자이로(mrad/s), 자세(mrad), 유효성/고장을 고정 offset으로 보낸다.
+// 31~44 바이트는 예약 영역으로 0을 유지하며 GPS는 Pi가 직접 수집한다.
 void sendTelemetry() {
   if (!g_session_active) {
     return;
@@ -140,6 +147,7 @@ void sendTelemetry() {
       sizeof(payload));
 }
 
+// 현재 부팅 ID와 보드 역할/규약이 맞는 SESSION_START만 수락한다. 주행 명령은 여기서 처리하지 않는다.
 void processHostProtocol() {
   proto::FrameView frame = {0U, 0U, 0U, 0U, 0UL, 0UL, NULL};
   while (Serial.available() > 0) {
@@ -168,6 +176,7 @@ void processHostProtocol() {
   }
 }
 
+// I2C/직렬과 센서를 초기화하고 AVR의 500ms 하드웨어 watchdog을 켠다.
 void setup() {
 #if defined(ARDUINO_ARCH_AVR)
   MCUSR = 0U;
@@ -186,6 +195,7 @@ void setup() {
 #endif
 }
 
+// 통신 처리와 주기별 센서 갱신을 반복한다. 센서 오류/무효 정보도 Pi가 판단하도록 전송한다.
 void loop() {
 #if defined(ARDUINO_ARCH_AVR)
   wdt_reset();

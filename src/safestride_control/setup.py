@@ -26,6 +26,7 @@ setup(
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
+            'speed_display = safestride_control.speed_display_node:main',
             (
                 'cruise_command = '
                 'safestride_control.cruise_command_node:main'

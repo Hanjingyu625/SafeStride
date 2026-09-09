@@ -137,8 +137,8 @@
     "Plot!speed": {
       "paths": [
         {
-          "value": "/wheel/hall.left_velocity_rad_s.@mul(0.115)",
-          "label": "Hall speed (m/s)",
+          "value": "/wheel/hall.left_speed_kmh",
+          "label": "Hall speed (km/h)",
           "color": "#42a5f5",
           "enabled": true,
           "lineSize": 2,
@@ -146,8 +146,8 @@
           "timestampMethod": "receiveTime"
         },
         {
-          "value": "/gps/speed.data",
-          "label": "GPS speed (m/s)",
+          "value": "/gps/speed_kmh.data",
+          "label": "GPS speed (km/h)",
           "color": "#66bb6a",
           "enabled": true,
           "lineSize": 2,
@@ -156,7 +156,7 @@
         }
       ],
       "minYValue": 0,
-      "maxYValue": 0.6,
+      "maxYValue": 10,
       "showLegend": true,
       "legendDisplay": "top",
       "showPlotValuesInLegend": true,
@@ -169,7 +169,7 @@
       "followingViewWidth": 60,
       "playbackBarPosition": "right",
       "xAxisDisplayMethod": "relative",
-      "yAxisLabel": "Speed (m/s)"
+      "yAxisLabel": "Speed (km/h)"
     },
     "Plot!pressure": {
       "paths": [

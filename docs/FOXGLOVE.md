@@ -15,7 +15,7 @@ SafeStride의 Drive MCU, Terrain MCU, GPS와 웹캠 노드 상태를 한 화면�
 | State Transitions | Drive 상태, dead-man, 압력 alert, TOF alert/hazard, 횡단보도 상태, 노면 분류 |
 | Raw Messages | `/walker/status`의 link/arm/E-stop/fault, MCU boot/session ID, CRC/frame 오류, telemetry age |
 | Diagnostics | `/diagnostics`의 MCU·GPS·웹캠·지도/API 준비 상태와 오류 |
-| Speed | `/wheel/hall` 기반 속도와 `/gps/speed` 비교, 단위 m/s |
+| Speed | `/wheel/hall.left_speed_kmh`와 `/gps/speed_kmh` 비교, 단위 km/h |
 | Pressure | 좌 A2·우 A1 filtered ADC와 현재 임계값 80 |
 | TOF | filtered/reference 거리와 error/change, 단위 m |
 | GPS Map | `/gps/fix` 위치와 최근 5분 이동 경로 |
@@ -24,12 +24,12 @@ SafeStride의 Drive MCU, Terrain MCU, GPS와 웹캠 노드 상태를 한 화면�
 홀 속도는 현재 설정된 휠 반지름 0.115 m를 사용해 다음과 같이 표시한다.
 
 ```text
-speed_m_s = /wheel/hall.left_velocity_rad_s * 0.115
+speed_kmh = /wheel/hall.left_speed_kmh
 ```
 
 현재 하드웨어는 왼쪽 A3 WSH135 홀센서 하나만 사용한다. `/wheel/hall`의 오른쪽 속도는
 왼쪽 측정값을 복제한 공통 구동계 추정치이므로 대시보드에는 왼쪽 값만 표시한다.
-휠 반지름을 바꾸면 레이아웃의 `@mul(0.115)`도 같은 값으로 수정해야 한다.
+휠 반지름은 bridge 설정에서 km/h로 환산할 때 적용되므로 레이아웃에서 재환산하지 않는다.
 
 ## 1. Raspberry Pi 준비
 

@@ -7,6 +7,9 @@ int32 right_pulses
 
 float32 left_velocity_rad_s
 float32 right_velocity_rad_s
+# Display speeds in km/h; SI fields above remain authoritative.
+float32 left_speed_kmh
+float32 right_speed_kmh
 bool calibrated
 
 # In the single-Hall build, right-side pulse/velocity fields mirror the left

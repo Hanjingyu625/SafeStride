@@ -3,6 +3,8 @@ uint8 DRIVE=0
 uint8 BRAKE=1
 std_msgs/Header header
 float32 target_linear_m_s
+# Display only; the controller consumes target_linear_m_s.
+float32 target_speed_kmh
 int16 slope_ff_pwm
 uint8 drive_pwm_cap
 uint8 mode

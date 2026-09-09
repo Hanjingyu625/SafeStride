@@ -1,3 +1,6 @@
+// Terrain Uno의 I2C 주소, 주기, 거리 판정과 자세 필터 설정.
+// ToF 기준 거리 학습과 위험 확정은 별개이며, 센서 유효성은 telemetry로 Pi에 전달한다.
+
 #pragma once
 
 #include <Arduino.h>
@@ -18,6 +21,7 @@ constexpr uint16_t TOF_SAMPLE_PERIOD_MS = 50U;
 constexpr uint16_t TOF_MIN_VALID_DISTANCE_MM = 100U;
 constexpr uint16_t TOF_MAX_VALID_DISTANCE_MM = 2000U;
 
+// 측정 필터는 0.3, 정상 지면 기준 추적은 0.02. 오차/변화/연속 프레임 조건을 함께 사용한다.
 constexpr float TOF_FILTER_ALPHA = 0.3F;
 constexpr float TOF_REFERENCE_ALPHA = 0.02F;
 constexpr float TOF_ERROR_THRESHOLD_MM = 60.0F;
@@ -28,6 +32,7 @@ constexpr uint8_t TOF_REQUIRED_FRAMES = 4U;
 constexpr uint16_t TOF_RED_HOLD_MS = 1000U;
 
 // GY-521 MPU6050 shares A4/A5 with the TOF. AD0 selects 0x68 or 0x69.
+// ToF와 같은 I2C 버스를 사용하며 AD0 상태에 따라 MPU 주소를 선택한다.
 constexpr bool ENABLE_MPU6050 = true;
 constexpr uint8_t MPU6050_ADDRESS_LOW = 0x68U;
 constexpr uint8_t MPU6050_ADDRESS_HIGH = 0x69U;
@@ -39,8 +44,10 @@ constexpr uint16_t MPU6050_RECONNECT_PERIOD_MS = 1000U;
 constexpr uint8_t MPU6050_MAX_CONSECUTIVE_ERRORS = 3U;
 // Mounting convention used by the attitude equations: +X forward, +Y left,
 // +Z up. The runtime pitch offset and sign are calibrated on the Pi.
+// 각도 EMA 계수. 작을수록 부드럽지만 응답이 늦다. 장착 offset과 부호는 Pi 설정에서 보정한다.
 constexpr float MPU6050_ATTITUDE_ALPHA = 0.15F;
 
+// 설정값의 범위와 센서 출력/읽기 주기 일치를 컴파일 시 검사한다.
 static_assert(
     TOF_MIN_VALID_DISTANCE_MM < TOF_MAX_VALID_DISTANCE_MM,
     "TOF valid range is invalid");

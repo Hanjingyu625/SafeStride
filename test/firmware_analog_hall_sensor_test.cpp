@@ -97,7 +97,7 @@ int main() {
   hall.update(now_us);
   assert(hall.pulseCount() == 2UL);
 
-  // Actual ADC -> pulse detector -> drive path: 100 ms pulses must not be
+  // Actual ADC -> pulse detector -> drive path: 20 ms pulses must not be
   // discarded as they were with the former 250 ms blanking window.
   g_hall_adc = 512U;
   AnalogHallSensor fast_hall;
@@ -105,13 +105,13 @@ int main() {
   DriveController drive;
   drive.begin();
   for (uint32_t t=5000UL;t<=1000000UL;t+=5000UL) {
-    g_hall_adc = (t % 100000UL == 0UL) ? 650U : 512U;
+    g_hall_adc = (t % 20000UL == 0UL) ? 650U : 512U;
     fast_hall.update(t);
     HallSample sample={fast_hall.pulseCount(),fast_hall.periodUs(),fast_hall.ageUs(t)};
     drive.update(5000UL,sample,sample,696L,true);
   }
-  assert(fast_hall.pulseCount()==10UL);
-  assert(fast_hall.periodUs()==100000UL);
+  assert(fast_hall.pulseCount()==50UL);
+  assert(fast_hall.periodUs()==20000UL);
   assert(drive.speedValid());
   assert(drive.braking() || drive.hallFaultMask()!=0U);
   printf("analogue WSH135 Hall and overspeed input-path tests: OK\n");

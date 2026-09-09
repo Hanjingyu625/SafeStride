@@ -216,7 +216,7 @@ class SerialBridgeNode(Node):
             ('diagnostics.publish_rate_hz', 1.0),
             ('base.wheel_radius_m', 0.115),
             ('base.wheel_separation_m', 0.55),
-            ('base.hall_pulses_per_revolution', 6),
+            ('base.hall_pulses_per_revolution', 12),
             ('base.max_wheel_speed_rad_s', 3.0),
             ('range.min_m', 0.02),
             ('range.max_m', 4.0),
@@ -994,6 +994,8 @@ class SerialBridgeNode(Node):
         hall.right_pulses = telemetry.hall_right_pulses
         hall.left_velocity_rad_s = left_velocity
         hall.right_velocity_rad_s = right_velocity
+        hall.left_speed_kmh = left_velocity * self._wheel_radius * 3.6
+        hall.right_speed_kmh = right_velocity * self._wheel_radius * 3.6
         hall.calibrated = bool(
             telemetry.status_bits & STATUS_HALL_CALIBRATED
         )
@@ -1213,6 +1215,7 @@ class SerialBridgeNode(Node):
             return
 
         message.measured_speed_m_s = telemetry.velocity_left_mrad_s * self._wheel_radius / 1000.0
+        message.measured_speed_kmh = message.measured_speed_m_s * 3.6
         message.ff_pwm = telemetry.ff_pwm
         message.feedback_pwm = telemetry.feedback_pwm
         message.applied_pwm = telemetry.applied_pwm
@@ -1380,6 +1383,9 @@ class SerialBridgeNode(Node):
         )
         telemetry = self._last_telemetry
         status.values = [
+            KeyValue(key='measured_speed_kmh', value=str(
+                telemetry.velocity_left_mrad_s * self._wheel_radius * 0.0036
+                if telemetry is not None else math.nan)),
             KeyValue(key='port', value=self._port),
             KeyValue(key='baudrate', value=str(self._baudrate)),
             KeyValue(key='expected_board_role', value='DRIVE'),

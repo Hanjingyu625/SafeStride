@@ -3,7 +3,7 @@
 단일 모터드라이버, 왼쪽 A3 WSH135 Hall, 왼쪽 A2/오른쪽 A1 압력 dead-man과 CRC serial watchdog을
 담당한다. WSH135는 부팅 시 무자계 기준값을 학습하고, 기준값에서 30 ADC 이상
 벗어나면 자석 1개를 센 뒤 12 ADC 이내로 돌아와야 다음 pulse를 센다. 회전당
-6 pulse이며 압력 threshold는 좌우 80이다. `HALL_CALIBRATED=true`, `PRESSURE_THRESHOLDS_CALIBRATED=true`,
+12 pulse이며 압력 threshold는 좌우 80이다. `HALL_CALIBRATED=true`, `PRESSURE_THRESHOLDS_CALIBRATED=true`,
 `MAGNET_BENCH_MODE=false`, `ENABLE_ESTOP=false`가 운영 기본값이다.
 
 오른쪽 Hall 입력은 없다. protocol의 오른쪽 pulse/velocity는 왼쪽 값을 복제한

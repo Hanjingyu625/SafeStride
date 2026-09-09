@@ -1,3 +1,6 @@
+// 양손 압력 센서 처리: ADC 평균 → 저역통과 필터 → 손 접촉 판정 → 해제 디바운스.
+// 압력 크기로 목표속도를 정하지 않는다. 양손 접촉 여부가 주행 허용(dead-man) 조건이다.
+
 #include "pressure_sensor.h"
 
 #include <math.h>
@@ -8,6 +11,7 @@ namespace cfg = safestride_config;
 
 namespace {
 
+// 접촉 진입은 raw와 필터값이 함께 임계값을 넘어야 한다. 잔류 필터값만으로 재접촉하지 않게 한다.
 bool channelPresent(
     float filtered_value,
     float raw_value,
@@ -30,6 +34,7 @@ bool channelPresent(
   return raw_value <= threshold && filtered_value <= threshold;
 }
 
+// 평소에는 EMA로 흔들림을 줄이되, 손 해제 값은 즉시 필터 상태에 반영한다.
 float filterChannel(
     float raw_value,
     float previous_filtered_value,
@@ -88,6 +93,7 @@ void PressureSensorPair::begin(uint32_t now_ms) {
   last_sample_ms_ = now_ms;
 }
 
+// ADC 채널 전환 직후 첫 변환은 버리고 여러 번 평균하여 다른 채널의 잔류 영향을 줄인다.
 uint16_t PressureSensorPair::readAveraged(uint8_t pin) const {
   // Discard the first conversion after an AVR ADC mux change so charge left
   // by the other pressure channel does not leak into this reading.
@@ -119,6 +125,7 @@ void PressureSensorPair::update(uint32_t now_ms) {
   sample();
 }
 
+// 손 접촉 판정과 불균형/급변 경고를 따로 계산한다. WARNING 자체가 손 해제를 뜻하지는 않는다.
 void PressureSensorPair::sample() {
   left_raw_ = readAveraged(cfg::PRESSURE_LEFT_PIN);
   right_raw_ = readAveraged(cfg::PRESSURE_RIGHT_PIN);
@@ -177,6 +184,7 @@ void PressureSensorPair::updatePresence() {
       right_sample_present, right_present_, right_release_samples_);
 }
 
+// 해제 샘플이 연속 2번이어야 접촉을 해제한다. 샘플 주기는 100ms이므로 한 번의 순간 하락을 무시한다.
 void PressureSensorPair::updateChannelPresence(
     bool sample_present,
     bool& present,
