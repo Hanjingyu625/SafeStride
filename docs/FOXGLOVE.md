@@ -80,7 +80,7 @@ Foxglove에서 모터 enable이나 `/cmd_vel` 명령을 보낼 수 없다.
   `SAFE_STOP=3`, `ESTOP=4`, `FAULT=5`는 원인을 먼저 해소한다.
 - Pressure: 손을 올리면 좌 A2와 우 A1이 임계값 80 위에 있고
   `deadman=true`가 되어야 한다. calibration/임계값은 대시보드에서 변경하지 않는다.
-- Hall speed: 바퀴 정지 시 0 근처, 회전 시 양의 m/s가 나타나야 한다.
+- Hall speed: 바퀴 정지 시 0 근처, 회전 시 양의 km/h가 나타나야 한다.
 - TOF: 평지에서는 filtered와 reference가 가깝고, 단차에서 error/change와
   TOF alert가 함께 변해야 한다.
 - Inclination: 정지 평지에서 pitch/roll이 0도 근처여야 한다. MPU 오류 시

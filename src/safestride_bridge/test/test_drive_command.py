@@ -81,14 +81,24 @@ class TestDriveCommand(unittest.TestCase):
         self.b._command_tick()
         self.assertEqual((self.packets[-1].target_mrad_s, self.packets[-1].slope_ff_pwm), (0, 0))
 
-    def test_v4_and_invalid_v5_payloads_rejected(self):
+    def test_v4_and_invalid_v6_payloads_rejected(self):
         import struct
         for raw in (struct.pack('<iHBB', 0, 200, 1, 0),
                     struct.pack('<iHBBhBB', 0, 200, 1, 0, -61, 100, 0),
                     struct.pack('<iHBBhBB', 0, 200, 1, 0, 0, 101, 0),
-                    struct.pack('<iHBBhBB', 0, 200, 1, 0, 0, 100, 2)):
+                    struct.pack('<iHBBhBB', 0, 200, 1, 0, 0, 100, 3)):
             with self.assertRaises(PayloadDecodeError):
                 CommandPayload.unpack(raw)
+
+    def test_terrain_stop_reaches_wire_and_clear_restores_drive(self):
+        self.b._on_cmd_vel(self.message(target=0, ff=0, mode=2))
+        self.b._command_tick()
+        packet = self.packets[-1]
+        self.assertEqual((packet.mode, packet.enable, packet.target_mrad_s), (2, 1, 0))
+        self.assertEqual(CommandPayload.unpack(packet.pack()).mode, 2)
+        self.b._on_cmd_vel(self.message())
+        self.b._command_tick()
+        self.assertEqual(self.packets[-1].mode, 0)
 
 
 if __name__ == '__main__':

@@ -53,6 +53,11 @@ class SafetySupervisor(Node):
         self.declare_parameter('range_timeout', 0.35)
         self.declare_parameter('surface_timeout', 2.5)
         self.declare_parameter('require_range_sensors', False)
+        self.declare_parameter('terrain_stop_enabled', True)
+        self._terrain_stopping = False
+        self._terrain_stop_started = 0.0
+        self._terrain_clear_since = None
+        self._terrain_note = ''
         self.declare_parameter('require_surface_condition', False)
         self.declare_parameter('require_deadman', True)
         self.declare_parameter('slope_control_enabled', True)
@@ -514,42 +519,43 @@ class SafetySupervisor(Node):
         return []
 
     def _terrain_reasons(self, now: float) -> List[str]:
-        # The Terrain bridge may remain active for MPU slope assistance when
-        # the downward TOF is intentionally excluded from motor interlocks.
-        if not self._require_ranges:
+        # Invalid measurements report diagnostics only; they neither initiate
+        # a stop nor prove that a previously confirmed hazard has disappeared.
+        if not self.get_parameter('terrain_stop_enabled').value:
+            self._terrain_stopping = False
+            self._terrain_note = ''
             return []
-        if self._last_terrain is None:
-            return ['terrain_status_missing']
-        if self._age(now, self._last_terrain_time) > self._range_timeout:
-            return ['terrain_status_stale']
-
         terrain = self._last_terrain
-        reasons: List[str] = []
-        telemetry_age = float(terrain.telemetry_age)
-        if (
-            not math.isfinite(telemetry_age)
-            or telemetry_age < 0.0
-            or telemetry_age > self._max_telemetry_age
-        ):
-            reasons.append('terrain_telemetry_stale')
-        if (
-            not terrain.tof_valid
-            or terrain.tof_alert == TerrainStatus.TOF_INVALID
-        ):
-            reasons.append('terrain_tof_invalid')
-        elif terrain.tof_alert == TerrainStatus.TOF_RAISED:
-            reasons.append('terrain_raised_obstacle')
-        elif terrain.tof_alert == TerrainStatus.TOF_DROP:
-            reasons.append('terrain_drop')
-        elif terrain.tof_alert not in (
-            TerrainStatus.TOF_NORMAL,
-            TerrainStatus.TOF_CANDIDATE_RAISED,
-            TerrainStatus.TOF_CANDIDATE_DROP,
-        ):
-            reasons.append('terrain_alert_invalid')
-        if terrain.fault_bits & TerrainStatus.FAULT_TOF_INVALID:
-            reasons.append('terrain_tof_fault')
-        return reasons
+        age = float(terrain.telemetry_age) if terrain is not None else math.inf
+        valid = (
+            terrain is not None and self._last_terrain_time is not None
+            and math.isfinite(age) and age >= 0.0
+            and 0.0 <= self._age(now, self._last_terrain_time) <= self._range_timeout
+            and age + self._age(now, self._last_terrain_time) <= self._max_telemetry_age
+            and terrain.tof_valid
+            and terrain.tof_alert in (TerrainStatus.TOF_NORMAL,
+                TerrainStatus.TOF_CANDIDATE_RAISED, TerrainStatus.TOF_CANDIDATE_DROP,
+                TerrainStatus.TOF_RAISED, TerrainStatus.TOF_DROP)
+            and not (terrain.fault_bits & TerrainStatus.FAULT_TOF_INVALID)
+        )
+        self._terrain_note = '' if valid else 'terrain_tof_unavailable'
+        if valid and terrain.tof_alert in (TerrainStatus.TOF_RAISED, TerrainStatus.TOF_DROP):
+            if not self._terrain_stopping:
+                self._terrain_stop_started = now
+            self._terrain_stopping = True
+            self._terrain_clear_since = None
+        elif valid and terrain.tof_alert == TerrainStatus.TOF_NORMAL:
+            if self._terrain_clear_since is None:
+                self._terrain_clear_since = now
+            if (now - self._terrain_clear_since >= 0.5
+                    and now - self._terrain_stop_started >= 3.1):
+                self._terrain_stopping = False
+        else:
+            self._terrain_clear_since = None
+        # TODO(display): show warning while _terrain_stopping; use
+        # /terrain/status and /diagnostics. A single oblique beam cannot locate
+        # the edge at 40/15 cm, so confirmed hazards start the ramp immediately.
+        return []
 
     def _slope_state(
         self, now: float
@@ -839,6 +845,12 @@ class SafetySupervisor(Node):
             self._output_linear = self._output_angular = 0.0
             operating_notes.append('slope_brake' if math.isfinite(normalized_pitch) else 'imu_brake')
 
+        if self._terrain_note:
+            operating_notes.append(self._terrain_note)
+        if self._terrain_stopping:
+            self._output_linear = self._output_angular = 0.0
+            operating_notes.append('terrain_hazard_ramp_or_brake')
+
         # Keep forwarding a valid supervised command while DISARMED so the
         # automatic bridge can activate the controller as soon as the
         # physical dead-man input is active. Other invalid or stale inputs
@@ -864,6 +876,8 @@ class SafetySupervisor(Node):
                 self._slope_braking or motion_stop_reasons or
                 'obstacle_stop' in operating_notes or 'surface_stop' in operating_notes
             ) else DriveCommand.DRIVE
+            if self._terrain_stopping and drive.mode == DriveCommand.DRIVE:
+                drive.mode = DriveCommand.TERRAIN_STOP
             drive.slope_ff_pwm = self._slope_ff_pwm if (
                 drive.mode == DriveCommand.DRIVE and self._output_linear > 0.0
             ) else 0
@@ -951,7 +965,8 @@ class SafetySupervisor(Node):
         diagnostic.message = ', '.join(all_reasons) if all_reasons else 'ready'
         status = self._last_status
         diagnostic.values = [
-            KeyValue(key='drive_mode', value='BRAKE' if self._slope_braking else 'DRIVE'),
+            KeyValue(key='drive_mode', value='BRAKE' if self._slope_braking or hard_stop_reasons
+                     else ('TERRAIN_STOP' if self._terrain_stopping else 'DRIVE')),
             KeyValue(key='slope_ff_pwm', value=str(self._slope_ff_pwm)),
             KeyValue(key='surface_control_enabled', value=_bool_text(self._surface_control_enabled)),
             KeyValue(key='slope_restart_latched', value='false'),

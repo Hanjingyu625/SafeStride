@@ -32,7 +32,8 @@ class DriveController {
       bool fade_pwm_during_deceleration = false,
       int16_t slope_ff_pwm = 0,
       uint8_t pwm_cap = 100U,
-      bool brake_requested = false);
+      bool brake_requested = false,
+      bool terrain_stop_requested = false);
   void updateMagnetBench(
       uint32_t elapsed_us,
       const HallSample& left_hall,
@@ -77,6 +78,10 @@ class DriveController {
   float ff_pwm_ = 0.0F;
   float feedback_pwm_ = 0.0F;
   bool braking_ = true;
+  bool terrain_stop_active_ = false;
+  bool terrain_recovering_ = false;
+  uint32_t terrain_stop_elapsed_us_ = 0UL;
+  float terrain_start_pwm_ = 0.0F;
   bool speed_brake_ = false;
   uint8_t absolute_overspeed_pulses_ = 0U;
   int8_t last_drive_direction_ = 0;

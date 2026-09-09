@@ -21,6 +21,14 @@ ROOT = Path(__file__).resolve().parents[3]
 class Message(NS):
     DRIVE = 0
     BRAKE = 1
+    TERRAIN_STOP = 2
+    TOF_NORMAL = 0
+    TOF_CANDIDATE_RAISED = 1
+    TOF_CANDIDATE_DROP = 2
+    TOF_RAISED = 3
+    TOF_DROP = 4
+    TOF_INVALID = 5
+    FAULT_TOF_INVALID = 1
     UNKNOWN = 0
     FAULT_MPU_INVALID = 2
 
@@ -179,6 +187,36 @@ class TestSupervisedDrive(unittest.TestCase):
         for args in ((math.nan, 7, 0.5), (7, 7, 0.5), (10, 7, -1)):
             with self.assertRaises(ValueError):
                 SlopeBrakePolicy(*args)
+
+    def test_terrain_invalid_does_not_stop_and_confirmed_hazard_ramps(self):
+        n = self.node
+        n._terrain_reasons = lambda now: Supervisor._terrain_reasons(n, now)
+        def step(alert, valid=True, dt=0.05):
+            n.now += dt
+            n._last_terrain_time = n._now_seconds()
+            n._last_terrain = NS(pitch_rad=0.0, telemetry_age=0.0,
+                mpu_valid=True, fault_bits=0, tof_valid=valid, tof_alert=alert)
+            n._timer_callback()
+            return n._drive_publisher.messages[-1]
+        for _ in range(20):
+            msg = step(Message.TOF_INVALID, False)
+        self.assertEqual(msg.mode, Message.DRIVE)
+        self.assertGreater(msg.target_linear_m_s, 0.0)
+        for hazard in (Message.TOF_RAISED, Message.TOF_DROP):
+            msg = step(hazard)
+            self.assertEqual((msg.mode, msg.target_linear_m_s, msg.slope_ff_pwm), (2, 0, 0))
+            for _ in range(12):
+                self.assertEqual(step(Message.TOF_NORMAL).mode, 2)
+            for _ in range(80):
+                self.assertEqual(step(Message.TOF_INVALID, False).mode, 2)
+            for _ in range(8):
+                self.assertEqual(step(Message.TOF_NORMAL).mode, 2)
+            for _ in range(5):
+                msg = step(Message.TOF_NORMAL)
+            self.assertEqual(msg.mode, Message.DRIVE)
+        step(Message.TOF_DROP)
+        n._status_reasons = lambda now: ['estop']
+        self.assertEqual(step(Message.TOF_DROP).mode, Message.BRAKE)
 
 
 if __name__ == '__main__':

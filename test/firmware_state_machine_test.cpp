@@ -290,7 +290,7 @@ int main() {
   assert(handleCommand(motion_enable_command));
   assert(g_state == ControllerState::ARMED);
 
-  // v5 explicit BRAKE stays enabled and releases on a newer DRIVE command.
+  // v6 explicit BRAKE stays enabled and releases on a newer DRIVE command.
   g_pressure_adc = 200;
   g_pressure.begin(g_test_millis);
   g_session_active = true;
@@ -300,23 +300,36 @@ int main() {
   g_watchdog_timed_out = false;
   g_deadman_release_ramp_active = false;
   g_have_command_sequence = false;
-  uint8_t v5[proto::COMMAND_PAYLOAD_SIZE] = {};
-  proto::writeU16(v5 + 4, 200U);
-  v5[6] = 1U; v5[10] = 100U; v5[11] = 1U;
+  uint8_t command[proto::COMMAND_PAYLOAD_SIZE] = {};
+  proto::writeU16(command + 4, 200U);
+  command[6] = 1U; command[10] = 100U; command[11] = 1U;
   proto::FrameView brake_frame={proto::TYPE_COMMAND,0U,100U,
-      proto::COMMAND_PAYLOAD_SIZE,g_session_id,g_test_millis,v5};
+      proto::COMMAND_PAYLOAD_SIZE,g_session_id,g_test_millis,command};
   assert(handleCommand(brake_frame));
   assert(g_state==ControllerState::ARMED && g_brake_requested);
   assert(!handleCommand(brake_frame)); // duplicate cannot refresh/alter state
   brake_frame.sequence=101U;
-  v5[11]=0U; proto::writeI32(v5,696L); proto::writeI16(v5+8,8);
+  command[11]=0U; proto::writeI32(command,696L); proto::writeI16(command+8,8);
   assert(handleCommand(brake_frame));
   assert(!g_brake_requested && g_slope_ff_pwm==8 && g_requested_mrad_s==696L);
-  brake_frame.sequence=102U; v5[10]=101U;
+  brake_frame.sequence=102U; command[10]=101U;
   assert(!handleCommand(brake_frame));
   assert(g_last_command_sequence==101U && g_drive_pwm_cap==100U);
-  v5[10]=100U; brake_frame.payload_length=8U;
+  command[10]=100U; brake_frame.payload_length=8U;
   assert(!handleCommand(brake_frame)); // no implicit legacy command acceptance
+
+  brake_frame.payload_length=proto::COMMAND_PAYLOAD_SIZE;
+  brake_frame.sequence=102U;
+  proto::writeI32(command,0L); proto::writeI16(command+8,0);
+  command[11]=2U;
+  assert(handleCommand(brake_frame));
+  assert(g_terrain_stop_requested && !g_brake_requested);
+  brake_frame.sequence=103U;
+  proto::writeI32(command,696L);
+  assert(!handleCommand(brake_frame));  // stop mode cannot carry drive torque
+  command[11]=0U;
+  assert(handleCommand(brake_frame));
+  assert(!g_terrain_stop_requested);
 
   printf("firmware watchdog/session state-machine tests: OK\n");
   return 0;

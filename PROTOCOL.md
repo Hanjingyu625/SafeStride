@@ -1,8 +1,8 @@
-# SafeStride 직렬 통신 프로토콜 v5
+# SafeStride 직렬 통신 프로토콜 v6
 
 Drive/Terrain Uno와 Raspberry Pi가 사용하는 115200 baud, little-endian,
-COBS+CRC16-CCITT-FALSE 프로토콜이다. 호환성 값은 version `5`, schema
-`0x0501`, release `20260906`이다.
+COBS+CRC16-CCITT-FALSE 프로토콜이다. 호환성 값은 version `6`, schema
+`0x0601`, release `20260908`이다.
 
 공통 16-byte 헤더는 `<BBBBHHII>`이며 version, type, flags, reserved,
 sequence, payload length, session ID, MCU timestamp 순서다. flags와 reserved는
@@ -36,7 +36,7 @@ Drive telemetry의 왼쪽/오른쪽 pulse와 velocity 필드는 wire 호환을 �
 | 0 | `uint16` | TOF raw mm |
 | 2 | `uint8` | TOF valid |
 | 3 | `uint8` | 0 normal, 1 raised candidate, 2 drop candidate, 3 raised, 4 drop, 5 invalid |
-| 4, 6 | `uint16` | EMA filtered mm, adaptive reference mm |
+| 4, 6 | `uint16` | EMA filtered mm, 고정 설치기하 기준 거리 mm |
 | 8, 10 | `int16` | reference error mm, per-frame change mm |
 | 12..16 | `int16` ×3 | MPU6050 acceleration, mg |
 | 18..22 | `int16` ×3 | MPU6050 angular velocity, mrad/s |
@@ -46,13 +46,15 @@ Drive telemetry의 왼쪽/오른쪽 pulse와 velocity 필드는 wire 호환을 �
 | 31..44 | `uint8` ×14 | 예약 영역, 항상 0 |
 
 Drive Uno는 session, 최신 command TTL, Hall 보정, 양손 압력, fault 및 명시적
-enable을 모두 만족할 때만 PWM을 허용한다. 단차 확정 시 ROS가 한 번 0 명령을
-발행한 뒤 명령 송신을 중단하므로 Drive command watchdog도 안전 정지한다.
+enable을 모두 만족할 때만 PWM을 허용한다. 단차 확정 시 ROS가 `TERRAIN_STOP`
+명령을 계속 보내며 Drive Uno는 직전 실제 PWM을 3초 동안 0으로 낮춘 뒤
+`IN1=IN2=LOW`를 유지한다. TOF 무효·통신 누락은 진단만 발행하며 새 정지를
+시작하지 않지만, 이미 확인된 단차 정지는 유효한 정상 지면 확인 전까지 해제하지 않는다.
 
-## v5 속도제어 계약
+## v6 속도·단차정지 계약
 
-v4 COMMAND는 수용하지 않는다. Drive/Terrain Uno와 Pi를 함께 갱신한다.
-`/drive/command`의 `DriveCommand`는 목표속도·경사 FF·상한·BRAKE mode를 한 메시지로
+이전 버전 COMMAND는 수용하지 않는다. Drive/Terrain Uno와 Pi를 함께 갱신한다.
+`/drive/command`의 `DriveCommand`는 목표속도·경사 FF·상한·정지 mode를 한 메시지로
 전달한다. `/cmd_vel_safe`는 감독된 속도 관찰용 `TwistStamped`로 계속 발행한다.
 bridge는 `/drive/command`만 정상 주행 입력으로 구독하며 ROS stamp가 미래이거나
 0.5초보다 오래된 메시지를 거부한다. 수신 후에도 monotonic timeout 0.5초를 적용한다.
@@ -66,12 +68,14 @@ MCU는 기존 CRC/session/단조 sequence 및 TTL 20~250ms 검사를 유지한�
 | 7 | uint8 | reserved, 반드시 0 |
 | 8 | int16 | slope FF PWM counts, -60~30 |
 | 10 | uint8 | drive PWM cap, 0~100 |
-| 11 | uint8 | 0 DRIVE / 1 BRAKE |
+| 11 | uint8 | 0 DRIVE / 1 BRAKE / 2 TERRAIN_STOP |
 
-BRAKE에서는 target=0, slope FF=0이어야 한다. enable=1인 BRAKE는 링크를 유지하면서
+BRAKE와 TERRAIN_STOP에서는 target=0, slope FF=0이어야 한다. enable=1인 BRAKE는 링크를 유지하면서
 `IN1=IN2=LOW` 상태를 요청한다. 경사 BRAKE 때문에 새 fault나 수동 재시작 잠금을
 만들지 않으며 최신 DRIVE 명령으로 자동 복귀한다. enable=0·기존 fault·watchdog
-처리는 별개로 유지된다. 음수 target은 후진 명령이며 제동 요청이 아니다.
+처리는 별개로 유지된다. TERRAIN_STOP은 실제 PWM을 3초간 선형 감소시키고 이후
+BRAKE를 유지하며, 복귀 출력은 정상 제어 목표에 도달할 때까지 10 count/s로 제한한다.
+음수 target은 후진 명령이며 제동 요청이 아니다.
 
 기존 Drive telemetry 0..41 필드는 그대로 두고 다음 필드를 추가했다.
 

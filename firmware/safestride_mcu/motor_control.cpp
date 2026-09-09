@@ -127,6 +127,8 @@ void DriveController::begin() {
 
 // 00 핀 상태와 PWM 0으로 BRAKE를 유지하고 제어 출력 이력을 초기화한다. 기계식 위치 고정은 아니다.
 void DriveController::disableImmediately() {
+  // A higher-priority stop must never restore the saved pre-stop PWM.
+  terrain_start_pwm_ = 0.0F;
   analogWrite(cfg::MOTOR_PWM_PIN, 0);
   digitalWrite(cfg::MOTOR_IN1_PIN, LOW);
   digitalWrite(cfg::MOTOR_IN2_PIN, LOW);
@@ -353,7 +355,8 @@ void DriveController::update(
     bool fade_pwm_during_deceleration,
     int16_t slope_ff_pwm,
     uint8_t pwm_cap,
-    bool brake_requested) {
+    bool brake_requested,
+    bool terrain_stop_requested) {
   if (elapsed_us == 0UL) {
     return;
   }
@@ -375,6 +378,31 @@ void DriveController::update(
   // consecutive, newly observed absolute overspeed periods. Re-evaluating one
   // stale period at 200 Hz made a single Hall sample look like sustained
   // overspeed and stopped the motor shortly after its second startup pulse.
+  // A dedicated mode is necessary: ramping the speed setpoint can make the
+  // speed controller add PWM. Fade the actual actuator output instead.
+  if ((terrain_stop_requested ||
+       (terrain_stop_active_ && terrain_stop_elapsed_us_ < 3000000UL)) && !brake_requested &&
+      !fade_pwm_during_deceleration) {
+    if (!terrain_stop_active_) {
+      terrain_stop_active_ = true;
+      terrain_recovering_ = true;
+      terrain_stop_elapsed_us_ = 0UL;
+      terrain_start_pwm_ = last_commanded_pwm_;
+    }
+    const uint32_t duration = 3000000UL;
+    terrain_stop_elapsed_us_ += elapsed_us < duration - terrain_stop_elapsed_us_
+        ? elapsed_us : duration - terrain_stop_elapsed_us_;
+    motor_pid_ = {0.0F, 0.0F};
+    ff_pwm_ = feedback_pwm_ = 0.0F;
+    updateHallPlausibility(left_hall, right_hall, elapsed_us, false);
+    const float ratio = 1.0F - static_cast<float>(terrain_stop_elapsed_us_) / duration;
+    const float terrain_cap = fminf(static_cast<float>(pwm_cap), fabsf(last_commanded_pwm_));
+    writeMotor(clampFloat(terrain_start_pwm_ * ratio, -terrain_cap, terrain_cap));
+    if (terrain_stop_elapsed_us_ == duration) applied_target_mrad_s_ = 0.0F;
+    return;
+  }
+  terrain_stop_active_ = false;
+
   const float raw_speed = hallSpeedMagnitude(left_hall, 0UL, elapsed_us);
   if (new_pulse_ && speed_valid_) {
     if (raw_speed > cfg::SPEED_BRAKE_ABSOLUTE_MRAD_S) {
@@ -485,13 +513,24 @@ void DriveController::update(
       -cfg::MOTOR_FF_NOMINAL_PWM, cfg::MOTOR_FF_NOMINAL_PWM);
   // 출력 크기를 늘릴 때 20count/s, 줄일 때 60count/s로 제한한다.
   // 0→60은 약 3초 이상 걸리며 실제 지면 속도 도달 시간과 같지 않다.
+  // After a terrain stop, retain the slower rise limit. The speed controller
+  // determines the PWM needed at target speed; there is no blind PWM sweep.
+  const float desired_output = output;
+  const float rise = terrain_recovering_
+      ? cfg::TERRAIN_RECOVERY_PWM_RISE_PER_S : cfg::MOTOR_PWM_RISE_PER_S;
   const float rate = fabsf(output) > fabsf(last_commanded_pwm_)
-      ? cfg::MOTOR_PWM_RISE_PER_S : cfg::MOTOR_PWM_FALL_PER_S;
+      ? rise : cfg::MOTOR_PWM_FALL_PER_S;
+  const bool terrain_recovery_complete =
+      terrain_recovering_ && fabsf(desired_output) >= 0.5F &&
+      fabsf(desired_output - last_commanded_pwm_) <= rate * dt_seconds + 0.001F;
   output = last_commanded_pwm_ + clampFloat(output - last_commanded_pwm_,
       -rate * dt_seconds, rate * dt_seconds);
   // A new cap and the requested direction apply even while slewing.
   output = clampFloat(compensateMotorDeadzone(output, target), -cap, cap);
   writeMotor(output);
+  if (terrain_recovery_complete) {
+    terrain_recovering_ = false;
+  }
 }
 
 // 바퀴 대신 손으로 자석을 움직이는 시험 전용 경로. 정상 속도 제어/고장 감시와 혼동하지 않는다.

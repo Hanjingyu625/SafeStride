@@ -94,6 +94,7 @@ safety_supervisor:
     # TOF is telemetry-only on the current hardware; MPU slope assistance stays
     # active, and an invalid MPU sample falls back to a neutral speed scale.
     require_range_sensors: false
+    terrain_stop_enabled: true  # confirmed ToF hazard only; invalid is diagnostic
     require_surface_condition: false
     surface_control_enabled: false
     drive_command_topic: /drive/command

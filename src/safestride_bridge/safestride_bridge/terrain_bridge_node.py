@@ -513,7 +513,7 @@ class TerrainBridgeNode(Node):
             message.tof_change_m = float('nan')
             message.tof_valid = False
             message.tof_alert = TerrainStatus.TOF_INVALID
-            message.terrain_hazard = True
+            message.terrain_hazard = False
             message.fault_bits = 0
             message.telemetry_age = float('inf')
             message.pitch_rad = float('nan')
@@ -532,8 +532,8 @@ class TerrainBridgeNode(Node):
             message.tof_change_m = telemetry.tof_change_mm / 1000.0
             message.tof_alert = telemetry.tof_alert
             message.terrain_hazard = (
-                not telemetry.tof_valid
-                or telemetry.tof_alert
+                telemetry.tof_valid
+                and telemetry.tof_alert
                 in (TerrainStatus.TOF_RAISED, TerrainStatus.TOF_DROP)
             )
             message.fault_bits = telemetry.fault_bits
@@ -592,8 +592,8 @@ class TerrainBridgeNode(Node):
             status.level = DiagnosticStatus.WARN
             status.message = 'Terrain firmware lacks MPU6050 capability'
         elif telemetry is None or not telemetry.tof_valid:
-            status.level = DiagnosticStatus.ERROR
-            status.message = 'TOF-10120 reading invalid'
+            status.level = DiagnosticStatus.WARN
+            status.message = 'TOF-10120 unavailable (diagnostic only)'
         elif not telemetry.mpu_valid:
             status.level = DiagnosticStatus.WARN
             status.message = 'MPU6050 reading invalid'

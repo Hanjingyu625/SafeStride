@@ -64,7 +64,10 @@ bash scripts/run.sh
 운영 직렬 장치는 `/dev/safestride-drive`, `/dev/safestride-terrain`, GPIO UART
 `/dev/serial0` 또는 `/dev/ttyS0`이다. `scripts/run.sh`가 GPS UART를 자동으로
 선택하며 `SAFESTRIDE_GPS_PORT`로 덮어쓸 수 있다. 펌웨어는
-프로토콜 v5이므로 두 Uno와 Pi 소프트웨어를 함께 갱신한다.
+프로토콜 v6이므로 두 Uno와 Pi 소프트웨어를 함께 갱신한다.
+ToF 장애물·낙차 확정 감지는 기본 활성화되며, 3초 PWM 감속 후 BRAKE와
+유효 정상 측정 후 자동 재가속을 수행한다. 측정 불가는 진단만 알린다.
+설치 조건과 배포·검증 방법은 [ToF 정지 안내](docs/TOF_STOP_KO.md)를 참고한다.
 
 ```bash
 arduino-cli compile --fqbn arduino:avr:uno firmware/safestride_mcu

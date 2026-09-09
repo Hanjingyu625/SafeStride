@@ -23,7 +23,7 @@ arduino-cli upload --fqbn arduino:avr:uno -p /dev/safestride-drive \
 
 ## pdj1 속도제어 (2026-09-06)
 
-프로토콜 v5로 목표속도·경사 FF·PWM cap·BRAKE를 함께 받는다. 평지 기준은 PWM
+프로토콜 v6로 목표속도·경사 FF·PWM cap·BRAKE/TERRAIN_STOP을 함께 받는다. 평지 기준은 PWM
 60, FF bias는 30이며 하한을 강제하지 않는다. Hall 무펄스 대기는 5초다.
 DRI0042 참고 제어표의 BRAKE(LOW/LOW)를 유지하고 경사 조건 해소 시 자동 복귀한다.
 기존 dead-man·watchdog·하드웨어 fault 처리는 유지한다.

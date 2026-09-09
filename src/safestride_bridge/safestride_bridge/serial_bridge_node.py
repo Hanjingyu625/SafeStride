@@ -830,8 +830,8 @@ class SerialBridgeNode(Node):
                (stamp.sec + stamp.nanosec / 1e9))
         valid = (math.isfinite(linear) and 0.0 <= age <= self._command_timeout and
                  -60 <= message.slope_ff_pwm <= 30 and
-                 0 <= message.drive_pwm_cap <= 100 and message.mode in (0, 1) and
-                 (message.mode != 1 or (linear == 0.0 and message.slope_ff_pwm == 0)))
+                 0 <= message.drive_pwm_cap <= 100 and message.mode in (0, 1, 2) and
+                 (message.mode == 0 or (linear == 0.0 and message.slope_ff_pwm == 0)))
         if not valid:
             with self._lock:
                 self._last_command_time = None

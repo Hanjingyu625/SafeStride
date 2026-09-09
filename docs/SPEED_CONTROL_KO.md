@@ -12,7 +12,7 @@ Terrain Uno MPU6050 → USB → terrain bridge → /terrain/status
 /cmd_vel → safety supervisor → /drive/command (DriveCommand)
                                    ↓
                               serial bridge
-                                   ↓ USB protocol v5
+                                   ↓ USB protocol v6
 Drive Uno: 목표 ramp → FF + Hall P → 방향/상한 제한 → PWM slew → 모터드라이버
                 ↑                                       ↓
           A3 WSH135, 12 pulse/rev                   모터 두 개 공통 구동
@@ -178,7 +178,7 @@ ROS 제어·표준 메시지 단위는 m/s, rad/s를 유지하고 다음 km/h �
 `/diagnostics`에는 정규화 pitch·경사 상태·목표속도·slope FF·MCU PWM·속도 age/valid와
 BRAKE 상태를 기록한다. 명시적 경사·과속 BRAKE 처리 시 MCU FF/P 표시값과 applied PWM은 0이다.
 
-프로토콜 **v5 / schema 0x0501 / release 20260906**은 v4와 호환되지 않는다.
+프로토콜 **v6 / schema 0x0601 / release 20260908**은 이전 버전과 호환되지 않는다.
 COMMAND는 12 bytes, Drive telemetry는 54 bytes다. [상세 형식](../PROTOCOL.md).
 **Drive Uno, Terrain Uno, Pi ROS 메시지와 노드를 함께 갱신**해야 한다.
 

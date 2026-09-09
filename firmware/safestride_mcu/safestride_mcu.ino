@@ -61,6 +61,7 @@ bool g_watchdog_timed_out = false;
 int16_t g_slope_ff_pwm = 0;
 uint8_t g_drive_pwm_cap = cfg::MAX_PWM;
 bool g_brake_requested = false;
+bool g_terrain_stop_requested = false;
 bool g_new_pulse_since_telemetry = false;
 bool g_valid_command_seen = false;
 bool g_session_active = false;
@@ -489,8 +490,8 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   const int16_t slope_ff = static_cast<int16_t>(proto::readU16(frame.payload + 8U));
   const uint8_t pwm_cap = frame.payload[10U];
   const uint8_t mode = frame.payload[11U];
-  if (slope_ff < -60 || slope_ff > 30 || pwm_cap > cfg::MAX_PWM || mode > 1U ||
-      (mode == 1U && (target != 0L || slope_ff != 0))) return false;
+  if (slope_ff < -60 || slope_ff > 30 || pwm_cap > cfg::MAX_PWM || mode > 2U ||
+      (mode != 0U && (target != 0L || slope_ff != 0))) return false;
   if ((enable != 0U && enable != 1U) || reserved != 0U) {
     return false;
   }
@@ -551,7 +552,7 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   }
 
   if (g_state == ControllerState::DISARMED) {
-    if (mode != 1U && !cfg::MAGNET_BENCH_MODE && !cfg::DEADMAN_DIRECT_DRIVE &&
+    if (mode == 0U && !cfg::MAGNET_BENCH_MODE && !cfg::DEADMAN_DIRECT_DRIVE &&
         !stationaryDwellMet()) {
       return false;
     }
@@ -560,6 +561,7 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
     g_slope_ff_pwm = slope_ff;
     g_drive_pwm_cap = pwm_cap;
     g_brake_requested = mode == 1U;
+    g_terrain_stop_requested = mode == 2U;
     g_requested_mrad_s = target;
     return true;
   }
@@ -571,6 +573,7 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   g_slope_ff_pwm = slope_ff;
   g_drive_pwm_cap = pwm_cap;
   g_brake_requested = mode == 1U;
+  g_terrain_stop_requested = mode == 2U;
   g_requested_mrad_s = target;
   return true;
 }
@@ -656,7 +659,8 @@ void runControlLoop(uint32_t now_us) {
         g_deadman_release_ramp_active,
         g_slope_ff_pwm,
         g_drive_pwm_cap,
-        g_brake_requested);
+        g_brake_requested,
+        g_terrain_stop_requested);
   }
   g_new_pulse_since_telemetry |= g_drive.newPulse();
   const uint8_t hall_faults = g_drive.hallFaultMask();

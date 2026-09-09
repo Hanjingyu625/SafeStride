@@ -10,7 +10,7 @@ import launch_testing.actions
 import pytest
 import rclpy
 
-from safestride_interfaces.msg import TerrainStatus, WalkerStatus
+from safestride_interfaces.msg import DriveCommand, TerrainStatus, WalkerStatus
 
 
 @pytest.mark.launch_test
@@ -35,6 +35,7 @@ def generate_test_description():
             'safe_command_topic': '/test/cmd_vel_safe',
             'status_topic': '/test/walker_status',
             'terrain_status_topic': '/test/terrain_status',
+            'drive_command_topic': '/test/drive_command',
         }],
     )
     return launch.LaunchDescription([
@@ -59,6 +60,10 @@ class TestTerrainFailSafe(unittest.TestCase):
             TerrainStatus, '/test/terrain_status', 10
         )
         cls.outputs = []
+        cls.drive_modes = []
+        cls.node.create_subscription(
+            DriveCommand, '/test/drive_command',
+            lambda message: cls.drive_modes.append(message.mode), 10)
         cls.node.create_subscription(
             TwistStamped,
             '/test/cmd_vel_safe',
@@ -129,3 +134,4 @@ class TestTerrainFailSafe(unittest.TestCase):
         self._publish_inputs(TerrainStatus.TOF_DROP, 1.0)
         self.assertTrue(self.outputs)
         self.assertEqual(self.outputs[-1], 0.0)
+        self.assertEqual(self.drive_modes[-1], DriveCommand.TERRAIN_STOP)

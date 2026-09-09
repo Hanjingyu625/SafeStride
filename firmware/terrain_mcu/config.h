@@ -23,10 +23,10 @@ constexpr uint16_t TOF_MAX_VALID_DISTANCE_MM = 2000U;
 
 // 측정 필터는 0.3, 정상 지면 기준 추적은 0.02. 오차/변화/연속 프레임 조건을 함께 사용한다.
 constexpr float TOF_FILTER_ALPHA = 0.3F;
-constexpr float TOF_REFERENCE_ALPHA = 0.02F;
-constexpr float TOF_ERROR_THRESHOLD_MM = 60.0F;
-constexpr float TOF_CHANGE_THRESHOLD_MM = 10.0F;
-constexpr float TOF_REFERENCE_FREEZE_THRESHOLD_MM = 30.0F;
+// Fixed mounting: 442 mm above ground, 45 degrees down, 75 mm behind wheel.
+// Convert the 250 mm vertical threshold to distance along the optical ray.
+constexpr float TOF_GROUND_DISTANCE_MM = 442.0F * 1.41421356F;
+constexpr float TOF_ERROR_THRESHOLD_MM = 250.0F * 1.41421356F;
 constexpr uint8_t TOF_BASELINE_SAMPLES = 10U;
 constexpr uint8_t TOF_REQUIRED_FRAMES = 4U;
 constexpr uint16_t TOF_RED_HOLD_MS = 1000U;
@@ -60,9 +60,6 @@ static_assert(
 static_assert(
     TOF_FILTER_ALPHA > 0.0F && TOF_FILTER_ALPHA <= 1.0F,
     "TOF filter alpha must be in (0, 1]");
-static_assert(
-    TOF_REFERENCE_ALPHA > 0.0F && TOF_REFERENCE_ALPHA <= 1.0F,
-    "TOF reference alpha must be in (0, 1]");
 static_assert(
     TOF_REQUIRED_FRAMES > 0U,
     "TOF required frame count must be positive");

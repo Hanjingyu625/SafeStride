@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "config.h"
 #include "motor_control.h"
@@ -93,6 +94,37 @@ int main() {
   run(boundary,20,696,32000UL);
   assert(boundary.appliedTargetMradS()>0);
 
+  {
+    DriveController terrain; terrain.begin(); primeFeedback(terrain);
+    run(terrain,800,696,1504595UL);
+    const int initial = g_motor_pwm;
+    HallSample h = {1000, 1504595UL, 0};
+    int previous = initial;
+    for (int i=1; i<=600; ++i) {
+      terrain.update(5000,h,h,0,true,true,0,false,0,100,false,true);
+      assert(g_motor_pwm <= previous);
+      assert(abs(g_motor_pwm - static_cast<int>(initial*(600-i)/600.0F+0.5F)) <= 1);
+      previous = g_motor_pwm;
+    }
+    assert(g_motor_pwm==0 && terrain.braking());
+    assert(g_motor_in1_level==LOW && g_motor_in2_level==LOW);
+    terrain.update(5000,h,h,0,true,true,0,false,0,100,false,true);
+    assert(g_motor_pwm==0);  // repeated stop commands do not restart the fade
+    HallSample absent = {1000,0,0xFFFFFFFFUL};
+    for (int i=0;i<200;++i)
+      terrain.update(5000,absent,absent,696,true,true);
+    assert(g_motor_pwm >= 9 && g_motor_pwm <= 10);
+    // Recovery uses 10 count/s only until it catches the normal controller
+    // output. A later demand change returns to the ordinary 20 count/s slew.
+    run(terrain,1020,696,752297UL);
+    assert(g_motor_pwm == 60);
+    run(terrain,20,696,752297UL,30);
+    assert(g_motor_pwm >= 62);
+    terrain.update(5000,absent,absent,0,true,true,0,false,0,100,false,true);
+    terrain.update(5000,absent,absent,0,false);
+    terrain.update(5000,absent,absent,0,true,true,0,false,0,100,false,true);
+    assert(g_motor_pwm==0);  // an interlock cannot restore captured PWM
+  }
   // Feed-forward replaces the old FF10 plus hard minimum 80.
   DriveController d; d.begin(); primeFeedback(d);
   run(d,800,696,752297UL);

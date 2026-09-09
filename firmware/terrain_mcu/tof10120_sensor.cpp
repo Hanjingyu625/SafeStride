@@ -84,7 +84,7 @@ void Tof10120Sensor::classify(
   distance_mm_ = distance_mm;
   if (!initialized_) {
     filtered_mm_ = static_cast<float>(distance_mm);
-    reference_mm_ = filtered_mm_;
+    reference_mm_ = cfg::TOF_GROUND_DISTANCE_MM;
     error_mm_ = 0.0F;
     change_mm_ = 0.0F;
     initialized_ = true;
@@ -101,14 +101,12 @@ void Tof10120Sensor::classify(
   error_mm_ = filtered_mm_ - reference_mm_;
   change_mm_ = filtered_mm_ - previous_filtered;
 
-  // Establish a stable downward-looking baseline before declaring the sensor
-  // ready. The ROS supervisor remains stopped while tof_valid is false.
-  // 초기 10개 측정으로 기준 거리를 만든다. 수집 중에는 valid=false이므로 정상 지면으로 확정하지 않는다.
+  // Warm the downward-looking filter before declaring the sensor ready.
+  // During warmup tof_valid=false is diagnostic-only and cannot start a stop.
+  // 초기 10개 측정 동안에는 valid=false이며 정상/위험 지면으로 확정하지 않는다.
+  // Never learn a startup obstacle as the ground plane.
   if (baseline_count_ < cfg::TOF_BASELINE_SAMPLES) {
     ++baseline_count_;
-    reference_mm_ +=
-        (filtered_mm_ - reference_mm_) /
-        static_cast<float>(baseline_count_);
     error_mm_ = filtered_mm_ - reference_mm_;
     valid_ = baseline_count_ >= cfg::TOF_BASELINE_SAMPLES;
     alert_ = valid_ ? TofAlert::NORMAL : TofAlert::INVALID;
@@ -129,10 +127,8 @@ void Tof10120Sensor::classify(
     candidate_direction_ = 0;
   } else {
     const bool same_direction = candidate_direction_ == direction;
-    const bool changed_enough =
-        fabsf(change_mm_) >= cfg::TOF_CHANGE_THRESHOLD_MM;
     if (!same_direction) {
-      consecutive_count_ = changed_enough ? 1U : 0U;
+      consecutive_count_ = 1U;
       candidate_direction_ = direction;
     } else if (consecutive_count_ > 0U &&
                consecutive_count_ < cfg::TOF_REQUIRED_FRAMES) {
@@ -164,12 +160,8 @@ void Tof10120Sensor::classify(
     alert_ = TofAlert::CANDIDATE_RAISED;
   } else {
     alert_ = TofAlert::NORMAL;
-    // 정상이며 오차가 작은 구간에서만 기준을 느리게 갱신한다. 위험 지형을 새 정상 기준으로 흡수하지 않게 한다.
-    if (fabsf(error_mm_) < cfg::TOF_REFERENCE_FREEZE_THRESHOLD_MM) {
-      reference_mm_ = cfg::TOF_REFERENCE_ALPHA * filtered_mm_ +
-                      (1.0F - cfg::TOF_REFERENCE_ALPHA) * reference_mm_;
-      error_mm_ = filtered_mm_ - reference_mm_;
-    }
+    // Keep the surveyed ground reference fixed: slow obstacles must not be
+    // absorbed by baseline adaptation. Recalibrate after changing the mount.
   }
 }
 

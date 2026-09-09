@@ -18,8 +18,8 @@ drive:
   requires_explicit_ros_enable: false
   wheel_radius_m: 0.115
   wheel_separation_m: 0.55
-  # Current six-magnet left-wheel preset. Use 5 here and in both runtime
-  # configs if five magnets are installed on the sensed wheel.
+  # Current twelve-magnet left-wheel preset. Keep this value identical in the
+  # Drive firmware and both runtime configs after physical recounting.
   hall_pulses_per_revolution: 12
   hall_calibrated: true
   hall_sensor_layout: single_left
@@ -32,8 +32,8 @@ terrain:
   tof:
     interface: I2C
     address_7bit: 0x52
-    mount_height_m: 0.25
-    mount_pitch_deg: null
+    mount_height_m: 0.442
+    mount_pitch_deg: 45.0
   imu:
     module: GY-521 MPU6050
     address_7bit: 0x68

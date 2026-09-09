@@ -8,6 +8,16 @@ The production target is Raspberry Pi 4 running 64-bit Ubuntu Server 24.04
 (Noble), ROS 2 Jazzy and Python 3.12. Windows is an editing and host-unit-test
 environment; release acceptance happens on arm64 Linux.
 
+On Windows with Visual Studio C++ Build Tools installed, run the eight
+firmware host tests without WSL:
+
+```powershell
+cmd /c scripts\test_firmware_windows.cmd
+```
+
+The script locates the current Visual Studio toolchain with `vswhere` and
+writes compiler outputs only under `%TEMP%`.
+
 ## Raspberry Pi installation
 
 ```bash
@@ -42,7 +52,7 @@ expects `/dev/safestride-drive`, `/dev/safestride-terrain` and a GPIO UART.
 GPIO serial -> `gps_node`; Terrain Uno does not receive or relay GPS data.
 
 Both Arduino sketches must be flashed after a wire-protocol change. Protocol
-v5 is intentionally incompatible with older firmware, so
+v6 is intentionally incompatible with older firmware, so
 the Drive MCU, Terrain MCU and ROS bridge must be updated together.
 
 For unattended startup, first review `config/raspberry_pi.yaml`, install the

@@ -108,6 +108,7 @@ constexpr uint8_t MOTOR_FF_BIAS_PWM = 30U;
 constexpr uint8_t MOTOR_FF_NOMINAL_PWM = 60U;
 constexpr float MOTOR_NOMINAL_MRAD_S = 0.08F / 0.115F * 1000.0F;
 constexpr float MOTOR_PWM_RISE_PER_S = 20.0F;
+constexpr float TERRAIN_RECOVERY_PWM_RISE_PER_S = 10.0F;
 constexpr float MOTOR_PWM_FALL_PER_S = 60.0F;
 constexpr uint32_t MOTOR_REVERSAL_BRAKE_US = 150000UL;
 // Target tracking error is handled by the Hall P term. A hard BRAKE is reserved

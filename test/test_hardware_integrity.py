@@ -170,7 +170,7 @@ class TestHardwareIntegrity(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn(
-            "if not self._require_ranges:\n            return []",
+            "if not self.get_parameter('terrain_stop_enabled').value:",
             supervisor,
         )
         self.assertIn("require_terrain_tof", launch)
@@ -282,13 +282,13 @@ class TestHardwareIntegrity(unittest.TestCase):
 
     def test_protocol_compatibility_constants_are_synchronized(self):
         for protocol in (self.drive_protocol, self.terrain_protocol):
-            self.assertEqual(constant_expression(protocol, "VERSION"), "5U")
+            self.assertEqual(constant_expression(protocol, "VERSION"), "6U")
             self.assertEqual(
-                constant_expression(protocol, "SCHEMA_ID"), "0x0501U"
+                constant_expression(protocol, "SCHEMA_ID"), "0x0601U"
             )
             self.assertEqual(
                 constant_expression(protocol, "FIRMWARE_RELEASE_ID"),
-                "20260906UL",
+                "20260908UL",
             )
             self.assertEqual(
                 constant_expression(protocol, "HELLO_PAYLOAD_SIZE"),
@@ -298,10 +298,10 @@ class TestHardwareIntegrity(unittest.TestCase):
                 constant_expression(protocol, "SESSION_START_PAYLOAD_SIZE"),
                 "12U",
             )
-        self.assertIn("PROTOCOL_VERSION = 5", self.python_protocol)
-        self.assertIn("PROTOCOL_SCHEMA_ID = 0x0501", self.python_protocol)
+        self.assertIn("PROTOCOL_VERSION = 6", self.python_protocol)
+        self.assertIn("PROTOCOL_SCHEMA_ID = 0x0601", self.python_protocol)
         self.assertIn(
-            "FIRMWARE_RELEASE_ID = 20260906", self.python_protocol
+            "FIRMWARE_RELEASE_ID = 20260908", self.python_protocol
         )
 
     def test_calibrated_single_left_hall_and_pressure(self):
