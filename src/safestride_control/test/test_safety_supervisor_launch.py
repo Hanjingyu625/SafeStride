@@ -122,7 +122,7 @@ class TestTerrainFailSafe(unittest.TestCase):
         self._publish_inputs(
             TerrainStatus.TOF_NORMAL,
             1.5,
-            TerrainStatus.FAULT_MPU_INVALID,
+            0,
         )
         self.assertTrue(any(value > 0.01 for value in self.outputs))
         self.outputs.clear()

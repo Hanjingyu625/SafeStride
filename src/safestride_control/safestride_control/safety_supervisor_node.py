@@ -17,12 +17,15 @@ from rclpy.qos import (
 from sensor_msgs.msg import Range
 
 from safestride_interfaces.msg import (
+    DriveCommand,
     SurfaceCondition,
     TerrainStatus,
     WalkerStatus,
 )
 from .safety_logic import (
     SlopeSpeedPolicy,
+    SlopeBrakePolicy,
+    slope_feedforward_pwm,
     combine_speed_scales,
     finite_parameter,
 )
@@ -53,6 +56,21 @@ class SafetySupervisor(Node):
         self.declare_parameter('require_surface_condition', False)
         self.declare_parameter('require_deadman', True)
         self.declare_parameter('slope_control_enabled', True)
+        self.declare_parameter('surface_control_enabled', False)
+        self.declare_parameter('drive_command_topic', '/drive/command')
+        self.declare_parameter('brake_enter_deg', 10.0)
+        self.declare_parameter('brake_release_deg', 7.0)
+        self.declare_parameter('brake_recovery_s', 0.5)
+        self.declare_parameter('drive_pwm_cap', 100)
+        self._surface_control_enabled = bool(self.get_parameter('surface_control_enabled').value)
+        self._brake_policy = SlopeBrakePolicy(
+            self.get_parameter('brake_enter_deg').value,
+            self.get_parameter('brake_release_deg').value,
+            self.get_parameter('brake_recovery_s').value)
+        self._drive_pwm_cap = int(finite_parameter('drive_pwm_cap',
+            self.get_parameter('drive_pwm_cap').value, minimum=0.0, maximum=100.0))
+        self._slope_braking = False
+        self._slope_ff_pwm = 0
 
         self.declare_parameter('max_forward_velocity', 0.15)
         self.declare_parameter('max_reverse_velocity', 0.08)
@@ -68,7 +86,7 @@ class SafetySupervisor(Node):
         self.declare_parameter('uphill_pitch_sign', 1.0)
         self.declare_parameter('pitch_offset_rad', 0.0)
         self.declare_parameter('downhill_speed_scale', 0.60)
-        self.declare_parameter('uphill_speed_scale', 1.25)
+        self.declare_parameter('uphill_speed_scale', 1.0)
         self.declare_parameter('max_combined_speed_scale', 1.25)
 
         self.declare_parameter('stop_distance', 0.35)
@@ -353,6 +371,8 @@ class SafetySupervisor(Node):
             qos_profile_sensor_data,
         )
 
+        self._drive_publisher = self.create_publisher(
+            DriveCommand, str(self.get_parameter('drive_command_topic').value), 10)
         self._command_publisher = self.create_publisher(
             TwistStamped,
             str(self.get_parameter('safe_command_topic').value),
@@ -543,6 +563,10 @@ class SafetySupervisor(Node):
             terrain is not None
             and self._age(now, self._last_terrain_time)
             <= self._range_timeout
+            and math.isfinite(float(terrain.telemetry_age))
+            and float(terrain.telemetry_age) >= 0.0
+            and 0.0 <= float(terrain.telemetry_age) + self._age(now, self._last_terrain_time)
+            <= self._range_timeout
             and terrain.mpu_valid
             and not (
                 terrain.fault_bits & TerrainStatus.FAULT_MPU_INVALID
@@ -601,6 +625,8 @@ class SafetySupervisor(Node):
     def _surface_state(
         self, now: float
     ) -> Tuple[List[str], float, int, float]:
+        if not self._surface_control_enabled:
+            return [], 1.0, SurfaceCondition.UNKNOWN, math.nan
         if self._last_surface is None:
             reasons = ['surface_missing'] if self._require_surface else []
             return reasons, 1.0, SurfaceCondition.UNKNOWN, math.nan
@@ -758,6 +784,9 @@ class SafetySupervisor(Node):
         ) = self._surface_state(now)
         hard_stop_reasons.extend(surface_reasons)
         slope_scale, slope_state, normalized_pitch = self._slope_state(now)
+        self._slope_braking = self._brake_policy.update(
+            normalized_pitch, now, self._slope_control_enabled)
+        self._slope_ff_pwm = slope_feedforward_pwm(normalized_pitch, slope_state)
         combined_speed_scale = combine_speed_scales(
             surface_scale,
             slope_scale,
@@ -806,6 +835,10 @@ class SafetySupervisor(Node):
                     dt,
                 )
 
+        if self._slope_braking:
+            self._output_linear = self._output_angular = 0.0
+            operating_notes.append('slope_brake' if math.isfinite(normalized_pitch) else 'imu_brake')
+
         # Keep forwarding a valid supervised command while DISARMED so the
         # automatic bridge can activate the controller as soon as the
         # physical dead-man input is active. Other invalid or stale inputs
@@ -822,6 +855,18 @@ class SafetySupervisor(Node):
             output.twist.linear.x = self._output_linear
             output.twist.angular.z = self._output_angular
             self._command_publisher.publish(output)
+            drive = DriveCommand()
+            drive.header = output.header
+            drive.target_linear_m_s = self._output_linear
+            drive.drive_pwm_cap = self._drive_pwm_cap
+            drive.mode = DriveCommand.BRAKE if (
+                self._slope_braking or motion_stop_reasons or
+                'obstacle_stop' in operating_notes or 'surface_stop' in operating_notes
+            ) else DriveCommand.DRIVE
+            drive.slope_ff_pwm = self._slope_ff_pwm if (
+                drive.mode == DriveCommand.DRIVE and self._output_linear > 0.0
+            ) else 0
+            self._drive_publisher.publish(drive)
         self._command_output_suppressed = not may_stream_command
 
         all_reasons = hard_stop_reasons + operating_notes
@@ -905,6 +950,18 @@ class SafetySupervisor(Node):
         diagnostic.message = ', '.join(all_reasons) if all_reasons else 'ready'
         status = self._last_status
         diagnostic.values = [
+            KeyValue(key='drive_mode', value='BRAKE' if self._slope_braking else 'DRIVE'),
+            KeyValue(key='slope_ff_pwm', value=str(self._slope_ff_pwm)),
+            KeyValue(key='surface_control_enabled', value=_bool_text(self._surface_control_enabled)),
+            KeyValue(key='slope_restart_latched', value='false'),
+            KeyValue(key='ff_pwm', value=str(status.ff_pwm if status else 0)),
+            KeyValue(key='feedback_pwm', value=str(status.feedback_pwm if status else 0)),
+            KeyValue(key='applied_pwm', value=str(status.applied_pwm if status else 0)),
+            KeyValue(key='speed_valid', value=_bool_text(bool(status and status.speed_valid))),
+            KeyValue(key='speed_age_s', value=str(status.speed_age if status else math.inf)),
+            KeyValue(key='direction_valid', value='false'),
+            KeyValue(key='measured_speed_m_s', value=str(status.measured_speed_m_s if status else math.nan)),
+            KeyValue(key='mcu_braking', value=_bool_text(bool(status and status.braking))),
             KeyValue(
                 key='motion_inhibited',
                 value=_bool_text(bool(hard_stop_reasons)),

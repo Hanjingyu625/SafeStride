@@ -22,7 +22,7 @@ Raspberry Pi: BE-220 GPS + serial bridges -> safety supervisor -> diagnostics/Fo
 - 왼쪽 휠 WSH135 아날로그 홀센서만 사용하며 A3, 자석 6개로 설정되어 있다. 공통
   드라이브 구조라 오른쪽 ROS 값은 왼쪽 측정값을 복제한 추정치다.
 - 압력센서 임계값은 좌우 ADC 80이고 dead-man으로 동작한다.
-  별도의 `/walker/set_enabled true` 없이도 정상 링크, fresh `/cmd_vel_safe`,
+  별도의 `/walker/set_enabled true` 없이도 정상 링크, fresh `/drive/command`,
   Hall/TOF와 양손 압력이 모두 유효하면 자동 arm된다. 정상 압력 해제는 0.6초
   목표속도 ramp 후 정지하고 fault, E-stop, watchdog은 즉시 정지한다.
 - TOF는 약 25 cm 아래 지면을 향한다. 초기 기준면 학습 후 EMA 거리,
@@ -31,9 +31,11 @@ Raspberry Pi: BE-220 GPS + serial bridges -> safety supervisor -> diagnostics/Fo
   watchdog이 재활성화 전까지 정지 상태를 유지한다.
 - MPU6050은 3축 가속도·자이로와 중력 기반 roll/pitch를 발행한다. 지자기센서가
   없으므로 yaw는 관측하지 않는다. 5도 이상 pitch가 0.5초 지속되면 경사로
-  확정해 내리막은 감속하고 오르막은 목표속도를 높인다. 장착 부호는
-  `uphill_pitch_sign`으로 반전할 수 있다. MPU 오류는 경사 보정만 중립화하며
-  TOF 단차 안전 정지를 대신하지 않는다.
+  확정해 내리막은 연속 감속하고 오르막은 목표속도를 유지하며 PWM을 보조한다.
+  평지 기준 PWM 60 + 경사 FF + Hall P 제어이며 Hall 대기시간은 5초다.
+  장착 부호는 `uphill_pitch_sign`으로 반전한다. 급내리막·MPU 오류는 BRAKE를
+  유지하고 유효한 복구 조건에서 자동 재개한다. 노면 제어는 비활성 상태다.
+  설정·제동 한계와 시험 절차는 [속도제어 문서](docs/SPEED_CONTROL_KO.md)를 참고한다.
 - GPS는 Raspberry Pi의 별도 serial 장치에서 `gps_node`가 직접 수신한다.
   지도·API가 없으면 횡단보도 노드는
   종료되지 않고 준비 여부만 `/diagnostics`에 표시하며 모터 명령을 발행하지 않는다.
@@ -62,7 +64,7 @@ bash scripts/run.sh
 운영 직렬 장치는 `/dev/safestride-drive`, `/dev/safestride-terrain`, GPIO UART
 `/dev/serial0` 또는 `/dev/ttyS0`이다. `scripts/run.sh`가 GPS UART를 자동으로
 선택하며 `SAFESTRIDE_GPS_PORT`로 덮어쓸 수 있다. 펌웨어는
-프로토콜 v4이므로 두 Uno와 Pi 소프트웨어를 함께 갱신한다.
+프로토콜 v5이므로 두 Uno와 Pi 소프트웨어를 함께 갱신한다.
 
 ```bash
 arduino-cli compile --fqbn arduino:avr:uno firmware/safestride_mcu
@@ -73,6 +75,7 @@ arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
 
 | 이름 | 형식 | 역할 |
 |---|---|---|
+| `/drive/command` | `DriveCommand` | 속도·경사 FF·PWM cap·BRAKE 원자 명령 |
 | `/wheel/hall` | `WheelHall` | 왼쪽 홀센서 및 미러된 공통 속도 |
 | `/handle/pressure` | `HandlePressure` | 좌우 압력과 dead-man 판정 |
 | `/terrain/tof` | `sensor_msgs/Range` | TOF 원거리 |

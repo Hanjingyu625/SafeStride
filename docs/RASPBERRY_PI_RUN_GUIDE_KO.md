@@ -166,7 +166,7 @@ test -r /dev/safestride-terrain && test -w /dev/safestride-terrain
 test -r /dev/serial0 && test -w /dev/serial0
 ```
 
-펌웨어 protocol v4가 두 Uno에 모두 올라가 있어야 한다. `arduino-cli`를 사용하는
+펌웨어 protocol v5가 두 Uno에 모두 올라가 있어야 한다. `arduino-cli`를 사용하는
 경우 각각 컴파일·업로드한다. 현재 MCU 펌웨어에는 외부 Arduino 라이브러리가
 필요하지 않는다.
 

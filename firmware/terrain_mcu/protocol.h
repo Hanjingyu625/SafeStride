@@ -4,9 +4,9 @@
 
 namespace safestride_protocol {
 
-constexpr uint8_t VERSION = 4U;
-constexpr uint16_t SCHEMA_ID = 0x0401U;
-constexpr uint32_t FIRMWARE_RELEASE_ID = 20260826UL;
+constexpr uint8_t VERSION = 5U;
+constexpr uint16_t SCHEMA_ID = 0x0501U;
+constexpr uint32_t FIRMWARE_RELEASE_ID = 20260906UL;
 constexpr uint8_t BOARD_ROLE_DRIVE = 1U;
 constexpr uint8_t BOARD_ROLE_TERRAIN = 2U;
 constexpr uint8_t TYPE_HELLO = 0x01U;

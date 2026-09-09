@@ -40,3 +40,14 @@ uint16 last_applied_command_sequence
 
 # Age of the underlying MCU telemetry when this status was published, seconds.
 float32 telemetry_age
+
+# Protocol v5 drive telemetry. Direction is inferred, never measured.
+int16 ff_pwm
+int16 feedback_pwm
+int16 applied_pwm
+float32 speed_age
+bool speed_valid
+bool new_pulse
+bool direction_valid
+bool braking
+float32 measured_speed_m_s
