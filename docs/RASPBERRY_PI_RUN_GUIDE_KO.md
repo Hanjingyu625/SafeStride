@@ -259,7 +259,7 @@ ros2 topic hz /terrain/imu
 
 - `/walker/status`: `link_ok: true`, `armed: false`, `fault_bits: 0`
 - `/handle/pressure`: 양쪽 ADC 값과 dead-man 판정이 손 입력에 따라 변함
-- `/wheel/hall`: 왼쪽 바퀴를 손으로 한 바퀴 돌리면 pulse가 6 증가함
+- `/wheel/hall`: 왼쪽 바퀴를 손으로 한 바퀴 돌리면 pulse가 12 증가함
 - `/terrain/status`: 초기 약 10샘플 뒤 `tof_valid: true`
 - TOF 정상 기준면: `tof_alert: 0`, `terrain_hazard: false`
 - 물체를 가까이 유지: raised 후보 후 `tof_alert: 3`

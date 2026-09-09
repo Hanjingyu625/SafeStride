@@ -1,3 +1,7 @@
+// Drive Uno의 핀 배치, 센서 판정값, 제어 게인과 시간 제한을 모은 설정.
+// 접미사 US/MS는 시간, MRAD_S는 각속도, PWM은 백분율이 아닌 0~255 count를 뜻한다.
+// Pi의 선속도 제한과 이 파일의 MCU 제한은 서로 다른 단계에서 적용된다.
+
 #pragma once
 
 #include <Arduino.h>
@@ -14,6 +18,7 @@ namespace safestride_config {
 constexpr uint32_t SERIAL_BAUD = 115200UL;
 
 // Scheduler.
+// 제어 계산은 200Hz, 상태 송신은 50Hz. 속도 센서의 실제 갱신률은 펄스 간격에 달려 있다.
 constexpr uint32_t CONTROL_PERIOD_US = 5000UL;   // 200 Hz
 constexpr uint16_t TELEMETRY_PERIOD_MS = 20U;    // 50 Hz
 constexpr uint16_t HELLO_PERIOD_MS = 500U;
@@ -34,6 +39,7 @@ constexpr uint16_t ARM_STATIONARY_DWELL_MS = 250U;
 // Normal deployment follows the supervised ROS velocity target and closes the
 // speed loop with the single installed Hall sensor. The pressure inputs remain
 // the physical motion level, but no longer replace /cmd_vel_safe.
+// false인 현재 설정은 Pi가 감독한 목표속도와 Hall FF+P를 사용한다.
 constexpr bool DEADMAN_DIRECT_DRIVE = false;
 // A normal pressure release ramps the current wheel target to zero over this
 // interval. E-stop, watchdog and hardware faults still call immediateStop().
@@ -42,7 +48,7 @@ constexpr uint16_t DEADMAN_RELEASE_RAMP_MS = 600U;
 // WSH135 is a linear analogue Hall sensor on the LEFT wheel. At 5 V its
 // no-field output is near 2.5 V. A3 is sampled around that boot-time baseline;
 // either magnetic polarity counts once, then must return inside the release
-// band before another pulse can be counted. Six magnets are fitted.
+// band before another pulse can be counted. Twelve magnets are fitted.
 constexpr uint8_t HALL_ANALOG_PIN = A3;
 constexpr uint32_t HALL_SAMPLE_PERIOD_US = CONTROL_PERIOD_US;
 constexpr uint8_t HALL_ADC_SAMPLES = 8U;
@@ -52,12 +58,13 @@ constexpr int32_t HALL_BASELINE_TRACK_DIVISOR = 128L;
 constexpr uint16_t HALL_TRIGGER_DELTA_ADC = 30U;
 constexpr uint16_t HALL_RELEASE_DELTA_ADC = 12U;
 // Keep the ADC trigger/release hysteresis separate from speed detection.
-// A 250 ms blanking window hid speeds above 4.19 rad/s. Use a 20 ms
-// glitch window so the 5 rad/s plausibility threshold remains observable.
+// With twelve magnets, 8 km/h produces a period of about 27.1 ms.
+// The 20 ms glitch window still admits the 25 rad/s plausibility threshold.
 // Verify magnetic pulse width and EMI with the actual harness.
 constexpr uint32_t HALL_MIN_PULSE_INTERVAL_US = 20000UL;
+// 5초는 측정 유효기간이다. 아래 스톨 감시 시간과 역할이 다르다.
 constexpr uint32_t HALL_ZERO_TIMEOUT_US = 5000000UL;
-constexpr uint32_t HALL_PULSES_PER_WHEEL_REV = 6UL;
+constexpr uint32_t HALL_PULSES_PER_WHEEL_REV = 12UL;
 constexpr bool HALL_CALIBRATED = true;
 // Do not prevent arming solely because calibration has not been certified.
 // Closed-loop pulse feedback and Hall stall/overspeed checks remain enabled.
@@ -84,8 +91,8 @@ constexpr uint16_t HALL_STALL_TIMEOUT_MS = 5000U;
 // stall, while HALL_STALL_TIMEOUT_MS remains the absolute minimum.
 constexpr float HALL_STALL_EXPECTED_PULSE_PERIODS = 2.5F;
 constexpr uint32_t HALL_STALL_MAX_TIMEOUT_US = 10000000UL;
-constexpr int32_t HALL_MAX_PLAUSIBLE_MRAD_S = 5000L;
-constexpr uint16_t HALL_OVERSPEED_TIMEOUT_MS = 100U;
+constexpr int32_t HALL_MAX_PLAUSIBLE_MRAD_S = 25000L;
+constexpr uint8_t HALL_OVERSPEED_CONFIRM_PULSES = 2U;
 
 // One SZH-GNP521 drives the two motors as one electrical load. The wiring must
 // be checked independently for voltage, polarity and combined stall current.
@@ -96,17 +103,19 @@ constexpr int8_t MOTOR_SIGN = 1;
 constexpr uint16_t MAX_PWM = 100U;  // deliberately low for first lifted test
 // Initial feed-forward model; PWM counts are on Arduino's 0..255 scale.
 // 30 is a bias, NOT a minimum output. Calibrate 60 at 0.08 m/s under load.
+// 평지 0.08m/s에서 기본 FF=60count(약 23.5% duty). 실측 보정 전 초기 모델이다.
 constexpr uint8_t MOTOR_FF_BIAS_PWM = 30U;
 constexpr uint8_t MOTOR_FF_NOMINAL_PWM = 60U;
 constexpr float MOTOR_NOMINAL_MRAD_S = 0.08F / 0.115F * 1000.0F;
 constexpr float MOTOR_PWM_RISE_PER_S = 20.0F;
 constexpr float MOTOR_PWM_FALL_PER_S = 60.0F;
 constexpr uint32_t MOTOR_REVERSAL_BRAKE_US = 150000UL;
-constexpr float SPEED_BRAKE_MARGIN_MRAD_S = 0.05F / 0.115F * 1000.0F;
-constexpr float SPEED_BRAKE_RELEASE_MARGIN_MRAD_S = 0.02F / 0.115F * 1000.0F;
-constexpr float SPEED_BRAKE_ABSOLUTE_MRAD_S = 0.18F / 0.115F * 1000.0F;
-constexpr float SPEED_BRAKE_RELEASE_MRAD_S = 0.15F / 0.115F * 1000.0F;
-constexpr uint32_t SPEED_BRAKE_DWELL_US = 200000UL;
+// Target tracking error is handled by the Hall P term. A hard BRAKE is reserved
+// for an absolute safety-speed violation confirmed by consecutive Hall periods;
+// one low-resolution or noisy period must not stop an otherwise healthy drive.
+constexpr float SPEED_BRAKE_ABSOLUTE_MRAD_S = (8.0F / 3.6F) / 0.115F * 1000.0F;
+constexpr float SPEED_BRAKE_RELEASE_MRAD_S = (7.0F / 3.6F) / 0.115F * 1000.0F;
+constexpr uint8_t SPEED_BRAKE_CONFIRM_PULSES = 2U;
 
 // E-stop hardware is not implemented in the current build. Keep this false so
 // the input is not configured, the reported state stays normal, and the
@@ -119,6 +128,7 @@ constexpr uint8_t ESTOP_ACTIVE_LEVEL = HIGH;
 // The two FSR channels replace the single digital dead-man switch. Each FSR
 // must be wired as a voltage divider that reads near zero when released. The
 // installed harness routes the physical left sensor to A2 and right to A1.
+// 현재 양손 모두 접촉해야 주행을 허용한다. 핀은 물리적 왼쪽 A2, 오른쪽 A1이다.
 constexpr bool REQUIRE_DEADMAN = true;
 constexpr uint8_t PRESSURE_LEFT_PIN = A2;
 constexpr uint8_t PRESSURE_RIGHT_PIN = A1;
@@ -146,6 +156,7 @@ constexpr uint8_t DRIVER_FAULT_ACTIVE_LEVEL = LOW;
 
 // Optional analogue telemetry. Disabled values are sent using protocol
 // sentinels and are never interpreted by ROS as real measurements.
+// 미사용 센서 값은 무효 표시값으로 전송한다. 측정값 0과 무효값을 구분해야 한다.
 constexpr bool ENABLE_BATTERY_SENSE = false;
 constexpr uint8_t BATTERY_SENSE_PIN = A5;
 constexpr float ADC_REFERENCE_V = 5.0F;
@@ -162,6 +173,7 @@ constexpr float CURRENT_MA_PER_V = 1000.0F;
 // require the ROS topics until real non-blocking drivers replace the sentinels.
 constexpr bool ENABLE_FRONT_RANGE_SENSORS = false;
 
+// 컴파일 시 설정 모순을 검출한다. I/D 활성화에는 별도의 포화 처리와 펄스 시간 설계가 필요하다.
 static_assert(MOTOR_FF_NOMINAL_PWM >= MOTOR_FF_BIAS_PWM &&
     MOTOR_FF_NOMINAL_PWM <= MAX_PWM, "feed-forward bounds");
 
@@ -242,9 +254,11 @@ static_assert(
             MAX_WHEEL_TARGET_MRAD_S,
     "Hall stall target threshold is invalid");
 static_assert(
-    HALL_STALL_TIMEOUT_MS > 0U &&
-        HALL_OVERSPEED_TIMEOUT_MS > 0U,
-    "Hall plausibility timeouts must be positive");
+    HALL_STALL_TIMEOUT_MS > 0U,
+    "Hall stall timeout must be positive");
+static_assert(
+    HALL_OVERSPEED_CONFIRM_PULSES >= 2U,
+    "Hall overspeed fault must require consecutive observations");
 static_assert(
     HALL_STALL_EXPECTED_PULSE_PERIODS >= 1.0F,
     "Hall stall detection must allow at least one expected pulse period");
@@ -252,6 +266,9 @@ static_assert(
     HALL_MAX_PLAUSIBLE_MRAD_S >
         MAX_WHEEL_TARGET_MRAD_S,
     "Hall plausible speed must exceed maximum target");
+static_assert(
+    SPEED_BRAKE_CONFIRM_PULSES >= 2U,
+    "Absolute speed BRAKE must require consecutive Hall observations");
 static_assert(
     AVR_BOOT_COUNTER_EEPROM_ADDRESS >= 0,
     "boot-counter EEPROM address must not be negative");

@@ -1,3 +1,6 @@
+// MPU6050 인터페이스. valid()가 false이면 저장된 이전 수치를 새 유효 측정으로 사용하지 않는다.
+// 장착 각도 offset과 전후 경사 부호의 최종 보정은 Pi에서 수행한다.
+
 #pragma once
 
 #include <Arduino.h>

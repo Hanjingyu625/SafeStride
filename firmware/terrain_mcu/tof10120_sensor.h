@@ -1,3 +1,6 @@
+// ToF 측정/분류 인터페이스. CANDIDATE는 후보, RAISED/DROP은 확정 위험, INVALID는 무효다.
+// error는 기준 거리 대비 차이, change는 이전 필터값 대비 변화량이다.
+
 #pragma once
 
 #include <Arduino.h>

@@ -858,6 +858,7 @@ class SafetySupervisor(Node):
             drive = DriveCommand()
             drive.header = output.header
             drive.target_linear_m_s = self._output_linear
+            drive.target_speed_kmh = self._output_linear * 3.6
             drive.drive_pwm_cap = self._drive_pwm_cap
             drive.mode = DriveCommand.BRAKE if (
                 self._slope_braking or motion_stop_reasons or
@@ -961,6 +962,8 @@ class SafetySupervisor(Node):
             KeyValue(key='speed_age_s', value=str(status.speed_age if status else math.inf)),
             KeyValue(key='direction_valid', value='false'),
             KeyValue(key='measured_speed_m_s', value=str(status.measured_speed_m_s if status else math.nan)),
+            KeyValue(key='measured_speed_kmh', value=str(status.measured_speed_m_s * 3.6 if status else math.nan)),
+            KeyValue(key='output_speed_kmh', value=str(self._output_linear * 3.6)),
             KeyValue(key='mcu_braking', value=_bool_text(bool(status and status.braking))),
             KeyValue(
                 key='motion_inhibited',

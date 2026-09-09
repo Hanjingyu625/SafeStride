@@ -1,3 +1,6 @@
+// 하향 ToF로 기준 지면과의 거리 차이를 감시한다. 단위는 mm이다.
+// 거리가 짧아지면 돌출물, 길어지면 낙차 후보로 보고 연속 측정으로 확정한다.
+
 #include "tof10120_sensor.h"
 
 #include <math.h>
@@ -51,6 +54,7 @@ void Tof10120Sensor::update(uint32_t now_ms) {
   classify(now_ms, distance);
 }
 
+// I2C로 2바이트 거리를 읽는다. 통신 실패는 0xFFFF로 표시하며 update()에서 무효 처리한다.
 uint16_t Tof10120Sensor::readDistanceI2c() {
   Wire.beginTransmission(cfg::TOF_I2C_ADDRESS);
   Wire.write(cfg::TOF_DISTANCE_REGISTER);
@@ -90,6 +94,7 @@ void Tof10120Sensor::classify(
     return;
   }
 
+  // 거리 EMA로 잡음을 줄인 뒤 기준과의 차이(error), 직전 측정과의 변화(change)를 계산한다.
   const float previous_filtered = filtered_mm_;
   filtered_mm_ = cfg::TOF_FILTER_ALPHA * static_cast<float>(distance_mm) +
                  (1.0F - cfg::TOF_FILTER_ALPHA) * filtered_mm_;
@@ -98,6 +103,7 @@ void Tof10120Sensor::classify(
 
   // Establish a stable downward-looking baseline before declaring the sensor
   // ready. The ROS supervisor remains stopped while tof_valid is false.
+  // 초기 10개 측정으로 기준 거리를 만든다. 수집 중에는 valid=false이므로 정상 지면으로 확정하지 않는다.
   if (baseline_count_ < cfg::TOF_BASELINE_SAMPLES) {
     ++baseline_count_;
     reference_mm_ +=
@@ -110,6 +116,7 @@ void Tof10120Sensor::classify(
   }
   valid_ = true;
 
+  // 양수 오차는 지면이 멀어진 낙차, 음수 오차는 가까워진 돌출물 후보이다.
   int8_t direction = 0;
   if (error_mm_ >= cfg::TOF_ERROR_THRESHOLD_MM) {
     direction = 1;  // Ground is farther away: drop/hole.
@@ -135,6 +142,7 @@ void Tof10120Sensor::classify(
     }
   }
 
+  // 변화가 시작되고 같은 방향의 오차가 필요한 횟수만큼 지속돼야 위험을 확정한다.
   if (direction != 0 &&
       consecutive_count_ >= cfg::TOF_REQUIRED_FRAMES) {
     red_hold_active_ = true;
@@ -156,6 +164,7 @@ void Tof10120Sensor::classify(
     alert_ = TofAlert::CANDIDATE_RAISED;
   } else {
     alert_ = TofAlert::NORMAL;
+    // 정상이며 오차가 작은 구간에서만 기준을 느리게 갱신한다. 위험 지형을 새 정상 기준으로 흡수하지 않게 한다.
     if (fabsf(error_mm_) < cfg::TOF_REFERENCE_FREEZE_THRESHOLD_MM) {
       reference_mm_ = cfg::TOF_REFERENCE_ALPHA * filtered_mm_ +
                       (1.0F - cfg::TOF_REFERENCE_ALPHA) * reference_mm_;

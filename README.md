@@ -19,7 +19,7 @@ Terrain Uno: downward TOF-10120, GY-521 MPU6050
 Raspberry Pi: BE-220 GPS + serial bridges -> safety supervisor -> diagnostics/Foxglove
 ```
 
-- 왼쪽 휠 WSH135 아날로그 홀센서만 사용하며 A3, 자석 6개로 설정되어 있다. 공통
+- 왼쪽 휠 WSH135 아날로그 홀센서만 사용하며 A3, 자석 12개로 설정되어 있다. 공통
   드라이브 구조라 오른쪽 ROS 값은 왼쪽 측정값을 복제한 추정치다.
 - 압력센서 임계값은 좌우 ADC 80이고 dead-man으로 동작한다.
   별도의 `/walker/set_enabled true` 없이도 정상 링크, fresh `/drive/command`,

@@ -1,8 +1,12 @@
+// 직렬 프레임 처리: 헤더+payload+CRC를 COBS로 인코딩하고 0 바이트로 끝을 표시한다.
+// COBS는 프레임 경계를 찾기 위한 인코딩이고, CRC는 전송 오류 검출용이다.
+
 #include "protocol.h"
 
 namespace safestride_protocol {
 namespace {
 
+// 원문 안의 0 바이트를 길이 코드로 바꿔, 프레임 끝의 0과 구분한다.
 size_t cobsEncode(
     const uint8_t* input,
     size_t length,
@@ -47,6 +51,7 @@ size_t cobsEncode(
   return write_index;
 }
 
+// 길이 코드를 따라 원문을 복원한다. 입력/출력 범위가 맞지 않으면 0을 반환한다.
 size_t cobsDecode(
     const uint8_t* input,
     size_t length,
@@ -90,6 +95,7 @@ void FrameReceiver::reset() {
   dropping_oversize_ = false;
 }
 
+// 한 바이트씩 누적하다 구분자 0에서 해석한다. 초과 길이 프레임은 다음 구분자까지 버린다.
 ReceiveResult FrameReceiver::push(uint8_t byte, FrameView& frame) {
   if (byte != 0U) {
     if (dropping_oversize_) {
@@ -115,6 +121,7 @@ ReceiveResult FrameReceiver::push(uint8_t byte, FrameView& frame) {
   return result;
 }
 
+// 길이, CRC, 버전/예약 필드를 검증한 뒤에만 FRAME_READY를 반환한다.
 ReceiveResult FrameReceiver::decode(FrameView& frame) {
   const size_t raw_length = cobsDecode(
       encoded_, encoded_length_, raw_, sizeof(raw_));
@@ -145,6 +152,7 @@ ReceiveResult FrameReceiver::decode(FrameView& frame) {
   return ReceiveResult::FRAME_READY;
 }
 
+// CRC-16/CCITT-FALSE: 초기값 0xFFFF, 다항식 0x1021. 송수신이 같은 규칙을 쓴다.
 uint16_t crc16CcittFalse(const uint8_t* data, size_t length) {
   uint16_t crc = 0xFFFFU;
   for (size_t i = 0U; i < length; ++i) {
@@ -158,6 +166,7 @@ uint16_t crc16CcittFalse(const uint8_t* data, size_t length) {
   return crc;
 }
 
+// 통신 정수는 little-endian(낮은 바이트 먼저)이다. MCU 메모리 구조체를 그대로 전송하지 않는다.
 uint16_t readU16(const uint8_t* data) {
   return static_cast<uint16_t>(data[0]) |
          (static_cast<uint16_t>(data[1]) << 8U);
@@ -194,6 +203,7 @@ void writeI32(uint8_t* data, int32_t value) {
   writeU32(data, static_cast<uint32_t>(value));
 }
 
+// 완성된 프레임을 직렬 포트에 기록한다. 반환값은 기록 성공 여부이며 Pi의 수신 확인은 아니다.
 bool sendFrame(
     Stream& stream,
     uint8_t type,

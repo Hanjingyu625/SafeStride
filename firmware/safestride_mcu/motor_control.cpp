@@ -1,3 +1,7 @@
+// 모터 제어 구현: 목표 ramp → 기본 FF + 경사 FF + Hall P 보정 → 상한/방향 제한 → PWM slew.
+// 각속도 입력은 mrad/s, P 계산은 rad/s, 출력은 PWM count(0~255 척도)이다.
+// 두 모터를 하나의 출력으로 구동하며, 좌우 독립 속도 제어는 하지 않는다.
+
 #include "motor_control.h"
 
 #include <math.h>
@@ -59,6 +63,7 @@ uint32_t hallZeroTimeoutUs() {
       : cfg::HALL_ZERO_TIMEOUT_US;
 }
 
+// 저속에서는 정상 펄스 간격도 길다. 예상 간격의 2.5배를 쓰되 5~10초로 제한한다.
 uint32_t hallStallTimeoutUs(uint32_t target_mrad_s) {
   const uint32_t minimum_us =
       static_cast<uint32_t>(cfg::HALL_STALL_TIMEOUT_MS) * 1000UL;
@@ -120,6 +125,7 @@ void DriveController::begin() {
   release_pwm_fade_active_ = false;
 }
 
+// 00 핀 상태와 PWM 0으로 BRAKE를 유지하고 제어 출력 이력을 초기화한다. 기계식 위치 고정은 아니다.
 void DriveController::disableImmediately() {
   analogWrite(cfg::MOTOR_PWM_PIN, 0);
   digitalWrite(cfg::MOTOR_IN1_PIN, LOW);
@@ -141,6 +147,7 @@ void DriveController::clearRecoverableFaults() {
   motor_pid_ = {0.0F, 0.0F};
 }
 
+// 목표 각속도의 변화량을 가속/감속률 × dt로 제한한다. 최종 PWM slew와 별도의 제한이다.
 float DriveController::rampTarget(
     float current,
     float requested,
@@ -160,6 +167,8 @@ float DriveController::rampTarget(
       requested - current, -maximum_step, maximum_step);
 }
 
+// mrad/s를 rad/s로 변환한 뒤 오차 = 목표 - 측정을 계산한다.
+// I/D 상태 계산은 남아 있지만 현재 Ki=Kd=0이므로 출력은 Kp × 오차뿐이다.
 float DriveController::calculatePid(
     float target_mrad_s,
     float measured_mrad_s,
@@ -190,6 +199,7 @@ float DriveController::calculatePid(
          cfg::MOTOR_PID_KD * derivative;
 }
 
+// 이름과 달리 최소 PWM을 더하지 않는다. 작은 목표를 0으로 만들고 목표 반대 방향 출력을 금지한다.
 float DriveController::compensateMotorDeadzone(
     float controller_pwm,
     float target_mrad_s) {
@@ -202,6 +212,7 @@ float DriveController::compensateMotorDeadzone(
       : clampFloat(controller_pwm, -cfg::MAX_PWM, 0.0F);
 }
 
+// Hall 고장 감시를 끈 별도 개방루프 경로용이다. 정상 FF+P 계산식은 update() 아래에 있다.
 float DriveController::openLoopPwm(float target_mrad_s) {
   if (fabsf(target_mrad_s) < 20.0F) {
     return 0.0F;
@@ -217,6 +228,7 @@ float DriveController::openLoopPwm(float target_mrad_s) {
   return target_mrad_s > 0.0F ? pwm : -pwm;
 }
 
+// 논리 출력 부호를 실제 핀 방향으로 바꾼다. 방향 반전 시 최소 150ms BRAKE를 끼우며 delay로 멈추지 않는다.
 void DriveController::writeMotor(float pwm) {
   const float logical_pwm = clampFloat(
       pwm,
@@ -243,6 +255,8 @@ void DriveController::writeMotor(float pwm) {
   if (magnitude) last_drive_direction_ = direction;
 }
 
+// 속도 크기 = (2π / 회전당 펄스 수) / 펄스 간격. 반환 단위는 mrad/s이다.
+// 첫 펄스만으로는 간격을 알 수 없고, 5초 이상 오래된 측정도 0을 반환한다.
 float DriveController::hallSpeedMagnitude(
     const HallSample& sample,
     uint32_t pulse_delta,
@@ -265,6 +279,8 @@ float DriveController::hallSpeedMagnitude(
   return 0.0F;
 }
 
+// 새 펄스일 때만 필터를 갱신한다: filtered += 0.35 × (raw - filtered).
+// 부호는 실제 회전 방향이 아니라 목표 방향에서 추정한다. timeout의 0은 정지 확인과 다르다.
 void DriveController::updateHallFeedback(
     uint32_t elapsed_us,
     const HallSample& left_hall,
@@ -325,6 +341,7 @@ void DriveController::updateHallFeedback(
   }
 }
 
+// 매 제어 주기의 중심 함수. 출력 금지/BRAKE가 정상 FF+P 계산보다 우선한다.
 void DriveController::update(
     uint32_t elapsed_us,
     const HallSample& left_hall,
@@ -348,28 +365,47 @@ void DriveController::update(
   if (!output_allowed) {
     updateHallPlausibility(
         left_hall, right_hall, elapsed_us, false);
+    speed_brake_ = false;
+    absolute_overspeed_pulses_ = 0U;
     disableImmediately();
     return;
   }
 
-  // Relative and absolute overspeed are brake conditions, not latched faults.
-  const float measured = fabsf(filtered_left_mrad_s_);
-  const float requested = fabsf(static_cast<float>(requested_mrad_s));
+  // The P term handles ordinary target-speed error. Reserve a hard BRAKE for
+  // consecutive, newly observed absolute overspeed periods. Re-evaluating one
+  // stale period at 200 Hz made a single Hall sample look like sustained
+  // overspeed and stopped the motor shortly after its second startup pulse.
   const float raw_speed = hallSpeedMagnitude(left_hall, 0UL, elapsed_us);
-  const float observed_speed = fmaxf(measured, raw_speed);
-  updateTimer(speed_valid_ &&
-      (observed_speed > requested + cfg::SPEED_BRAKE_MARGIN_MRAD_S ||
-       observed_speed > cfg::SPEED_BRAKE_ABSOLUTE_MRAD_S),
-      elapsed_us, speed_brake_dwell_us_);
-  if (speed_brake_dwell_us_ >= cfg::SPEED_BRAKE_DWELL_US) speed_brake_ = true;
+  if (new_pulse_ && speed_valid_) {
+    if (raw_speed > cfg::SPEED_BRAKE_ABSOLUTE_MRAD_S) {
+      if (absolute_overspeed_pulses_ < 0xFFU) {
+        ++absolute_overspeed_pulses_;
+      }
+    } else {
+      absolute_overspeed_pulses_ = 0U;
+    }
+  } else if (!speed_valid_ && !speed_brake_) {
+    absolute_overspeed_pulses_ = 0U;
+  }
+  if (absolute_overspeed_pulses_ >= cfg::SPEED_BRAKE_CONFIRM_PULSES) {
+    speed_brake_ = true;
+  }
   if (speed_brake_ &&
-      ((speed_valid_ && observed_speed < requested + cfg::SPEED_BRAKE_RELEASE_MARGIN_MRAD_S &&
-        observed_speed < cfg::SPEED_BRAKE_RELEASE_MRAD_S) ||
+      ((new_pulse_ && speed_valid_ &&
+        raw_speed < cfg::SPEED_BRAKE_RELEASE_MRAD_S) ||
        left_hall.age_us >= cfg::HALL_ZERO_TIMEOUT_US)) {
     speed_brake_ = false;
+    absolute_overspeed_pulses_ = 0U;
   }
-  if (brake_requested || speed_brake_ ||
+  if (brake_requested ||
       (requested_mrad_s == 0L && !fade_pwm_during_deceleration)) {
+    speed_brake_ = false;
+    absolute_overspeed_pulses_ = 0U;
+    updateHallPlausibility(left_hall, right_hall, elapsed_us, false);
+    disableImmediately();
+    return;
+  }
+  if (speed_brake_) {
     updateHallPlausibility(left_hall, right_hall, elapsed_us, false);
     disableImmediately();
     return;
@@ -429,6 +465,8 @@ void DriveController::update(
     return;
   }
 
+  // 정상 제어식: u = sign(ω) × [30 + (60-30)|ω|/ω_nom] + 경사 FF + Kp(ω-측정).
+  // ω_nom은 0.08m/s에 해당한다. 30은 계산 bias이며 최종 PWM의 하한이 아니다.
   const float target = applied_target_mrad_s_;
   const float direction = target >= 0.0F ? 1.0F : -1.0F;
   ff_pwm_ = fabsf(target) < 20.0F ? 0.0F : direction *
@@ -445,6 +483,8 @@ void DriveController::update(
   output = clampFloat(output, -cap, cap);
   if (!speed_valid_) output = clampFloat(output,
       -cfg::MOTOR_FF_NOMINAL_PWM, cfg::MOTOR_FF_NOMINAL_PWM);
+  // 출력 크기를 늘릴 때 20count/s, 줄일 때 60count/s로 제한한다.
+  // 0→60은 약 3초 이상 걸리며 실제 지면 속도 도달 시간과 같지 않다.
   const float rate = fabsf(output) > fabsf(last_commanded_pwm_)
       ? cfg::MOTOR_PWM_RISE_PER_S : cfg::MOTOR_PWM_FALL_PER_S;
   output = last_commanded_pwm_ + clampFloat(output - last_commanded_pwm_,
@@ -454,6 +494,7 @@ void DriveController::update(
   writeMotor(output);
 }
 
+// 바퀴 대신 손으로 자석을 움직이는 시험 전용 경로. 정상 속도 제어/고장 감시와 혼동하지 않는다.
 void DriveController::updateMagnetBench(
     uint32_t elapsed_us,
     const HallSample& left_hall,
@@ -508,6 +549,7 @@ int32_t DriveController::rightHallPulsePosition() const {
   return static_cast<int32_t>(right_position_bits_);
 }
 
+// 제어 갱신을 두 번 거쳤는지만 나타낸다. 유효한 Hall 펄스 두 개를 받았다는 의미가 아니다.
 bool DriveController::feedbackReady() const {
   return feedback_sample_count_ >= 2U;
 }
@@ -516,6 +558,7 @@ uint8_t DriveController::hallFaultMask() const {
   return hall_fault_mask_;
 }
 
+// 출력이 있는 동안 펄스가 오래 없거나 속도 추정이 물리 상한을 넘으면 Hall 고장으로 본다.
 bool DriveController::updateHallMonitor(
     HallMonitorState& state,
     uint32_t pulse_count,
@@ -533,7 +576,7 @@ bool DriveController::updateHallMonitor(
 
   if (!output_allowed) {
     state.no_pulse_us = 0UL;
-    state.overspeed_us = 0UL;
+    state.overspeed_pulses = 0U;
     return false;
   }
 
@@ -546,16 +589,22 @@ bool DriveController::updateHallMonitor(
       target_requests_motion && motor_output_active && !pulse_seen,
       elapsed_us,
       state.no_pulse_us);
-  updateTimer(
-      measured_magnitude > static_cast<uint32_t>(
-          cfg::HALL_MAX_PLAUSIBLE_MRAD_S),
-      elapsed_us,
-      state.overspeed_us);
+  // Velocity changes only when a new pulse period is observed. Counting the
+  // same cached value every 5 ms turns one noisy period into a latched fault.
+  if (pulse_seen) {
+    if (measured_magnitude > static_cast<uint32_t>(
+            cfg::HALL_MAX_PLAUSIBLE_MRAD_S)) {
+      if (state.overspeed_pulses < 0xFFU) {
+        ++state.overspeed_pulses;
+      }
+    } else {
+      state.overspeed_pulses = 0U;
+    }
+  }
 
   return (
       state.no_pulse_us >= hallStallTimeoutUs(target_magnitude) ||
-      state.overspeed_us >=
-          static_cast<uint32_t>(cfg::HALL_OVERSPEED_TIMEOUT_MS) * 1000UL);
+      state.overspeed_pulses >= cfg::HALL_OVERSPEED_CONFIRM_PULSES);
 }
 
 void DriveController::updateHallPlausibility(

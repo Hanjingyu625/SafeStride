@@ -1,3 +1,6 @@
+// Pi와 MCU가 공유하는 바이너리 통신 규약. 상세 바이트 배치는 저장소 루트 PROTOCOL.md 참조.
+// 버전/스키마/릴리스 및 payload 크기는 Pi와 두 보드가 맞아야 한다.
+
 #pragma once
 
 #include <Arduino.h>
@@ -33,6 +36,7 @@ enum class ReceiveResult : uint8_t {
   CRC_ERROR,
 };
 
+// payload는 수신기 내부 버퍼를 가리키는 뷰다. 다음 프레임 해석 전에 처리하거나 필요한 값을 복사한다.
 struct FrameView {
   uint8_t type;
   uint8_t flags;
@@ -43,6 +47,7 @@ struct FrameView {
   const uint8_t* payload;
 };
 
+// 고정 크기 버퍼를 사용한다. push()가 FRAME_READY일 때만 FrameView 내용을 사용한다.
 class FrameReceiver {
  public:
   FrameReceiver();

@@ -115,6 +115,7 @@ class TestSupervisedDrive(unittest.TestCase):
         for _ in range(20):
             msg = self.tick(0)
         self.assertAlmostEqual(msg.target_linear_m_s, 0.08)
+        self.assertAlmostEqual(msg.target_speed_kmh, 0.288)
         self.assertEqual((msg.mode, msg.slope_ff_pwm), (0, 0))
         for _ in range(20):
             msg = self.tick(5.5)

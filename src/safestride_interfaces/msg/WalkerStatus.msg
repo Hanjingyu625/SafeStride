@@ -51,3 +51,4 @@ bool new_pulse
 bool direction_valid
 bool braking
 float32 measured_speed_m_s
+float32 measured_speed_kmh

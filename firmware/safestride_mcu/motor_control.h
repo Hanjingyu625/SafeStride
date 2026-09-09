@@ -1,7 +1,11 @@
+// 모터 제어 인터페이스와 내부 상태. update()는 실제 경과시간(us)을 받아 한 제어 단계를 수행한다.
+// braking은 전기적 BRAKE 출력 상태이며, 물리적으로 정지했거나 경사에서 고정됐다는 뜻은 아니다.
+
 #pragma once
 
 #include <Arduino.h>
 
+// 한 시점의 Hall 스냅샷. 누적 count와 직전 period/현재 age를 함께 전달해 오래된 측정을 구분한다.
 struct HallSample {
   uint32_t pulse_count;
   uint32_t period_us;
@@ -15,6 +19,8 @@ class DriveController {
   DriveController();
 
   void begin();
+  // output_allowed는 최종 출력 허용, enforce_hall_faults는 Hall 감시/피드백 경로 선택이다.
+  // deceleration=0이면 기본 감속률, fade는 손 해제용, brake_requested는 Pi의 명시적 BRAKE다.
   void update(
       uint32_t elapsed_us,
       const HallSample& left_hall,
@@ -61,7 +67,7 @@ class DriveController {
     bool initialized;
     uint32_t previous_count;
     uint32_t no_pulse_us;
-    uint32_t overspeed_us;
+    uint8_t overspeed_pulses;
   };
 
   int16_t applied_pwm_counts_ = 0;
@@ -72,7 +78,7 @@ class DriveController {
   float feedback_pwm_ = 0.0F;
   bool braking_ = true;
   bool speed_brake_ = false;
-  uint32_t speed_brake_dwell_us_ = 0UL;
+  uint8_t absolute_overspeed_pulses_ = 0U;
   int8_t last_drive_direction_ = 0;
   uint32_t reversal_remaining_us_ = 0UL;
   bool feedback_initialized_;
