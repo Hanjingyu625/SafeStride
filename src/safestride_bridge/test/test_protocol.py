@@ -204,7 +204,7 @@ class TestPayloads(unittest.TestCase):
         payload = CommandPayload(-12345, 150, 1)
         self.assertEqual(
             payload.pack(),
-            struct.pack('<iHBBhBB', -12345, 150, 1, 0, 0, 100, 0),
+            struct.pack('<iHBB', -12345, 150, 1, 0),
         )
         self.assertEqual(CommandPayload.unpack(payload.pack()), payload)
         self.assertEqual(len(payload.pack()), COMMAND_STRUCT.size)
@@ -235,7 +235,7 @@ class TestPayloads(unittest.TestCase):
         self.assertEqual(
             packed,
             struct.pack(
-                '<iiiiHHHhhHHHHHHHBBhhhIBB',
+                '<iiiiHHHhhHHHHHHHBB',
                 -123456,
                 789012,
                 -2000,
@@ -254,7 +254,6 @@ class TestPayloads(unittest.TestCase):
                 600,
                 0x07,
                 1,
-                0, 0, 0, 0xFFFFFFFF, 0, 1,
             ),
         )
         self.assertEqual(TelemetryPayload.unpack(packed), payload)
@@ -309,15 +308,15 @@ class TestPayloads(unittest.TestCase):
             CommandPayload(0, 100, 2).pack()
         with self.assertRaises(PayloadDecodeError):
             CommandPayload.unpack(
-                struct.pack('<iHBBhBB', 0, 100, 2, 0, 0, 100, 0)
+                struct.pack('<iHBB', 0, 100, 2, 0)
             )
         with self.assertRaises(PayloadDecodeError):
             CommandPayload.unpack(
-                struct.pack('<iHBBhBB', 0, 100, 1, 1, 0, 100, 0)
+                struct.pack('<iHBB', 0, 100, 1, 1)
             )
 
     def test_telemetry_rejects_invalid_pressure_fields(self):
-        values = [0] * 24
+        values = [0] * 18
         values[16] = 0x08
         with self.assertRaises(PayloadDecodeError):
             TelemetryPayload.unpack(TELEMETRY_STRUCT.pack(*values))

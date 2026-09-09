@@ -65,7 +65,6 @@ int main() {
   assert(g_watchdog_timed_out);
 
   uint8_t command_payload[proto::COMMAND_PAYLOAD_SIZE] = {};
-  command_payload[10U] = 100U;
   proto::writeU16(command_payload + 4U, 200U);
   command_payload[6U] = 0U;
   proto::FrameView old_command = {
@@ -281,34 +280,6 @@ int main() {
   motion_enable_command.sequence = next_sequence++;
   assert(handleCommand(motion_enable_command));
   assert(g_state == ControllerState::ARMED);
-
-  // v5 explicit BRAKE stays enabled and releases on a newer DRIVE command.
-  g_pressure_adc = 200;
-  g_pressure.begin(g_test_millis);
-  g_session_active = true;
-  g_session_id = 0x55667788UL;
-  g_state = ControllerState::ARMED;
-  g_fault_bits = 0U;
-  g_watchdog_timed_out = false;
-  g_deadman_release_ramp_active = false;
-  g_have_command_sequence = false;
-  uint8_t v5[proto::COMMAND_PAYLOAD_SIZE] = {};
-  proto::writeU16(v5 + 4, 200U);
-  v5[6] = 1U; v5[10] = 100U; v5[11] = 1U;
-  proto::FrameView brake_frame={proto::TYPE_COMMAND,0U,100U,
-      proto::COMMAND_PAYLOAD_SIZE,g_session_id,g_test_millis,v5};
-  assert(handleCommand(brake_frame));
-  assert(g_state==ControllerState::ARMED && g_brake_requested);
-  assert(!handleCommand(brake_frame)); // duplicate cannot refresh/alter state
-  brake_frame.sequence=101U;
-  v5[11]=0U; proto::writeI32(v5,696L); proto::writeI16(v5+8,8);
-  assert(handleCommand(brake_frame));
-  assert(!g_brake_requested && g_slope_ff_pwm==8 && g_requested_mrad_s==696L);
-  brake_frame.sequence=102U; v5[10]=101U;
-  assert(!handleCommand(brake_frame));
-  assert(g_last_command_sequence==101U && g_drive_pwm_cap==100U);
-  v5[10]=100U; brake_frame.payload_length=8U;
-  assert(!handleCommand(brake_frame)); // no implicit legacy command acceptance
 
   printf("firmware watchdog/session state-machine tests: OK\n");
   return 0;

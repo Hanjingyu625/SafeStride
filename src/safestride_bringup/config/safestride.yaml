@@ -95,12 +95,6 @@ safety_supervisor:
     # active, and an invalid MPU sample falls back to a neutral speed scale.
     require_range_sensors: false
     require_surface_condition: false
-    surface_control_enabled: false
-    drive_command_topic: /drive/command
-    brake_enter_deg: 10.0
-    brake_release_deg: 7.0
-    brake_recovery_s: 0.5
-    drive_pwm_cap: 100
     require_deadman: true
     slope_control_enabled: true
 
@@ -112,15 +106,15 @@ safety_supervisor:
     max_linear_deceleration: 0.50
     max_angular_acceleration: 0.50
     max_angular_deceleration: 1.00
-    # Flip to -1.0 if lifting the walker front makes pitch_rad negative.
-    uphill_pitch_sign: 1.0
-    # Measured in the walker's normal level stance (2026-09-03, 146 samples).
-    pitch_offset_rad: -0.196164
+      # Flip to -1.0 if lifting the walker front makes pitch_rad negative.
+      uphill_pitch_sign: 1.0
+      # Measured in the walker's normal level stance (2026-09-03, 146 samples).
+      pitch_offset_rad: -0.196164
     slope_enter_angle_rad: 0.0872665  # 5 deg
     slope_exit_angle_rad: 0.0523599   # 3 deg
     slope_confirmation_time_s: 0.50
     downhill_speed_scale: 0.60
-    uphill_speed_scale: 1.0
+    uphill_speed_scale: 1.25
     max_combined_speed_scale: 1.25
 
     stop_distance: 0.35

@@ -23,10 +23,7 @@ class DriveController {
       bool output_allowed,
       bool enforce_hall_faults = true,
       uint32_t deceleration_mrad_s2 = 0UL,
-      bool fade_pwm_during_deceleration = false,
-      int16_t slope_ff_pwm = 0,
-      uint8_t pwm_cap = 100U,
-      bool brake_requested = false);
+      bool fade_pwm_during_deceleration = false);
   void updateMagnetBench(
       uint32_t elapsed_us,
       const HallSample& left_hall,
@@ -42,13 +39,6 @@ class DriveController {
   int32_t leftHallPulsePosition() const;
   int32_t rightHallPulsePosition() const;
   bool feedbackReady() const;
-  bool speedValid() const { return speed_valid_; }
-  bool newPulse() const { return new_pulse_; }
-  uint32_t speedAgeUs() const { return speed_age_us_; }
-  int16_t feedforwardPwm() const { return static_cast<int16_t>(ff_pwm_); }
-  int16_t feedbackPwm() const { return static_cast<int16_t>(feedback_pwm_); }
-  int16_t appliedPwm() const { return applied_pwm_counts_; }
-  bool braking() const { return braking_; }
   uint8_t hallFaultMask() const;
 
  private:
@@ -64,17 +54,6 @@ class DriveController {
     uint32_t overspeed_us;
   };
 
-  int16_t applied_pwm_counts_ = 0;
-  bool speed_valid_ = false;
-  bool new_pulse_ = false;
-  uint32_t speed_age_us_ = 0xFFFFFFFFUL;
-  float ff_pwm_ = 0.0F;
-  float feedback_pwm_ = 0.0F;
-  bool braking_ = true;
-  bool speed_brake_ = false;
-  uint32_t speed_brake_dwell_us_ = 0UL;
-  int8_t last_drive_direction_ = 0;
-  uint32_t reversal_remaining_us_ = 0UL;
   bool feedback_initialized_;
   uint8_t feedback_sample_count_;
   uint32_t previous_left_pulse_count_;

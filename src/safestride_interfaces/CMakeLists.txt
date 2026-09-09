@@ -7,7 +7,6 @@ find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/WalkerStatus.msg"
-  "msg/DriveCommand.msg"
   "msg/SurfaceCondition.msg"
   "msg/TerrainStatus.msg"
   "msg/HandlePressure.msg"

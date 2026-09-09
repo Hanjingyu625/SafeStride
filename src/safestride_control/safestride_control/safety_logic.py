@@ -120,7 +120,7 @@ class SlopeSpeedPolicy:
             or not math.isfinite(now_s)
         ):
             self.reset()
-            return 0.0, self.LEVEL, math.nan
+            return 1.0, self.LEVEL, math.nan
 
         normalized_pitch = (
             pitch_rad - self._pitch_offset
@@ -144,9 +144,7 @@ class SlopeSpeedPolicy:
         if self._state == self.UPHILL:
             scale = self._uphill_scale
         elif self._state == self.DOWNHILL:
-            amount = min(1.0, max(0.0,
-                (-normalized_pitch - self._exit_angle) / math.radians(5.0)))
-            scale = 1.0 - (1.0 - self._downhill_scale) * amount
+            scale = self._downhill_scale
         return scale, self._state, normalized_pitch
 
 
@@ -155,50 +153,3 @@ __all__ = [
     'combine_speed_scales',
     'finite_parameter',
 ]
-
-
-class SlopeBrakePolicy:
-    """Non-latching BRAKE with angle hysteresis and valid-sample recovery dwell."""
-
-    def __init__(self, enter_deg=10.0, release_deg=7.0, recovery_s=0.5):
-        self.enter = finite_parameter('brake_enter_deg', enter_deg, minimum=0.0,
-                                      maximum=45.0, minimum_inclusive=False)
-        self.release = finite_parameter('brake_release_deg', release_deg, minimum=0.0,
-                                        maximum=self.enter)
-        if self.release >= self.enter:
-            raise ValueError('brake release must be below entry')
-        self.recovery = finite_parameter('brake_recovery_s', recovery_s, minimum=0.0)
-        self.braking = False
-        self.clear_since = None
-
-    def update(self, pitch_rad, now_s, enabled=True):
-        if not enabled:
-            self.braking = False
-            self.clear_since = None
-            return False
-        valid = math.isfinite(pitch_rad) and math.isfinite(now_s)
-        angle = math.degrees(pitch_rad) if valid else math.nan
-        if not valid or angle <= -self.enter:
-            self.braking = True
-            self.clear_since = None
-        elif self.braking:
-            if angle < -self.release:
-                self.clear_since = None
-            elif self.clear_since is None:
-                self.clear_since = now_s
-            elif now_s - self.clear_since >= self.recovery:
-                self.braking = False
-                self.clear_since = None
-        return self.braking
-
-
-def slope_feedforward_pwm(pitch_rad, state):
-    """Initial tuning model, forward travel only; PWM counts, not percent."""
-    if not math.isfinite(pitch_rad):
-        return 0
-    degrees = math.degrees(pitch_rad)
-    if state == SlopeSpeedPolicy.UPHILL:
-        return round(min(30.0, max(0.0, 4.0 * (degrees - 3.0))))
-    if state == SlopeSpeedPolicy.DOWNHILL:
-        return -round(min(60.0, max(0.0, 6.0 * (-degrees - 3.0))))
-    return 0

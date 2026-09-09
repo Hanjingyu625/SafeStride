@@ -54,10 +54,6 @@ AnalogHallSensor g_hall;
 ControllerState g_state = ControllerState::BOOT;
 uint16_t g_fault_bits = 0U;
 bool g_watchdog_timed_out = false;
-int16_t g_slope_ff_pwm = 0;
-uint8_t g_drive_pwm_cap = cfg::MAX_PWM;
-bool g_brake_requested = false;
-bool g_new_pulse_since_telemetry = false;
 bool g_valid_command_seen = false;
 bool g_session_active = false;
 bool g_session_offer_active = false;
@@ -383,23 +379,15 @@ void sendTelemetry() {
   }
   payload[40U] = pressure_flags;
   payload[41U] = static_cast<uint8_t>(g_pressure.alert());
-  proto::writeI16(payload + 42U, g_drive.feedforwardPwm());
-  proto::writeI16(payload + 44U, g_drive.feedbackPwm());
-  proto::writeI16(payload + 46U, g_drive.appliedPwm());
-  proto::writeU32(payload + 48U, g_drive.speedAgeUs());
-  payload[52U] = (g_drive.speedValid() ? 1U : 0U) | (g_new_pulse_since_telemetry ? 2U : 0U);
-  payload[53U] = g_drive.braking() ? 1U : 0U;
 
-  if (proto::sendFrame(
+  proto::sendFrame(
       Serial,
       proto::TYPE_TELEMETRY,
       g_tx_sequence++,
       g_session_id,
       millis(),
       payload,
-      sizeof(payload))) {
-    g_new_pulse_since_telemetry = false;
-  }
+      sizeof(payload));
 }
 
 bool stationaryDwellMet() {
@@ -470,11 +458,6 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   const uint16_t ttl_ms = proto::readU16(frame.payload + 4U);
   const uint8_t enable = frame.payload[6U];
   const uint8_t reserved = frame.payload[7U];
-  const int16_t slope_ff = static_cast<int16_t>(proto::readU16(frame.payload + 8U));
-  const uint8_t pwm_cap = frame.payload[10U];
-  const uint8_t mode = frame.payload[11U];
-  if (slope_ff < -60 || slope_ff > 30 || pwm_cap > cfg::MAX_PWM || mode > 1U ||
-      (mode == 1U && (target != 0L || slope_ff != 0))) return false;
   if ((enable != 0U && enable != 1U) || reserved != 0U) {
     return false;
   }
@@ -535,15 +518,12 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   }
 
   if (g_state == ControllerState::DISARMED) {
-    if (mode != 1U && !cfg::MAGNET_BENCH_MODE && !cfg::DEADMAN_DIRECT_DRIVE &&
+    if (!cfg::MAGNET_BENCH_MODE && !cfg::DEADMAN_DIRECT_DRIVE &&
         !stationaryDwellMet()) {
       return false;
     }
     markAcceptedCommand(frame, ttl_ms);
     g_state = ControllerState::ARMED;
-    g_slope_ff_pwm = slope_ff;
-    g_drive_pwm_cap = pwm_cap;
-    g_brake_requested = mode == 1U;
     g_requested_mrad_s = target;
     return true;
   }
@@ -552,9 +532,6 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
     return false;
   }
   markAcceptedCommand(frame, ttl_ms);
-  g_slope_ff_pwm = slope_ff;
-  g_drive_pwm_cap = pwm_cap;
-  g_brake_requested = mode == 1U;
   g_requested_mrad_s = target;
   return true;
 }
@@ -634,12 +611,8 @@ void runControlLoop(uint32_t now_us) {
         g_deadman_release_ramp_active
             ? g_deadman_release_decel_mrad_s2
             : cfg::MAX_DECEL_MRAD_S2,
-        g_deadman_release_ramp_active,
-        g_slope_ff_pwm,
-        g_drive_pwm_cap,
-        g_brake_requested);
+        g_deadman_release_ramp_active);
   }
-  g_new_pulse_since_telemetry |= g_drive.newPulse();
   const uint8_t hall_faults = g_drive.hallFaultMask();
   if (hall_faults != 0U) {
     if ((hall_faults & DriveController::HALL_FAULT_LEFT) != 0U) {

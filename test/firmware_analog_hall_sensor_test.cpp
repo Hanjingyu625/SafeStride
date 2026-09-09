@@ -2,7 +2,6 @@
 #include <stdio.h>
 
 #include "../firmware/safestride_mcu/analog_hall_sensor.h"
-#include "../firmware/safestride_mcu/motor_control.h"
 #include "../firmware/safestride_mcu/config.h"
 
 namespace {
@@ -57,7 +56,7 @@ int main() {
   assert(hall.pulseCount() == 1UL);
   assert(hall.magnetPresent());
 
-  for (uint8_t sample = 0U; sample < 1U; ++sample) {
+  for (uint8_t sample = 0U; sample < 20U; ++sample) {
     g_hall_adc = sample % 2U == 0U ? 620U : 700U;
     now_us += cfg::HALL_SAMPLE_PERIOD_US;
     hall.update(now_us);
@@ -97,23 +96,6 @@ int main() {
   hall.update(now_us);
   assert(hall.pulseCount() == 2UL);
 
-  // Actual ADC -> pulse detector -> drive path: 100 ms pulses must not be
-  // discarded as they were with the former 250 ms blanking window.
-  g_hall_adc = 512U;
-  AnalogHallSensor fast_hall;
-  fast_hall.begin(0UL);
-  DriveController drive;
-  drive.begin();
-  for (uint32_t t=5000UL;t<=1000000UL;t+=5000UL) {
-    g_hall_adc = (t % 100000UL == 0UL) ? 650U : 512U;
-    fast_hall.update(t);
-    HallSample sample={fast_hall.pulseCount(),fast_hall.periodUs(),fast_hall.ageUs(t)};
-    drive.update(5000UL,sample,sample,696L,true);
-  }
-  assert(fast_hall.pulseCount()==10UL);
-  assert(fast_hall.periodUs()==100000UL);
-  assert(drive.speedValid());
-  assert(drive.braking() || drive.hallFaultMask()!=0U);
-  printf("analogue WSH135 Hall and overspeed input-path tests: OK\n");
+  printf("analogue WSH135 Hall tests: OK\n");
   return 0;
 }
