@@ -130,9 +130,9 @@ class TestSupervisedDrive(unittest.TestCase):
         self.assertAlmostEqual(msg.target_linear_m_s, 0.08)
         self.assertEqual(msg.slope_ff_pwm, 10)
         msg = self.tick(-11)
-        self.assertEqual((msg.mode, msg.target_linear_m_s, msg.slope_ff_pwm), (1, 0.0, 0))
+        self.assertEqual((msg.mode, msg.target_linear_m_s, msg.slope_ff_pwm), (2, 0.0, 0))
         for _ in range(20):
-            self.assertEqual(self.tick(-8).mode, 1)
+            self.assertEqual(self.tick(-8).mode, 2)
         for _ in range(30):
             msg = self.tick(0)
         self.assertEqual(msg.mode, 0)
@@ -155,11 +155,11 @@ class TestSupervisedDrive(unittest.TestCase):
         for _ in range(20):
             msg = self.tick(-6)
         self.assertAlmostEqual(msg.target_linear_m_s, 0.08 * 0.76)
-        self.assertEqual(msg.slope_ff_pwm, -18)
+        self.assertEqual(msg.slope_ff_pwm, 0)
         for _ in range(20):
             msg = self.tick(-8)
         self.assertAlmostEqual(msg.target_linear_m_s, 0.08 * 0.6)
-        self.assertEqual(msg.slope_ff_pwm, -30)
+        self.assertEqual(msg.slope_ff_pwm, 0)
 
     def test_existing_fault_still_suppresses_stream(self):
         self.node._status_reasons = lambda now: ['mcu_fault']
@@ -187,6 +187,52 @@ class TestSupervisedDrive(unittest.TestCase):
         for args in ((math.nan, 7, 0.5), (7, 7, 0.5), (10, 7, -1)):
             with self.assertRaises(ValueError):
                 SlopeBrakePolicy(*args)
+
+    def test_deployed_raw_pitch_thresholds_and_fault_priority(self):
+        import yaml
+        params = yaml.safe_load((ROOT / 'config/raspberry_pi.yaml').read_text(
+            encoding='utf-8'))['safety_supervisor']['ros__parameters']
+        launch_params = yaml.safe_load((ROOT /
+            'src/safestride_bringup/config/safestride.yaml').read_text(
+                encoding='utf-8'))['safety_supervisor']['ros__parameters']
+        for key in ('brake_enter_deg', 'brake_release_deg', 'brake_recovery_s',
+                    'uphill_pitch_sign', 'pitch_offset_rad', 'uphill_speed_scale',
+                    'downhill_speed_scale', 'slope_enter_angle_rad'):
+            self.assertEqual(params[key], launch_params[key], key)
+        n = self.node
+        n.params.update(params)
+        n._slope_policy = SlopeSpeedPolicy(**{
+            key: params['slope_' + key] if 'slope_' + key in params else params[key]
+            for key in ('enter_angle_rad', 'exit_angle_rad', 'confirmation_time_s',
+                        'uphill_pitch_sign', 'pitch_offset_rad',
+                        'downhill_speed_scale', 'uphill_speed_scale')})
+        n._brake_policy = SlopeBrakePolicy(params['brake_enter_deg'],
+            params['brake_release_deg'], params['brake_recovery_s'])
+        for _ in range(20):
+            msg = self.tick(-9.9)
+        self.assertEqual((msg.mode, msg.slope_ff_pwm), (Message.DRIVE, 0))
+        for _ in range(20):
+            msg = self.tick(-10.0)
+        self.assertGreater(msg.slope_ff_pwm, 0)
+        self.assertEqual(msg.mode, Message.DRIVE)
+        self.assertAlmostEqual(msg.target_linear_m_s, 0.08 * 1.15)
+        self.assertEqual(self.tick(-9.9).slope_ff_pwm, 0)
+        for angle in (0.0, 10.0, 20.0, 29.9):
+            for _ in range(30):
+                msg = self.tick(angle)
+            self.assertEqual(msg.mode, Message.DRIVE)
+            self.assertEqual(msg.slope_ff_pwm, 0)
+            self.assertAlmostEqual(msg.target_linear_m_s, 0.08)
+        self.assertEqual(self.tick(30.0).mode, Message.TERRAIN_STOP)
+        for _ in range(20):
+            self.assertEqual(self.tick(27.1).mode, Message.TERRAIN_STOP)
+        for _ in range(20):
+            msg = self.tick(27.0)
+        self.assertEqual(msg.mode, Message.DRIVE)
+        self.assertEqual(self.tick(30.0).mode, Message.TERRAIN_STOP)
+        self.assertEqual(self.tick(30.0, valid=False).mode, Message.BRAKE)
+        n._status_reasons = lambda now: ['deadman_released']
+        self.assertEqual(self.tick(30.0).mode, Message.BRAKE)
 
     def test_terrain_invalid_does_not_stop_and_confirmed_hazard_ramps(self):
         n = self.node

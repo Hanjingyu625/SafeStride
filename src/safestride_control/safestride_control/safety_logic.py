@@ -177,12 +177,12 @@ class SlopeBrakePolicy:
             self.clear_since = None
             return False
         valid = math.isfinite(pitch_rad) and math.isfinite(now_s)
-        angle = math.degrees(pitch_rad) if valid else math.nan
-        if not valid or angle <= -self.enter:
+        # Compare in sensor units to avoid degree round-trip errors at entry.
+        if not valid or pitch_rad <= -math.radians(self.enter):
             self.braking = True
             self.clear_since = None
         elif self.braking:
-            if angle < -self.release:
+            if pitch_rad < -math.radians(self.release):
                 self.clear_since = None
             elif self.clear_since is None:
                 self.clear_since = now_s
@@ -199,6 +199,5 @@ def slope_feedforward_pwm(pitch_rad, state):
     degrees = math.degrees(pitch_rad)
     if state == SlopeSpeedPolicy.UPHILL:
         return round(min(30.0, max(0.0, 4.0 * (degrees - 3.0))))
-    if state == SlopeSpeedPolicy.DOWNHILL:
-        return -round(min(60.0, max(0.0, 6.0 * (-degrees - 3.0))))
+    # Downhill stopping uses the explicit PWM ramp mode, not subtractive FF.
     return 0

@@ -532,7 +532,7 @@ class TerrainBridgeNode(Node):
             message.tof_change_m = telemetry.tof_change_mm / 1000.0
             message.tof_alert = telemetry.tof_alert
             message.terrain_hazard = (
-                telemetry.tof_valid
+                bool(telemetry.tof_valid)
                 and telemetry.tof_alert
                 in (TerrainStatus.TOF_RAISED, TerrainStatus.TOF_DROP)
             )

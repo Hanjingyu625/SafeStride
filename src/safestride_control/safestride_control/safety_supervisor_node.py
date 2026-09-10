@@ -756,6 +756,7 @@ class SafetySupervisor(Node):
         if (
             slope_state == SlopeSpeedPolicy.DOWNHILL
             and requested_linear > 0.0
+            and slope_scale < 1.0
         ):
             notes.append('downhill_slowdown')
         elif (
@@ -793,6 +794,9 @@ class SafetySupervisor(Node):
         self._slope_braking = self._brake_policy.update(
             normalized_pitch, now, self._slope_control_enabled)
         self._slope_ff_pwm = slope_feedforward_pwm(normalized_pitch, slope_state)
+        if (self._slope_ff_pwm > 0 and normalized_pitch <
+                float(self.get_parameter('slope_enter_angle_rad').value)):
+            self._slope_ff_pwm = 0
         combined_speed_scale = combine_speed_scales(
             surface_scale,
             slope_scale,
@@ -843,7 +847,7 @@ class SafetySupervisor(Node):
 
         if self._slope_braking:
             self._output_linear = self._output_angular = 0.0
-            operating_notes.append('slope_brake' if math.isfinite(normalized_pitch) else 'imu_brake')
+            operating_notes.append('slope_ramp_stop' if math.isfinite(normalized_pitch) else 'imu_brake')
 
         if self._terrain_note:
             operating_notes.append(self._terrain_note)
@@ -873,10 +877,11 @@ class SafetySupervisor(Node):
             drive.target_speed_kmh = self._output_linear * 3.6
             drive.drive_pwm_cap = self._drive_pwm_cap
             drive.mode = DriveCommand.BRAKE if (
-                self._slope_braking or motion_stop_reasons or
+                (self._slope_braking and not math.isfinite(normalized_pitch)) or motion_stop_reasons or
                 'obstacle_stop' in operating_notes or 'surface_stop' in operating_notes
             ) else DriveCommand.DRIVE
-            if self._terrain_stopping and drive.mode == DriveCommand.DRIVE:
+            # Valid downhill angles use the MCU's existing three-second PWM ramp.
+            if (self._terrain_stopping or self._slope_braking) and drive.mode == DriveCommand.DRIVE:
                 drive.mode = DriveCommand.TERRAIN_STOP
             drive.slope_ff_pwm = self._slope_ff_pwm if (
                 drive.mode == DriveCommand.DRIVE and self._output_linear > 0.0
@@ -965,8 +970,10 @@ class SafetySupervisor(Node):
         diagnostic.message = ', '.join(all_reasons) if all_reasons else 'ready'
         status = self._last_status
         diagnostic.values = [
-            KeyValue(key='drive_mode', value='BRAKE' if self._slope_braking or hard_stop_reasons
-                     else ('TERRAIN_STOP' if self._terrain_stopping else 'DRIVE')),
+            KeyValue(key='drive_mode', value='BRAKE' if (
+                (self._slope_braking and not math.isfinite(normalized_pitch))
+                or any(reason != 'disarmed' for reason in hard_stop_reasons))
+                else ('TERRAIN_STOP' if self._terrain_stopping or self._slope_braking else 'DRIVE')),
             KeyValue(key='slope_ff_pwm', value=str(self._slope_ff_pwm)),
             KeyValue(key='surface_control_enabled', value=_bool_text(self._surface_control_enabled)),
             KeyValue(key='slope_restart_latched', value='false'),
