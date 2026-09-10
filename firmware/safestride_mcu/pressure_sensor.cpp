@@ -60,9 +60,11 @@ void PressureSensorPair::begin(uint32_t now_ms) {
   maximum_delta_ = 0.0F;
   initialized_ = true;
   updatePresence();
-  alert_ = bothHandsPresent()
-      ? PressureAlert::NORMAL
-      : PressureAlert::HANDS_OFF;
+  alert_ = !anyHandPresent()
+      ? PressureAlert::HANDS_OFF
+      : (bothHandsPresent()
+          ? PressureAlert::NORMAL
+          : PressureAlert::WARNING);
   last_sample_ms_ = now_ms;
 }
 
@@ -113,9 +115,9 @@ void PressureSensorPair::sample() {
   difference_ = fabsf(left_ - right_);
   updatePresence();
 
-  if (!bothHandsPresent()) {
+  if (!anyHandPresent()) {
     alert_ = PressureAlert::HANDS_OFF;
-  } else if (
+  } else if (!bothHandsPresent() ||
       difference_ > cfg::PRESSURE_IMBALANCE_THRESHOLD ||
       maximum_delta_ > cfg::PRESSURE_SUDDEN_CHANGE_THRESHOLD) {
     alert_ = PressureAlert::WARNING;
@@ -170,6 +172,10 @@ void PressureSensorPair::updateChannelPresence(
 
 bool PressureSensorPair::bothHandsPresent() const {
   return leftPresent() && rightPresent();
+}
+
+bool PressureSensorPair::anyHandPresent() const {
+  return leftPresent() || rightPresent();
 }
 
 bool PressureSensorPair::leftPresent() const {

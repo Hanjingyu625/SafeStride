@@ -9,12 +9,12 @@ import time
 from typing import Optional
 
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
-from geometry_msgs.msg import TransformStamped, TwistStamped
+from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from safestride_interfaces.msg import HandlePressure, WalkerStatus, WheelHall
+from safestride_interfaces.msg import DriveCommand, HandlePressure, WalkerStatus, WheelHall
 from sensor_msgs.msg import BatteryState, JointState, Range
 from std_srvs.srv import SetBool
 from tf2_ros import TransformBroadcaster
@@ -60,6 +60,12 @@ PRESSURE_CALIBRATED = 1 << 2
 CAP_PRESSURE_TELEMETRY = 1 << 6
 CAP_SINGLE_LEFT_HALL = 1 << 0
 CAP_MAGNET_BENCH_MODE = 1 << 7
+CAP_ADVISORY_SENSOR_POLICY = 1 << 10
+
+# Hall faults remain visible in telemetry but are advisory. Only faults in
+# this mask may prevent the bridge from enabling motion.
+CRITICAL_FAULT_MASK = (1 << 0) | (1 << 1) | (1 << 8)
+HALL_FAULT_MASK = (1 << 3) | (1 << 4)
 
 # Firmware state values encoded in status_bits[10:8].
 FW_BOOT = 0
@@ -114,6 +120,9 @@ class SerialBridgeNode(Node):
         self._level_enable_blocked = False
         self._last_command_time: Optional[float] = None
         self._target_linear = 0.0
+        self._slope_ff_pwm = 0
+        self._drive_pwm_cap = 100
+        self._drive_mode = 1
         self._command_timed_out = True
 
         self._last_telemetry_time: Optional[float] = None
@@ -159,8 +168,8 @@ class SerialBridgeNode(Node):
         )
 
         self._cmd_sub = self.create_subscription(
-            TwistStamped,
-            self._topic_cmd_vel,
+            DriveCommand,
+            str(self.get_parameter('drive_command_topic').value),
             self._on_cmd_vel,
             10,
         )
@@ -193,6 +202,7 @@ class SerialBridgeNode(Node):
 
     def _declare_parameters(self) -> None:
         parameters = (
+            ('drive_command_topic', '/drive/command'),
             ('serial.port', '/dev/serial/by-id/CHANGE_ME'),
             ('serial.baudrate', 115200),
             ('serial.read_chunk_size', 256),
@@ -212,7 +222,7 @@ class SerialBridgeNode(Node):
             ('diagnostics.publish_rate_hz', 1.0),
             ('base.wheel_radius_m', 0.115),
             ('base.wheel_separation_m', 0.55),
-            ('base.hall_pulses_per_revolution', 6),
+            ('base.hall_pulses_per_revolution', 12),
             ('base.max_wheel_speed_rad_s', 3.0),
             ('range.min_m', 0.02),
             ('range.max_m', 4.0),
@@ -527,6 +537,18 @@ class SerialBridgeNode(Node):
             and bool(self._capabilities & CAP_MAGNET_BENCH_MODE)
         )
 
+    def _pressure_telemetry_available(
+        self, telemetry: TelemetryPayload
+    ) -> bool:
+        return (
+            bool(self._capabilities & CAP_PRESSURE_TELEMETRY)
+            and bool(telemetry.pressure_flags & PRESSURE_CALIBRATED)
+            and telemetry.pressure_left_raw != 0xFFFF
+            and telemetry.pressure_right_raw != 0xFFFF
+            and telemetry.pressure_left_filtered != 0xFFFF
+            and telemetry.pressure_right_filtered != 0xFFFF
+        )
+
     def _remote_allows_enable(self, telemetry: TelemetryPayload) -> bool:
         firmware_state = self._firmware_state(telemetry)
         magnet_bench_mode = self._magnet_bench_mode_active(telemetry)
@@ -547,12 +569,15 @@ class SerialBridgeNode(Node):
                 or not self._require_hall_calibration
                 or bench_feedback_bypass
             )
-            and bool(self._capabilities & CAP_SINGLE_LEFT_HALL)
+            and bool(
+                self._capabilities & CAP_ADVISORY_SENSOR_POLICY
+            )
+            and self._pressure_telemetry_available(telemetry)
             and not bool(telemetry.status_bits & STATUS_ESTOP)
             and not bool(
                 telemetry.status_bits & STATUS_WATCHDOG_TIMEOUT
             )
-            and telemetry.fault_bits == 0
+            and not bool(telemetry.fault_bits & CRITICAL_FAULT_MASK)
             and firmware_state in (FW_DISARMED, FW_ARMED)
         )
 
@@ -571,12 +596,15 @@ class SerialBridgeNode(Node):
                 bool(telemetry.status_bits & STATUS_HALL_CALIBRATED)
                 or not self._require_hall_calibration
             )
-            and bool(self._capabilities & CAP_SINGLE_LEFT_HALL)
+            and bool(
+                self._capabilities & CAP_ADVISORY_SENSOR_POLICY
+            )
+            and self._pressure_telemetry_available(telemetry)
             and not bool(telemetry.status_bits & STATUS_ESTOP)
             and not bool(
                 telemetry.status_bits & STATUS_WATCHDOG_TIMEOUT
             )
-            and telemetry.fault_bits == 0
+            and not bool(telemetry.fault_bits & CRITICAL_FAULT_MASK)
             and self._firmware_state(telemetry) == FW_ARMED
         )
 
@@ -819,26 +847,28 @@ class SerialBridgeNode(Node):
             self._close_serial(str(error))
             return False
 
-    def _on_cmd_vel(self, message: TwistStamped) -> None:
-        linear = float(message.twist.linear.x)
-        angular = float(message.twist.angular.z)
-        if not math.isfinite(linear) or not math.isfinite(angular):
-            self.get_logger().error('discarded non-finite /cmd_vel_safe')
-            return
-        if abs(angular) > self._max_abs_angular_z:
+    def _on_cmd_vel(self, message: DriveCommand) -> None:
+        linear = float(message.target_linear_m_s)
+        stamp = message.header.stamp
+        age = (self.get_clock().now().nanoseconds / 1e9 -
+               (stamp.sec + stamp.nanosec / 1e9))
+        valid = (math.isfinite(linear) and 0.0 <= age <= self._command_timeout and
+                 -60 <= message.slope_ff_pwm <= 30 and
+                 0 <= message.drive_pwm_cap <= 100 and message.mode in (0, 1) and
+                 (message.mode != 1 or (linear == 0.0 and message.slope_ff_pwm == 0)))
+        if not valid:
             with self._lock:
-                self._target_linear = 0.0
                 self._last_command_time = None
                 self._command_timed_out = True
-            self.get_logger().error(
-                'discarded angular command: one shared motor driver '
-                'supports straight motion only',
-                throttle_duration_sec=2.0,
-            )
-            if self._session_started and self._serial_connected():
-                self._send_command(0, False)
+                self._target_linear = 0.0
+                self._slope_ff_pwm = 0
+                self._drive_mode = 1
+            self._send_command(0, False)
             return
         with self._lock:
+            self._slope_ff_pwm = int(message.slope_ff_pwm)
+            self._drive_pwm_cap = int(message.drive_pwm_cap)
+            self._drive_mode = int(message.mode)
             self._target_linear = linear
             self._last_command_time = self._now_monotonic()
             self._command_timed_out = False
@@ -890,13 +920,20 @@ class SerialBridgeNode(Node):
             self._send_command(0, False)
             return
 
+        slope_ff, pwm_cap, mode = 0, 100, 0
         if self._deadman_direct_drive:
             target_linear = self._deadman_forward_velocity
             self._command_timed_out = False
         else:
+            with self._lock:
+                received_at = self._last_command_time
+                target_linear = self._target_linear
+                slope_ff = self._slope_ff_pwm
+                pwm_cap = self._drive_pwm_cap
+                mode = self._drive_mode
             fresh = (
-                self._last_command_time is not None
-                and (now - self._last_command_time) <= self._command_timeout
+                received_at is not None
+                and 0.0 <= now - received_at <= self._command_timeout
             )
 
             if not fresh:
@@ -908,7 +945,6 @@ class SerialBridgeNode(Node):
                 self._command_timed_out = True
                 self._send_command(0, False)
                 return
-            target_linear = self._target_linear
 
         enable = not self._level_enable_blocked and link_ok and remote_safe
         if not enable:
@@ -920,15 +956,19 @@ class SerialBridgeNode(Node):
             -self._max_wheel_speed,
             min(self._max_wheel_speed, target),
         )
-        self._send_command(int(round(target * 1000.0)), True)
+        self._send_command(
+            int(round(target * 1000.0)), True, slope_ff, pwm_cap, mode)
 
     def _send_command(
-        self, target_mrad_s: int, enable: bool
+        self, target_mrad_s: int, enable: bool, slope_ff_pwm=0, drive_pwm_cap=100, mode=0
     ) -> bool:
         payload = CommandPayload(
             target_mrad_s=target_mrad_s,
             ttl_ms=self._command_ttl_ms,
             enable=1 if enable else 0,
+            slope_ff_pwm=slope_ff_pwm,
+            drive_pwm_cap=drive_pwm_cap,
+            mode=mode,
         ).pack()
         return self._write_frame(
             self._make_frame(PacketType.COMMAND, payload)
@@ -1196,6 +1236,17 @@ class SerialBridgeNode(Node):
             self._status_pub.publish(message)
             return
 
+        message.measured_speed_m_s = telemetry.velocity_left_mrad_s * self._wheel_radius / 1000.0
+        message.ff_pwm = telemetry.ff_pwm
+        message.feedback_pwm = telemetry.feedback_pwm
+        message.applied_pwm = telemetry.applied_pwm
+        message.speed_age = telemetry.speed_age_us / 1e6 + message.telemetry_age
+        message.speed_valid = (
+            bool(telemetry.speed_flags & 1) and message.link_ok
+            and message.speed_age < 5.0)
+        message.new_pulse = bool(telemetry.speed_flags & 2)
+        message.direction_valid = False
+        message.braking = telemetry.drive_mode == 1
         firmware_state = self._firmware_state(telemetry)
         status_consistent = self._firmware_status_consistent(telemetry)
         message.armed = (
@@ -1228,7 +1279,7 @@ class SerialBridgeNode(Node):
             message.state = self._walker_constant('ESTOP', 4)
         elif (
             not status_consistent
-            or telemetry.fault_bits
+            or telemetry.fault_bits & CRITICAL_FAULT_MASK
             or firmware_state == FW_FAULT
         ):
             message.state = self._walker_constant('FAULT', 5)
@@ -1283,9 +1334,11 @@ class SerialBridgeNode(Node):
         elif not self._link_ok(now):
             status.level = DiagnosticStatus.ERROR
             status.message = 'controller telemetry timed out'
-        elif self._last_telemetry and self._last_telemetry.fault_bits:
+        elif self._last_telemetry and (
+            self._last_telemetry.fault_bits & CRITICAL_FAULT_MASK
+        ):
             status.level = DiagnosticStatus.ERROR
-            status.message = 'controller reports a fault'
+            status.message = 'controller reports a critical drive fault'
         elif (
             self._last_telemetry
             and not self._firmware_status_consistent(
@@ -1300,8 +1353,16 @@ class SerialBridgeNode(Node):
             status.level = DiagnosticStatus.ERROR
             status.message = 'emergency stop is active'
         elif not (self._capabilities & CAP_SINGLE_LEFT_HALL):
-            status.level = DiagnosticStatus.ERROR
+            status.level = DiagnosticStatus.WARN
             status.message = 'drive firmware lacks Hall feedback'
+        elif not (
+            self._capabilities & CAP_ADVISORY_SENSOR_POLICY
+        ):
+            status.level = DiagnosticStatus.ERROR
+            status.message = (
+                'drive firmware lacks advisory-sensor safety policy; '
+                'flash the current Drive Uno firmware'
+            )
         elif (
             self._last_telemetry
             and self._last_telemetry.status_bits
@@ -1326,13 +1387,25 @@ class SerialBridgeNode(Node):
             status.level = DiagnosticStatus.WARN
             status.message = 'Hall pulses per revolution are not calibrated'
         elif not (self._capabilities & CAP_PRESSURE_TELEMETRY):
-            status.level = DiagnosticStatus.WARN
+            status.level = DiagnosticStatus.ERROR
             status.message = 'drive firmware lacks pressure telemetry'
         elif self._last_telemetry and not (
             self._last_telemetry.pressure_flags & PRESSURE_CALIBRATED
         ):
-            status.level = DiagnosticStatus.WARN
+            status.level = DiagnosticStatus.ERROR
             status.message = 'pressure thresholds are not marked calibrated'
+        elif self._last_telemetry and not self._pressure_telemetry_available(
+            self._last_telemetry
+        ):
+            status.level = DiagnosticStatus.ERROR
+            status.message = 'pressure telemetry is unavailable'
+        elif self._last_telemetry and (
+            self._last_telemetry.fault_bits & HALL_FAULT_MASK
+        ):
+            status.level = DiagnosticStatus.WARN
+            status.message = (
+                'Hall feedback degraded; motion remains enabled by policy'
+            )
         elif (
             self._parser.crc_error_count
             or self._parser.frame_error_count

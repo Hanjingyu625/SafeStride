@@ -26,7 +26,7 @@ serial_bridge:
     telemetry: {timeout_s: 0.30}
     diagnostics: {publish_rate_hz: 1.0}
     base:
-      hall_pulses_per_revolution: 6
+      hall_pulses_per_revolution: 12
       max_wheel_speed_rad_s: 3.0
     range: {min_m: 0.02, max_m: 4.0, field_of_view_rad: 0.35}
     # Nominal pack voltage is known, but no battery-to-ADC divider is fitted.
@@ -82,6 +82,14 @@ safety_supervisor:
     # active, and an invalid MPU sample falls back to a neutral speed scale.
     require_range_sensors: false
     require_surface_condition: false
+    surface_control_enabled: false
+    # Auxiliary sensors may slow the request but can never reduce it to zero.
+    minimum_auxiliary_speed_scale: 0.25
+    drive_command_topic: /drive/command
+    brake_enter_deg: 10.0
+    brake_release_deg: 7.0
+    brake_recovery_s: 0.5
+    drive_pwm_cap: 100
     require_deadman: true
     slope_control_enabled: true
     max_forward_velocity: 0.15
@@ -101,7 +109,7 @@ safety_supervisor:
     slope_exit_angle_rad: 0.0523599   # 3 deg
     slope_confirmation_time_s: 0.50
     downhill_speed_scale: 0.60
-    uphill_speed_scale: 1.25
+    uphill_speed_scale: 1.0
     max_combined_speed_scale: 1.25
     stop_distance: 0.35
     slow_distance: 0.80
@@ -225,6 +233,42 @@ crosswalk_controller:
     status_topic: /crosswalk/status
     diagnostics_topic: /diagnostics
     output_frame_id: base_link
+
+device_health_monitor:
+  ros__parameters:
+    publish_rate_hz: 1.0
+    drive_timeout_s: 0.60
+    terrain_timeout_s: 0.60
+    gps_timeout_s: 2.50
+    camera_timeout_s: 2.50
+    perception_timeout_s: 2.50
+    crosswalk_timeout_s: 2.50
+    command_timeout_s: 0.75
+    terrain_expected: true
+    gps_expected: true
+    camera_expected: false
+    perception_expected: false
+    crosswalk_expected: true
+    motor_driver_fault_input_available: false
+    pressure_disconnect_detection_available: false
+    independent_motor_feedback_available: false
+    battery_monitoring_available: false
+    battery_nominal_voltage_v: 12.0
+    battery_nominal_capacity_ah: 0.0
+    converter_monitoring_available: false
+    converter_nominal_input_v: 12.0
+    converter_nominal_output_v: 5.0
+    walker_status_topic: /walker/status
+    pressure_topic: /handle/pressure
+    hall_topic: /wheel/hall
+    terrain_status_topic: /terrain/status
+    battery_topic: /battery_state
+    gps_fix_topic: /gps/fix
+    camera_topic: /camera/image/compressed
+    surface_topic: /perception/surface_condition
+    crosswalk_topic: /crosswalk/status
+    drive_command_topic: /drive/command
+    diagnostics_topic: /diagnostics
 
 foxglove_bridge:
   ros__parameters:

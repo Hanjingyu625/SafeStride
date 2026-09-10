@@ -9,18 +9,19 @@ arduino-cli compile --fqbn arduino:avr:uno firmware/safestride_mcu
 arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
 ```
 
-두 Uno를 모두 protocol v4로 다시 업로드한다. ROS bridge와 Arduino 시리얼
+두 Uno를 모두 protocol v5로 다시 업로드한다. ROS bridge와 Arduino 시리얼
 모니터는 같은 포트를 동시에 열 수 없다.
 
 ## 2. 센서 단독 확인
 
 - 전원을 넣을 때 WSH135에서 자석을 떼어 기준값을 잡는다. 이후 왼쪽 휠
-  1회전에서 A3 Hall pulse가 정확히 6 증가하고, 자석을 센서 앞에서 흔들어도
+  1회전에서 A3 Hall pulse가 정확히 12 증가하고, 자석을 센서 앞에서 흔들어도
   자석이 빠져나가기 전에는 같은 pulse를 중복 계산하지 않는다.
-- 왼쪽 A2/오른쪽 A1을 누르면 각각 raw가 80 이상이고 양손에서 dead-man이 true다.
-- TOF 정지 기준면은 약 0.25 m이며 초기 10샘플 후 valid가 true가 된다.
+- 왼쪽 A2/오른쪽 A1을 누르면 각각 raw가 80 이상이다. 어느 한쪽이라도 누르면
+  dead-man이 true이고 양쪽을 모두 놓았을 때만 false다.
+- TOF 기준면은 약 0.25 m이며 초기 10샘플 후 valid가 true가 된다.
 - GY-521을 기울이면 `/terrain/imu`와 status roll/pitch가 변한다. MPU가 아직
-  연결되지 않은 경우 진단은 WARN이지만 TOF 단차 정지 시험은 계속할 수 있다.
+  연결되지 않은 경우 진단은 WARN이며 모터 정지 사유가 되지 않는다.
 - BE-220은 Terrain Uno가 아니라 Raspberry Pi의 `/dev/serial0`에 직접
   연결한다. 유효한 NMEA no-fix 문장은 `/gps/fix`의 NO_FIX로 발행된다.
 
@@ -48,18 +49,17 @@ bash scripts/hil_smoke_test.sh
 - TOF에 물체를 가까이 유지: `TOF_CANDIDATE_RAISED` 후 `TOF_RAISED`
 - 바닥을 멀리 이동: `TOF_CANDIDATE_DROP` 후 `TOF_DROP`
 
-확정 상태에서 `/cmd_vel_safe`는 0이 된 뒤 송신이 억제되고 Drive Uno가
-disarmed 상태로 전환되어야 한다. cruise가 꺼져 있으면 장애물을 제거해도
-정지 상태를 유지하고, fresh 명령과 양손 압력이 다시 들어오면 자동 arm된다.
+확정 상태는 `/terrain/status`와 `/diagnostics`에 표시되지만
+`/cmd_vel_safe`를 0으로 만들거나 Drive Uno를 disarm하지 않아야 한다.
 
 ## 4. 최종 체크
 
 - `MAGNET_BENCH_MODE=false`, `ENABLE_ESTOP=false`
 - `HALL_CALIBRATED=true`, `PRESSURE_THRESHOLDS_CALIBRATED=true`
-- 두 ROS YAML에서 `require_range_sensors=true`, `require_deadman=true`
+- 두 ROS YAML에서 `require_range_sensors=false`, `require_deadman=true`
 - 두 ROS YAML과 Drive 펌웨어에서 `deadman_direct_drive=false`
 - 앞쪽을 들었을 때 `/terrain/status.pitch_rad`가 음수면
   `uphill_pitch_sign=-1.0`, 양수면 `1.0`
-- protocol v4/schema `0x0401`/release `20260826`
+- protocol v5/schema `0x0501`/release `20260906`
 - 지도/API가 없을 때 crosswalk 진단은 WARN이고 `/cmd_vel` 발행자는 아니다.
 - 시험 종료 후 `/walker/set_enabled false`와 물리 모터 전원 차단 완료

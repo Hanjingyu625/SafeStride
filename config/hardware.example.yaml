@@ -18,9 +18,9 @@ drive:
   requires_explicit_ros_enable: false
   wheel_radius_m: 0.115
   wheel_separation_m: 0.55
-  # Current six-magnet left-wheel preset. Use 5 here and in both runtime
-  # configs if five magnets are installed on the sensed wheel.
-  hall_pulses_per_revolution: 6
+  # Current twelve-pulse left-wheel preset. Change this and both runtime
+  # configs together if the installed pulse count changes.
+  hall_pulses_per_revolution: 12
   hall_calibrated: true
   hall_sensor_layout: single_left
   pressure:
@@ -41,4 +41,16 @@ perception:
   model_path: models/road_surface.onnx
   model_sha256: CHANGE_ME
   confidence_threshold: 0.65
-  unknown_speed_scale: 0.0
+  # Unknown/degraded perception is advisory and must not request a stop.
+  unknown_speed_scale: 1.0
+monitoring:
+  # Set these true only after the corresponding electrical telemetry exists.
+  motor_driver_fault_input_available: false
+  pressure_disconnect_detection_available: false
+  independent_motor_feedback_available: false
+  battery_monitoring_available: false
+  battery_nominal_voltage_v: 12.0
+  battery_nominal_capacity_ah: 0.0
+  converter_monitoring_available: false
+  converter_nominal_input_v: 12.0
+  converter_nominal_output_v: 5.0

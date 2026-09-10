@@ -1,4 +1,4 @@
-"""Launch-level test for TerrainStatus fail-safe motor inhibition."""
+"""Launch-level test for advisory-only TerrainStatus telemetry."""
 
 import time
 import unittest
@@ -117,15 +117,15 @@ class TestTerrainFailSafe(unittest.TestCase):
                 return
         self.fail('safety supervisor ROS graph did not become ready')
 
-    def test_confirmed_drop_stops_output(self):
+    def test_confirmed_drop_does_not_stop_output(self):
         self._wait_for_graph()
         self._publish_inputs(
             TerrainStatus.TOF_NORMAL,
             1.5,
-            TerrainStatus.FAULT_MPU_INVALID,
+            0,
         )
         self.assertTrue(any(value > 0.01 for value in self.outputs))
         self.outputs.clear()
         self._publish_inputs(TerrainStatus.TOF_DROP, 1.0)
         self.assertTrue(self.outputs)
-        self.assertEqual(self.outputs[-1], 0.0)
+        self.assertGreater(self.outputs[-1], 0.01)

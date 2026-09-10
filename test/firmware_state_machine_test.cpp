@@ -6,7 +6,8 @@
 namespace {
 
 uint32_t g_test_millis = 0UL;
-int g_pressure_adc = 200;
+int g_pressure_left_adc = 200;
+int g_pressure_right_adc = 200;
 int g_hall_adc = 512;
 
 }  // namespace
@@ -18,9 +19,12 @@ void digitalWrite(uint8_t, uint8_t) {}
 int digitalRead(uint8_t) { return LOW; }
 void analogWrite(uint8_t, int) {}
 int analogRead(uint8_t pin) {
-  return pin == safestride_config::HALL_ANALOG_PIN
-      ? g_hall_adc
-      : g_pressure_adc;
+  if (pin == safestride_config::HALL_ANALOG_PIN) {
+    return g_hall_adc;
+  }
+  return pin == safestride_config::PRESSURE_LEFT_PIN
+      ? g_pressure_left_adc
+      : g_pressure_right_adc;
 }
 int digitalPinToInterrupt(uint8_t) { return 0; }
 void attachInterrupt(int, void (*)(), int) {}
@@ -65,6 +69,7 @@ int main() {
   assert(g_watchdog_timed_out);
 
   uint8_t command_payload[proto::COMMAND_PAYLOAD_SIZE] = {};
+  command_payload[10U] = 100U;
   proto::writeU16(command_payload + 4U, 200U);
   command_payload[6U] = 0U;
   proto::FrameView old_command = {
@@ -167,13 +172,26 @@ int main() {
   // A normal pressure release stays ARMED only while the MCU ramps the target
   // to zero. The bridge may refresh the watchdog with enabled zero commands,
   // but a non-zero command is rejected while the level remains released.
-  g_pressure_adc = 0;
+  // Releasing only one handle is advisory and must not stop motion.
+  g_pressure_left_adc = 0;
   g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
   g_pressure.update(g_test_millis);
   refreshPhysicalSafety();
   assert(deadmanActive());
   assert(g_state == ControllerState::ARMED);
   assert(!g_deadman_release_ramp_active);
+  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  g_pressure.update(g_test_millis);
+  refreshPhysicalSafety();
+  assert(deadmanActive());
+  assert(!g_deadman_release_ramp_active);
+
+  // Releasing the remaining handle starts the controlled stop.
+  g_pressure_right_adc = 0;
+  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  g_pressure.update(g_test_millis);
+  refreshPhysicalSafety();
+  assert(deadmanActive());
   g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
   g_pressure.update(g_test_millis);
   refreshPhysicalSafety();
@@ -187,10 +205,10 @@ int main() {
   motion_enable_command.sequence = next_sequence++;
   assert(!handleCommand(motion_enable_command));
 
-  // The dead-man is level-triggered. Reacquiring both pressure channels before
+  // The dead-man is level-triggered. Reacquiring either pressure channel before
   // the ramp finishes cancels the release state, and the next fresh command
   // resumes closed-loop motion without waiting for a watchdog/session reset.
-  g_pressure_adc = 200;
+  g_pressure_left_adc = 200;
   g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
   g_pressure.update(g_test_millis);
   refreshPhysicalSafety();
@@ -202,7 +220,8 @@ int main() {
   assert(g_requested_mrad_s == 500L);
 
   // A release that remains active still completes the controlled stop.
-  g_pressure_adc = 0;
+  g_pressure_left_adc = 0;
+  g_pressure_right_adc = 0;
   g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
   g_pressure.update(g_test_millis);
   refreshPhysicalSafety();
@@ -233,7 +252,8 @@ int main() {
   assert(handleCommand(disable_command));
   assert(g_state == ControllerState::DISARMED);
 
-  g_pressure_adc = 200;
+  g_pressure_left_adc = 200;
+  g_pressure_right_adc = 200;
   g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
   g_pressure.update(g_test_millis);
   assert(deadmanActive());
@@ -246,40 +266,44 @@ int main() {
   assert(handleCommand(motion_enable_command));
   assert(g_state == ControllerState::ARMED);
 
-  // Recoverable faults stay latched while the handle is held. Releasing the
-  // dead-man and receiving a disabled command clears the fault; after the
-  // stationary dwell, a fresh level-triggered grasp may arm again.
+  // A Hall plausibility fault remains visible but cannot stop or inhibit.
   g_fault_bits = FAULT_LEFT_HALL;
-  immediateStop(ControllerState::FAULT, false);
-  command_payload[6U] = 0U;
-  disable_command.sequence = next_sequence++;
-  assert(handleCommand(disable_command));
-  assert(g_state == ControllerState::FAULT);
-  assert(g_fault_bits == FAULT_LEFT_HALL);
-
-  g_pressure_adc = 0;
-  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
-  g_pressure.update(g_test_millis);
-  assert(deadmanActive());
-  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
-  g_pressure.update(g_test_millis);
-  assert(!deadmanActive());
-  disable_command.sequence = next_sequence++;
-  assert(handleCommand(disable_command));
-  assert(g_state == ControllerState::DISARMED);
-  assert(g_fault_bits == 0U);
-
-  g_pressure_adc = 200;
-  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
-  g_pressure.update(g_test_millis);
-  assert(deadmanActive());
-  g_stationary_tracking = true;
-  g_stationary_since_ms =
-      g_test_millis - cfg::ARM_STATIONARY_DWELL_MS;
   command_payload[6U] = 1U;
+  proto::writeI32(command_payload + 0U, 500L);
   motion_enable_command.sequence = next_sequence++;
   assert(handleCommand(motion_enable_command));
   assert(g_state == ControllerState::ARMED);
+  assert(g_fault_bits == FAULT_LEFT_HALL);
+  g_fault_bits = 0U;
+
+  // v5 explicit BRAKE stays enabled and releases on a newer DRIVE command.
+  g_pressure_left_adc = 200;
+  g_pressure_right_adc = 200;
+  g_pressure.begin(g_test_millis);
+  g_session_active = true;
+  g_session_id = 0x55667788UL;
+  g_state = ControllerState::ARMED;
+  g_fault_bits = 0U;
+  g_watchdog_timed_out = false;
+  g_deadman_release_ramp_active = false;
+  g_have_command_sequence = false;
+  uint8_t v5[proto::COMMAND_PAYLOAD_SIZE] = {};
+  proto::writeU16(v5 + 4, 200U);
+  v5[6] = 1U; v5[10] = 100U; v5[11] = 1U;
+  proto::FrameView brake_frame={proto::TYPE_COMMAND,0U,100U,
+      proto::COMMAND_PAYLOAD_SIZE,g_session_id,g_test_millis,v5};
+  assert(handleCommand(brake_frame));
+  assert(g_state==ControllerState::ARMED && g_brake_requested);
+  assert(!handleCommand(brake_frame)); // duplicate cannot refresh/alter state
+  brake_frame.sequence=101U;
+  v5[11]=0U; proto::writeI32(v5,696L); proto::writeI16(v5+8,8);
+  assert(handleCommand(brake_frame));
+  assert(!g_brake_requested && g_slope_ff_pwm==8 && g_requested_mrad_s==696L);
+  brake_frame.sequence=102U; v5[10]=101U;
+  assert(!handleCommand(brake_frame));
+  assert(g_last_command_sequence==101U && g_drive_pwm_cap==100U);
+  v5[10]=100U; brake_frame.payload_length=8U;
+  assert(!handleCommand(brake_frame)); // no implicit legacy command acceptance
 
   printf("firmware watchdog/session state-machine tests: OK\n");
   return 0;

@@ -166,7 +166,7 @@ test -r /dev/safestride-terrain && test -w /dev/safestride-terrain
 test -r /dev/serial0 && test -w /dev/serial0
 ```
 
-펌웨어 protocol v4가 두 Uno에 모두 올라가 있어야 한다. `arduino-cli`를 사용하는
+펌웨어 protocol v5가 두 Uno에 모두 올라가 있어야 한다. `arduino-cli`를 사용하는
 경우 각각 컴파일·업로드한다. 현재 MCU 펌웨어에는 외부 Arduino 라이브러리가
 필요하지 않는다.
 
@@ -206,9 +206,9 @@ bash scripts/run.sh
 
 `run.sh`는 `/dev/safestride-drive`, `/dev/safestride-terrain`, `/dev/serial0`의
 존재를 확인하고 두 Uno의 serial 역할도 검증한다. 이 예시는 cruise 명령을
-끄므로 Drive MCU는 disarmed 상태여야 한다. 이후 정상 `/cmd_vel_safe`, 링크,
-Hall/TOF와 양손 압력이 갖춰지면 별도의 `/walker/set_enabled true` 없이
-자동 arm된다.
+끄므로 Drive MCU는 disarmed 상태여야 한다. 이후 정상 `/drive/command`, 링크,
+유효한 압력 telemetry와 어느 한쪽 손이 갖춰지면 별도의
+`/walker/set_enabled true` 없이 자동 arm된다.
 
 ## 6. 두 번째 SSH 터미널에서 topic 확인
 
@@ -259,7 +259,7 @@ ros2 topic hz /terrain/imu
 
 - `/walker/status`: `link_ok: true`, `armed: false`, `fault_bits: 0`
 - `/handle/pressure`: 양쪽 ADC 값과 dead-man 판정이 손 입력에 따라 변함
-- `/wheel/hall`: 왼쪽 바퀴를 손으로 한 바퀴 돌리면 pulse가 6 증가함
+- `/wheel/hall`: 왼쪽 바퀴를 손으로 한 바퀴 돌리면 pulse가 12 증가함
 - `/terrain/status`: 초기 약 10샘플 뒤 `tof_valid: true`
 - TOF 정상 기준면: `tof_alert: 0`, `terrain_hazard: false`
 - 물체를 가까이 유지: raised 후보 후 `tof_alert: 3`
@@ -272,8 +272,8 @@ ros2 topic hz /terrain/imu
   `/gps/fix`의 NO_FIX 상태로 발행됨
 - 지도·API 미설정 횡단보도 노드는 readiness WARN만 발행하며 모터 명령을 내지 않음
 
-`require_range_sensors=true`이므로 Terrain TOF가 없거나 무효이면 모터 활성은
-차단되는 것이 정상이다.
+Terrain TOF가 없거나 무효이면 `/diagnostics`에는 WARN이 나타나지만 모터 활성은
+차단되지 않는 것이 현재 정책이다.
 
 ## 7. 자동 HIL smoke test
 
@@ -292,8 +292,8 @@ bash scripts/hil_smoke_test.sh
 아래 단계는 센서 토픽과 HIL이 모두 정상일 때만 진행한다.
 
 - 바퀴가 지면과 완전히 떨어져 있어야 한다.
-- 양손 압력센서를 계속 잡아야 한다.
-- TOF가 정상 기준면을 보고 있어야 한다.
+- 적어도 한쪽 압력센서를 계속 잡아야 한다.
+- TOF와 Hall 상태는 `/diagnostics`로 함께 기록한다.
 - 물리 모터 전원 차단 수단을 즉시 조작할 수 있어야 한다.
 
 첫 번째 터미널에서 cruise를 끈 stack을 다시 실행한다.
@@ -310,11 +310,10 @@ cd ~/SafeStride
 bash scripts/test_drive_pi.sh --enable-motor 5
 ```
 
-이 스크립트는 0.08 m/s `/cmd_vel`을 20 Hz로 발행한다. 안전 조건과 양손 압력이
-유효하면 service true 없이 자동 arm되며, 종료·오류·`Ctrl+C` 시 0 명령을
-발행하고 수동 inhibit도 설정한다. 왼쪽 Hall pulse가 없거나 TOF hazard가
-발생하면 즉시 정지해야 하고, 정상 dead-man 해제는 약 0.6초 ramp 뒤
-정지해야 한다.
+이 스크립트는 0.08 m/s `/cmd_vel`을 20 Hz로 발행한다. Drive 링크와 어느 한쪽
+압력이 유효하면 service true 없이 자동 arm되며, 종료·오류·`Ctrl+C` 시 0
+명령을 발행하고 수동 inhibit도 설정한다. Hall 누락이나 TOF hazard는 진단만
+발생하고, 양쪽 압력을 모두 놓으면 약 0.6초 ramp 뒤 정지해야 한다.
 
 수동으로 비활성화해야 할 때:
 

@@ -19,21 +19,23 @@ Terrain Uno: downward TOF-10120, GY-521 MPU6050
 Raspberry Pi: BE-220 GPS + serial bridges -> safety supervisor -> diagnostics/Foxglove
 ```
 
-- 왼쪽 휠 WSH135 아날로그 홀센서만 사용하며 A3, 자석 6개로 설정되어 있다. 공통
+- 왼쪽 휠 WSH135 아날로그 홀센서만 사용하며 A3, 자석 12개로 설정되어 있다. 공통
   드라이브 구조라 오른쪽 ROS 값은 왼쪽 측정값을 복제한 추정치다.
-- 압력센서 임계값은 좌우 ADC 80이고 dead-man으로 동작한다.
-  별도의 `/walker/set_enabled true` 없이도 정상 링크, fresh `/cmd_vel_safe`,
-  Hall/TOF와 양손 압력이 모두 유효하면 자동 arm된다. 정상 압력 해제는 0.6초
-  목표속도 ramp 후 정지하고 fault, E-stop, watchdog은 즉시 정지한다.
+- 압력센서 임계값은 좌우 ADC 80이고 dead-man으로 동작한다. 어느 한쪽 손이라도
+  유지되면 구동을 허용하며 양쪽을 모두 놓으면 0.6초 목표속도 ramp 후 정지한다.
+  정상 Drive 링크, fresh `/drive/command`, 유효한 압력 telemetry와 critical
+  motor-driver fault 없음이 자동 arm 조건이다.
 - TOF는 약 25 cm 아래 지면을 향한다. 초기 기준면 학습 후 EMA 거리,
   적응 기준값, 변화량과 4회 연속 검출을 함께 사용해 높아진 물체와
-  낮아진 바닥을 구분한다. 확정 시 모터 명령을 즉시 0으로 만들고 MCU
-  watchdog이 재활성화 전까지 정지 상태를 유지한다.
+  낮아진 바닥을 구분한다. TOF 결과는 진단 전용이며 모터를 정지시키지 않는다.
 - MPU6050은 3축 가속도·자이로와 중력 기반 roll/pitch를 발행한다. 지자기센서가
   없으므로 yaw는 관측하지 않는다. 5도 이상 pitch가 0.5초 지속되면 경사로
-  확정해 내리막은 감속하고 오르막은 목표속도를 높인다. 장착 부호는
-  `uphill_pitch_sign`으로 반전할 수 있다. MPU 오류는 경사 보정만 중립화하며
-  TOF 단차 안전 정지를 대신하지 않는다.
+  확정해 내리막은 연속 감속하고 오르막은 목표속도를 유지하며 PWM을 보조한다.
+  평지 기준 PWM 60 + 경사 FF + Hall P 제어이며 Hall 대기시간은 5초다.
+  장착 부호는 `uphill_pitch_sign`으로 반전한다. 실제로 관측된 급내리막만
+  BRAKE를 만들며 MPU 오류·유실은 진단 경고와 중립 배율로 처리한다. Hall fault,
+  TOF, GPS, 카메라, 노면 결과도 모터 정지에 관여하지 않는다.
+  설정·제동 한계와 시험 절차는 [속도제어 문서](docs/SPEED_CONTROL_KO.md)를 참고한다.
 - GPS는 Raspberry Pi의 별도 serial 장치에서 `gps_node`가 직접 수신한다.
   지도·API가 없으면 횡단보도 노드는
   종료되지 않고 준비 여부만 `/diagnostics`에 표시하며 모터 명령을 발행하지 않는다.
@@ -49,20 +51,13 @@ bash scripts/test.sh
 SAFESTRIDE_ENABLE_CRUISE=false bash scripts/run.sh
 ```
 
-현재 하드웨어에서는 TOF가 기본적으로 모터 차단 조건에서 제외되며 Terrain
-Uno의 MPU 경사 토픽은 계속 유지된다. TOF interlock을 다시 시험할 때만 다음처럼
-명시한다.
-
-```bash
-SAFESTRIDE_ENABLE_TERRAIN=true \
-SAFESTRIDE_REQUIRE_TERRAIN_TOF=true \
-bash scripts/run.sh
-```
+TOF와 나머지 보조센서는 항상 진단·감속 전용이다. 전체 장치 상태는
+`device_health_monitor`가 `/diagnostics`에 장치별로 발행한다.
 
 운영 직렬 장치는 `/dev/safestride-drive`, `/dev/safestride-terrain`, GPIO UART
 `/dev/serial0` 또는 `/dev/ttyS0`이다. `scripts/run.sh`가 GPS UART를 자동으로
 선택하며 `SAFESTRIDE_GPS_PORT`로 덮어쓸 수 있다. 펌웨어는
-프로토콜 v4이므로 두 Uno와 Pi 소프트웨어를 함께 갱신한다.
+프로토콜 v5이므로 두 Uno와 Pi 소프트웨어를 함께 갱신한다.
 
 ```bash
 arduino-cli compile --fqbn arduino:avr:uno firmware/safestride_mcu
@@ -73,6 +68,7 @@ arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
 
 | 이름 | 형식 | 역할 |
 |---|---|---|
+| `/drive/command` | `DriveCommand` | 속도·경사 FF·PWM cap·BRAKE 원자 명령 |
 | `/wheel/hall` | `WheelHall` | 왼쪽 홀센서 및 미러된 공통 속도 |
 | `/handle/pressure` | `HandlePressure` | 좌우 압력과 dead-man 판정 |
 | `/terrain/tof` | `sensor_msgs/Range` | TOF 원거리 |
@@ -95,4 +91,5 @@ arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
 - PC-Pi 끊김 진단: [Pi 연결 진단](docs/PI_CONNECTION_DIAGNOSIS.md)
 - 시각화: [Foxglove 구성](docs/FOXGLOVE.md)
 
-휠 반지름, PID, stall/overspeed 제한은 실물 로그를 확보한 뒤 조정한다.
+휠 반지름과 Hall P 보정은 실물 로그를 확보한 뒤 조정한다. Hall stall/overspeed는
+진단 경고만 만들며 PWM 차단이나 BRAKE를 만들지 않는다.

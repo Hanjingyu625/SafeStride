@@ -83,16 +83,18 @@ class TestSlopeSpeedPolicy(unittest.TestCase):
             sample_valid=True,
             now_s=2.5,
         )
-        self.assertEqual((scale, state), (0.6, SlopeSpeedPolicy.DOWNHILL))
+        self.assertAlmostEqual(scale, 0.68)
+        self.assertEqual(state, SlopeSpeedPolicy.DOWNHILL)
         self.assertLess(pitch, 0.0)
         scale, state, _ = self.policy.update(
             pitch_rad=math.radians(-4.0),
             sample_valid=True,
             now_s=3.0,
         )
-        self.assertEqual((scale, state), (0.6, SlopeSpeedPolicy.DOWNHILL))
+        self.assertAlmostEqual(scale, 0.92)
+        self.assertEqual(state, SlopeSpeedPolicy.DOWNHILL)
 
-    def test_invalid_sample_resets_to_neutral(self) -> None:
+    def test_invalid_sample_returns_neutral_advisory_scale(self) -> None:
         self.policy.update(
             pitch_rad=math.radians(8.0),
             sample_valid=True,

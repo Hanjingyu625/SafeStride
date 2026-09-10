@@ -151,7 +151,7 @@ class TestHardwareIntegrity(unittest.TestCase):
             self.assertIn("require_range_sensors: false", text)
             self.assertIn("require_surface_condition: false", text)
 
-    def test_tof_interlock_can_be_disabled_without_disabling_mpu(self):
+    def test_tof_is_advisory_without_disabling_mpu(self):
         supervisor = (
             ROOT
             / "src"
@@ -169,10 +169,7 @@ class TestHardwareIntegrity(unittest.TestCase):
         run_script = (ROOT / "scripts" / "run.sh").read_text(
             encoding="utf-8"
         )
-        self.assertIn(
-            "if not self._require_ranges:\n            return []",
-            supervisor,
-        )
+        self.assertIn("del now\n        return []", supervisor)
         self.assertIn("require_terrain_tof", launch)
         self.assertIn("'require_range_sensors': ParameterValue(", launch)
         self.assertIn("SAFESTRIDE_REQUIRE_TERRAIN_TOF", run_script)
@@ -188,6 +185,56 @@ class TestHardwareIntegrity(unittest.TestCase):
             "                            enable_perception,",
             launch,
         )
+
+    def test_advisory_sensors_cannot_stop_motion(self):
+        motor = (
+            ROOT / "firmware/safestride_mcu/motor_control.cpp"
+        ).read_text(encoding="utf-8")
+        supervisor = (
+            ROOT
+            / "src/safestride_control/safestride_control"
+            / "safety_supervisor_node.py"
+        ).read_text(encoding="utf-8")
+        self.assertEqual(
+            constant_expression(self.config, "ENABLE_HALL_SPEED_BRAKE"),
+            "false",
+        )
+        self.assertEqual(
+            constant_expression(
+                self.config, "HALL_FAULTS_ARE_DIAGNOSTIC_ONLY"
+            ),
+            "true",
+        )
+        self.assertIn("CAP_ADVISORY_SENSOR_POLICY", self.drive)
+        self.assertIn("CAP_ADVISORY_SENSOR_POLICY", self.bridge)
+        self.assertIn("CRITICAL_FAULT_MASK", self.bridge)
+        self.assertIn("_pressure_telemetry_available", self.bridge)
+        self.assertIn(
+            "Hall feedback must never inhibit or brake motor output",
+            self.config,
+        )
+        self.assertNotIn(
+            "immediateStop(ControllerState::FAULT, false);\n"
+            "    g_stationary_tracking = false;\n"
+            "    return;",
+            self.drive,
+        )
+        self.assertIn("MOTOR_MIN_ACTIVE_PWM", motor)
+        self.assertIn("minimum_auxiliary_speed_scale", supervisor)
+
+    def test_device_health_monitor_is_always_launched(self):
+        setup = (
+            ROOT / "src/safestride_control/setup.py"
+        ).read_text(encoding="utf-8")
+        monitor = (
+            ROOT
+            / "src/safestride_control/safestride_control"
+            / "device_health_monitor_node.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("device_health_monitor", setup)
+        self.assertIn("executable='device_health_monitor'", self.bringup_launch)
+        self.assertNotIn("DriveCommand, self.create_publisher", monitor)
+        self.assertIn("monitor_is_read_only", monitor)
 
     def test_drive_uses_supervised_automatic_enable(self):
         self.assertIn("self._level_enable_blocked = False", self.bridge)
@@ -282,13 +329,13 @@ class TestHardwareIntegrity(unittest.TestCase):
 
     def test_protocol_compatibility_constants_are_synchronized(self):
         for protocol in (self.drive_protocol, self.terrain_protocol):
-            self.assertEqual(constant_expression(protocol, "VERSION"), "4U")
+            self.assertEqual(constant_expression(protocol, "VERSION"), "5U")
             self.assertEqual(
-                constant_expression(protocol, "SCHEMA_ID"), "0x0401U"
+                constant_expression(protocol, "SCHEMA_ID"), "0x0501U"
             )
             self.assertEqual(
                 constant_expression(protocol, "FIRMWARE_RELEASE_ID"),
-                "20260826UL",
+                "20260906UL",
             )
             self.assertEqual(
                 constant_expression(protocol, "HELLO_PAYLOAD_SIZE"),
@@ -298,10 +345,10 @@ class TestHardwareIntegrity(unittest.TestCase):
                 constant_expression(protocol, "SESSION_START_PAYLOAD_SIZE"),
                 "12U",
             )
-        self.assertIn("PROTOCOL_VERSION = 4", self.python_protocol)
-        self.assertIn("PROTOCOL_SCHEMA_ID = 0x0401", self.python_protocol)
+        self.assertIn("PROTOCOL_VERSION = 5", self.python_protocol)
+        self.assertIn("PROTOCOL_SCHEMA_ID = 0x0501", self.python_protocol)
         self.assertIn(
-            "FIRMWARE_RELEASE_ID = 20260826", self.python_protocol
+            "FIRMWARE_RELEASE_ID = 20260906", self.python_protocol
         )
 
     def test_calibrated_single_left_hall_and_pressure(self):
@@ -320,11 +367,11 @@ class TestHardwareIntegrity(unittest.TestCase):
         self.assertNotIn("attachInterrupt(", self.drive)
         self.assertEqual(
             constant_expression(self.config, "HALL_PULSES_PER_WHEEL_REV"),
-            "6UL",
+            "12UL",
         )
         for path in ROS_CONFIGS:
             text = path.read_text(encoding="utf-8")
-            self.assertRegex(text, r"hall_pulses_per_revolution:\s*6\b")
+            self.assertRegex(text, r"hall_pulses_per_revolution:\s*12\b")
         self.assertEqual(
             constant_expression(self.config, "HALL_CALIBRATED"), "true"
         )

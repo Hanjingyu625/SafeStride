@@ -14,9 +14,9 @@ import struct
 from typing import ClassVar, Iterable, List
 
 
-PROTOCOL_VERSION = 4
-PROTOCOL_SCHEMA_ID = 0x0401
-FIRMWARE_RELEASE_ID = 20260826
+PROTOCOL_VERSION = 5
+PROTOCOL_SCHEMA_ID = 0x0501
+FIRMWARE_RELEASE_ID = 20260906
 
 BOARD_ROLE_DRIVE = 1
 BOARD_ROLE_TERRAIN = 2
@@ -28,8 +28,8 @@ CRC_STRUCT = struct.Struct('<H')
 
 HELLO_STRUCT = struct.Struct('<IIBBHI')
 SESSION_START_STRUCT = struct.Struct('<IBBHI')
-COMMAND_STRUCT = struct.Struct('<iHBB')
-TELEMETRY_STRUCT = struct.Struct('<iiiiHHHhhHHHHHHHBB')
+COMMAND_STRUCT = struct.Struct('<iHBBhBB')
+TELEMETRY_STRUCT = struct.Struct('<iiiiHHHhhHHHHHHHBBhhhIBB')
 # Protocol v4 keeps the original 45-byte payload for compatibility. The final
 # 14 bytes were GPS data and are now reserved because GPS is owned by the Pi.
 TERRAIN_TELEMETRY_STRUCT = struct.Struct(
@@ -432,6 +432,9 @@ class CommandPayload:
     ttl_ms: int
     enable: int
     reserved: int = 0
+    slope_ff_pwm: int = 0
+    drive_pwm_cap: int = 100
+    mode: int = 0
     TYPE: ClassVar[PacketType] = PacketType.COMMAND
 
     def pack(self) -> bytes:
@@ -439,17 +442,30 @@ class CommandPayload:
             raise ValueError('enable must be 0 or 1')
         if self.reserved != 0:
             raise ValueError('COMMAND reserved field must be zero')
+        if not -60 <= self.slope_ff_pwm <= 30:
+            raise ValueError('slope_ff_pwm must be in [-60, 30]')
+        if not 0 <= self.drive_pwm_cap <= 100 or self.mode not in (0, 1):
+            raise ValueError('invalid drive cap or mode')
+        if self.mode == 1 and (self.target_mrad_s != 0 or self.slope_ff_pwm != 0):
+            raise ValueError('BRAKE requires zero target and slope FF')
         return COMMAND_STRUCT.pack(
             int(self.target_mrad_s),
             _u16('ttl_ms', self.ttl_ms),
             _u8('enable', self.enable),
             _u8('reserved', self.reserved),
+            int(self.slope_ff_pwm),
+            _u8('drive_pwm_cap', self.drive_pwm_cap),
+            _u8('mode', self.mode),
         )
 
     @classmethod
     def unpack(cls, data: bytes) -> 'CommandPayload':
         _require_size('COMMAND', data, COMMAND_STRUCT.size)
         payload = cls(*COMMAND_STRUCT.unpack(data))
+        try:
+            payload.pack()
+        except ValueError as error:
+            raise PayloadDecodeError(str(error)) from error
         if payload.enable not in (0, 1):
             raise PayloadDecodeError('COMMAND enable must be 0 or 1')
         if payload.reserved != 0:
@@ -479,6 +495,12 @@ class TelemetryPayload:
     pressure_right_filtered: int = 0xFFFF
     pressure_flags: int = 0
     pressure_alert: int = 0
+    ff_pwm: int = 0
+    feedback_pwm: int = 0
+    applied_pwm: int = 0
+    speed_age_us: int = 0xFFFFFFFF
+    speed_flags: int = 0
+    drive_mode: int = 1
     TYPE: ClassVar[PacketType] = PacketType.TELEMETRY
 
     def pack(self) -> bytes:
@@ -505,12 +527,18 @@ class TelemetryPayload:
             _u16('pressure_right_filtered', self.pressure_right_filtered),
             _u8('pressure_flags', self.pressure_flags),
             _u8('pressure_alert', self.pressure_alert),
+            int(self.ff_pwm), int(self.feedback_pwm), int(self.applied_pwm),
+            _u32('speed_age_us', self.speed_age_us),
+            _u8('speed_flags', self.speed_flags),
+            _u8('drive_mode', self.drive_mode),
         )
 
     @classmethod
     def unpack(cls, data: bytes) -> 'TelemetryPayload':
         _require_size('TELEMETRY', data, TELEMETRY_STRUCT.size)
         payload = cls(*TELEMETRY_STRUCT.unpack(data))
+        if payload.speed_flags & ~0x03 or payload.drive_mode not in (0, 1):
+            raise PayloadDecodeError('invalid drive telemetry flags/mode')
         if payload.pressure_flags & ~0x07:
             raise PayloadDecodeError(
                 'pressure_flags contains reserved bits'

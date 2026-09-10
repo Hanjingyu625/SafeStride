@@ -94,8 +94,8 @@ def generate_launch_description() -> LaunchDescription:
                 'require_terrain_tof',
                 default_value='false',
                 description=(
-                    'Use Terrain TOF validity and hazards as motor '
-                    'interlocks while keeping MPU telemetry independent.'
+                    'Deprecated compatibility option; Terrain TOF is '
+                    'diagnostic-only and never stops the motor.'
                 ),
             ),
             DeclareLaunchArgument(
@@ -107,8 +107,8 @@ def generate_launch_description() -> LaunchDescription:
                 'require_surface_condition',
                 default_value='false',
                 description=(
-                    'Use surface classification validity as a motor '
-                    'interlock. Perception can run independently.'
+                    'Deprecated compatibility option; surface health is '
+                    'diagnostic-only and never stops the motor.'
                 ),
             ),
             DeclareLaunchArgument(
@@ -227,6 +227,37 @@ def generate_launch_description() -> LaunchDescription:
                         ),
                         'require_surface_condition': ParameterValue(
                             require_surface_condition,
+                            value_type=bool,
+                        ),
+                    },
+                ],
+            ),
+            Node(
+                package='safestride_control',
+                executable='device_health_monitor',
+                name='device_health_monitor',
+                output='screen',
+                parameters=[
+                    config_file,
+                    {
+                        'terrain_expected': ParameterValue(
+                            enable_terrain,
+                            value_type=bool,
+                        ),
+                        'gps_expected': ParameterValue(
+                            enable_gps,
+                            value_type=bool,
+                        ),
+                        'camera_expected': ParameterValue(
+                            enable_perception,
+                            value_type=bool,
+                        ),
+                        'perception_expected': ParameterValue(
+                            enable_perception,
+                            value_type=bool,
+                        ),
+                        'crosswalk_expected': ParameterValue(
+                            enable_crosswalk,
                             value_type=bool,
                         ),
                     },

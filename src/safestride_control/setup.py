@@ -34,6 +34,10 @@ setup(
                 'safety_supervisor = '
                 'safestride_control.safety_supervisor_node:main'
             ),
+            (
+                'device_health_monitor = '
+                'safestride_control.device_health_monitor_node:main'
+            ),
         ],
     },
 )

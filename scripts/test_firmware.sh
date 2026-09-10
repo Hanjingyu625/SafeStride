@@ -29,6 +29,7 @@ common=(
   -I"${workspace}/firmware/safestride_mcu" \
   "${workspace}/test/firmware_analog_hall_sensor_test.cpp" \
   "${workspace}/firmware/safestride_mcu/analog_hall_sensor.cpp" \
+  "${workspace}/firmware/safestride_mcu/motor_control.cpp" \
   -o "${build_dir}/analog_hall_test"
 
 "${cxx}" "${common[@]}" \

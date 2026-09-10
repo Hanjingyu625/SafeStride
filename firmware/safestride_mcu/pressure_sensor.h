@@ -15,6 +15,7 @@ class PressureSensorPair {
   void begin(uint32_t now_ms);
   void update(uint32_t now_ms);
 
+  bool anyHandPresent() const;
   bool bothHandsPresent() const;
   bool leftPresent() const;
   bool rightPresent() const;

@@ -4,6 +4,8 @@ uint8 ALERT_NORMAL=0
 uint8 ALERT_WARNING=1
 uint8 ALERT_HANDS_OFF=2
 
+# WARNING includes one-hand operation; HANDS_OFF means both channels released.
+
 float32 left_raw
 float32 right_raw
 float32 left_filtered

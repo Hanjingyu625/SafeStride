@@ -41,6 +41,9 @@ constexpr uint32_t CAP_DEADMAN = 1UL << 4U;
 constexpr uint32_t CAP_ESTOP = 1UL << 5U;
 constexpr uint32_t CAP_PRESSURE_TELEMETRY = 1UL << 6U;
 constexpr uint32_t CAP_MAGNET_BENCH_MODE = 1UL << 7U;
+// The bridge requires this bit before arming. It prevents an older firmware
+// that can stop on Hall faults from being mixed with the advisory policy.
+constexpr uint32_t CAP_ADVISORY_SENSOR_POLICY = 1UL << 10U;
 
 constexpr uint8_t PRESSURE_FLAG_LEFT_PRESENT = 1U << 0U;
 constexpr uint8_t PRESSURE_FLAG_RIGHT_PRESENT = 1U << 1U;
@@ -54,6 +57,10 @@ AnalogHallSensor g_hall;
 ControllerState g_state = ControllerState::BOOT;
 uint16_t g_fault_bits = 0U;
 bool g_watchdog_timed_out = false;
+int16_t g_slope_ff_pwm = 0;
+uint8_t g_drive_pwm_cap = cfg::MAX_PWM;
+bool g_brake_requested = false;
+bool g_new_pulse_since_telemetry = false;
 bool g_valid_command_seen = false;
 bool g_session_active = false;
 bool g_session_offer_active = false;
@@ -89,7 +96,7 @@ bool estopActive() {
 }
 
 bool deadmanActive() {
-  return g_pressure.bothHandsPresent();
+  return g_pressure.anyHandPresent();
 }
 
 bool motionDeadmanSatisfied() {
@@ -101,6 +108,12 @@ bool driverFaultActive() {
   return cfg::USE_DRIVER_FAULT_PIN &&
          digitalRead(cfg::DRIVER_FAULT_PIN) ==
              cfg::DRIVER_FAULT_ACTIVE_LEVEL;
+}
+
+bool criticalFaultActive() {
+  // Hall is diagnostic-only. The installed driver's fault line remains the
+  // only firmware fault bit allowed to inhibit output.
+  return (g_fault_bits & FAULT_MOTOR_DRIVER) != 0U;
 }
 
 void readHallSamples(
@@ -174,7 +187,7 @@ void clearSession() {
   immediateStop(
       estopActive() ? ControllerState::ESTOP : ControllerState::DISARMED,
       false);
-  if (g_fault_bits != 0U) {
+  if (criticalFaultActive()) {
     g_state = ControllerState::FAULT;
   }
   g_session_active = false;
@@ -302,7 +315,8 @@ int16_t readCurrentMa(uint8_t pin) {
 void sendHello() {
   uint8_t payload[proto::HELLO_PAYLOAD_SIZE];
   uint32_t capabilities = CAP_SINGLE_LEFT_HALL | CAP_DEADMAN |
-                          CAP_PRESSURE_TELEMETRY;
+                          CAP_PRESSURE_TELEMETRY |
+                          CAP_ADVISORY_SENSOR_POLICY;
   if (cfg::ENABLE_ESTOP) {
     capabilities |= CAP_ESTOP;
   }
@@ -379,15 +393,23 @@ void sendTelemetry() {
   }
   payload[40U] = pressure_flags;
   payload[41U] = static_cast<uint8_t>(g_pressure.alert());
+  proto::writeI16(payload + 42U, g_drive.feedforwardPwm());
+  proto::writeI16(payload + 44U, g_drive.feedbackPwm());
+  proto::writeI16(payload + 46U, g_drive.appliedPwm());
+  proto::writeU32(payload + 48U, g_drive.speedAgeUs());
+  payload[52U] = (g_drive.speedValid() ? 1U : 0U) | (g_new_pulse_since_telemetry ? 2U : 0U);
+  payload[53U] = g_drive.braking() ? 1U : 0U;
 
-  proto::sendFrame(
+  if (proto::sendFrame(
       Serial,
       proto::TYPE_TELEMETRY,
       g_tx_sequence++,
       g_session_id,
       millis(),
       payload,
-      sizeof(payload));
+      sizeof(payload))) {
+    g_new_pulse_since_telemetry = false;
+  }
 }
 
 bool stationaryDwellMet() {
@@ -429,7 +451,7 @@ bool handleSessionStart(
   immediateStop(
       estopActive() ? ControllerState::ESTOP : ControllerState::DISARMED,
       watchdog_latched);
-  if (g_fault_bits != 0U) {
+  if (criticalFaultActive()) {
     g_state = ControllerState::FAULT;
   }
   g_session_id = frame.session_id;
@@ -458,6 +480,11 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   const uint16_t ttl_ms = proto::readU16(frame.payload + 4U);
   const uint8_t enable = frame.payload[6U];
   const uint8_t reserved = frame.payload[7U];
+  const int16_t slope_ff = static_cast<int16_t>(proto::readU16(frame.payload + 8U));
+  const uint8_t pwm_cap = frame.payload[10U];
+  const uint8_t mode = frame.payload[11U];
+  if (slope_ff < -60 || slope_ff > 30 || pwm_cap > cfg::MAX_PWM || mode > 1U ||
+      (mode == 1U && (target != 0L || slope_ff != 0))) return false;
   if ((enable != 0U && enable != 1U) || reserved != 0U) {
     return false;
   }
@@ -485,7 +512,7 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
       g_drive.clearRecoverableFaults();
       g_fault_bits &= static_cast<uint16_t>(~FAULT_LEFT_HALL);
     }
-    if (g_fault_bits != 0U) {
+    if (criticalFaultActive()) {
       g_state = ControllerState::FAULT;
     }
     return true;
@@ -510,7 +537,7 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
        cfg::REQUIRE_HALL_CALIBRATION_FOR_ARM &&
        !cfg::HALL_CALIBRATED) ||
       estopActive() || !motionDeadmanSatisfied() || g_watchdog_timed_out ||
-      g_fault_bits != 0U ||
+      criticalFaultActive() ||
       g_state == ControllerState::ESTOP ||
       g_state == ControllerState::SAFE_STOP ||
       g_state == ControllerState::FAULT) {
@@ -518,12 +545,15 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   }
 
   if (g_state == ControllerState::DISARMED) {
-    if (!cfg::MAGNET_BENCH_MODE && !cfg::DEADMAN_DIRECT_DRIVE &&
+    if (mode != 1U && !cfg::MAGNET_BENCH_MODE && !cfg::DEADMAN_DIRECT_DRIVE &&
         !stationaryDwellMet()) {
       return false;
     }
     markAcceptedCommand(frame, ttl_ms);
     g_state = ControllerState::ARMED;
+    g_slope_ff_pwm = slope_ff;
+    g_drive_pwm_cap = pwm_cap;
+    g_brake_requested = mode == 1U;
     g_requested_mrad_s = target;
     return true;
   }
@@ -532,6 +562,9 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
     return false;
   }
   markAcceptedCommand(frame, ttl_ms);
+  g_slope_ff_pwm = slope_ff;
+  g_drive_pwm_cap = pwm_cap;
+  g_brake_requested = mode == 1U;
   g_requested_mrad_s = target;
   return true;
 }
@@ -589,7 +622,7 @@ void runControlLoop(uint32_t now_us) {
       g_state == ControllerState::ARMED &&
       !estopActive() &&
       (motionDeadmanSatisfied() || g_deadman_release_ramp_active) &&
-      g_fault_bits == 0U;
+      !criticalFaultActive();
   if (cfg::MAGNET_BENCH_MODE) {
     const uint32_t pulse_hold_us =
         static_cast<uint32_t>(cfg::MAGNET_BENCH_PULSE_HOLD_MS) * 1000UL;
@@ -611,16 +644,17 @@ void runControlLoop(uint32_t now_us) {
         g_deadman_release_ramp_active
             ? g_deadman_release_decel_mrad_s2
             : cfg::MAX_DECEL_MRAD_S2,
-        g_deadman_release_ramp_active);
+        g_deadman_release_ramp_active,
+        g_slope_ff_pwm,
+        g_drive_pwm_cap,
+        g_brake_requested);
   }
+  g_new_pulse_since_telemetry |= g_drive.newPulse();
   const uint8_t hall_faults = g_drive.hallFaultMask();
   if (hall_faults != 0U) {
     if ((hall_faults & DriveController::HALL_FAULT_LEFT) != 0U) {
       g_fault_bits |= FAULT_LEFT_HALL;
     }
-    immediateStop(ControllerState::FAULT, false);
-    g_stationary_tracking = false;
-    return;
   }
 
   if (g_deadman_release_ramp_active &&
@@ -671,7 +705,7 @@ void setup() {
   g_state = estopActive()
       ? ControllerState::ESTOP
       : ControllerState::DISARMED;
-  if (g_fault_bits != 0U) {
+  if (criticalFaultActive()) {
     g_state = ControllerState::FAULT;
   }
   g_last_control_us = micros();

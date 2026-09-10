@@ -42,7 +42,7 @@ constexpr uint16_t DEADMAN_RELEASE_RAMP_MS = 600U;
 // WSH135 is a linear analogue Hall sensor on the LEFT wheel. At 5 V its
 // no-field output is near 2.5 V. A3 is sampled around that boot-time baseline;
 // either magnetic polarity counts once, then must return inside the release
-// band before another pulse can be counted. Six magnets are fitted.
+// band before another pulse can be counted. Twelve magnets are fitted.
 constexpr uint8_t HALL_ANALOG_PIN = A3;
 constexpr uint32_t HALL_SAMPLE_PERIOD_US = CONTROL_PERIOD_US;
 constexpr uint8_t HALL_ADC_SAMPLES = 8U;
@@ -51,16 +51,17 @@ constexpr uint16_t HALL_BASELINE_SAMPLE_DELAY_US = 250U;
 constexpr int32_t HALL_BASELINE_TRACK_DIVISOR = 128L;
 constexpr uint16_t HALL_TRIGGER_DELTA_ADC = 30U;
 constexpr uint16_t HALL_RELEASE_DELTA_ADC = 12U;
-// The commanded wheel speed is capped at 3 rad/s. With six magnets, valid
-// pulses are at least about 349 ms apart at that limit. Reject any retrigger
-// inside 250 ms so WSH135 threshold chatter cannot become a false speed sample
-// or latch FAULT_LEFT_HALL, while retaining margin for real wheel overshoot.
-constexpr uint32_t HALL_MIN_PULSE_INTERVAL_US = 250000UL;
-constexpr uint32_t HALL_ZERO_TIMEOUT_US = 3000000UL;
-constexpr uint32_t HALL_PULSES_PER_WHEEL_REV = 6UL;
+// Keep the ADC trigger/release hysteresis separate from speed detection.
+// A 250 ms blanking window hid speeds above 4.19 rad/s. Use a 20 ms
+// glitch window so the 5 rad/s plausibility threshold remains observable.
+// Verify magnetic pulse width and EMI with the actual harness.
+constexpr uint32_t HALL_MIN_PULSE_INTERVAL_US = 20000UL;
+constexpr uint32_t HALL_ZERO_TIMEOUT_US = 5000000UL;
+constexpr uint32_t HALL_PULSES_PER_WHEEL_REV = 12UL;
 constexpr bool HALL_CALIBRATED = true;
 // Do not prevent arming solely because calibration has not been certified.
-// Closed-loop pulse feedback and Hall stall/overspeed checks remain enabled.
+// Closed-loop pulse feedback and Hall stall/overspeed diagnostics remain
+// enabled, but neither may inhibit or brake the motor.
 constexpr bool REQUIRE_HALL_CALIBRATION_FOR_ARM = false;
 
 // Temporary no-wheel hardware test. When enabled, either Hall input pulse
@@ -76,13 +77,24 @@ constexpr uint16_t MAGNET_BENCH_PULSE_HOLD_MS = 750U;
 constexpr uint32_t MAGNET_BENCH_VELOCITY_HOLD_US = 5000000UL;
 constexpr float MAGNET_BENCH_VELOCITY_FILTER_ALPHA = 1.0F;
 
+// Hall plausibility is diagnostic-only. A Hall fault must never stop or
+// inhibit motion: the sensor may adjust PWM, but pressure/command/driver and
+// severe-downhill interlocks own all automatic stop decisions.
+constexpr bool HALL_FAULTS_ARE_DIAGNOSTIC_ONLY = true;
+constexpr bool ENABLE_HALL_SPEED_BRAKE = false;
+// A valid non-zero target may be reduced by Hall feedback, but not to a zero
+// PWM command. This floor is deliberately only one count; normal feed-forward
+// and output slew still determine useful motor torque.
+constexpr uint8_t MOTOR_MIN_ACTIVE_PWM = 1U;
+
 // Runtime Hall plausibility monitor used when DEADMAN_DIRECT_DRIVE is false.
-constexpr int32_t HALL_STALL_TARGET_MIN_MRAD_S = 300L;
-constexpr uint16_t HALL_STALL_TIMEOUT_MS = 3000U;
+constexpr int32_t HALL_STALL_TARGET_MIN_MRAD_S = 20L;
+constexpr uint16_t HALL_STALL_TIMEOUT_MS = 5000U;
 // At slow walking speeds one magnet can legitimately take several seconds to
 // reach the Hall sensor. Require 2.5 expected pulse periods before declaring a
 // stall, while HALL_STALL_TIMEOUT_MS remains the absolute minimum.
 constexpr float HALL_STALL_EXPECTED_PULSE_PERIODS = 2.5F;
+constexpr uint32_t HALL_STALL_MAX_TIMEOUT_US = 10000000UL;
 constexpr int32_t HALL_MAX_PLAUSIBLE_MRAD_S = 5000L;
 constexpr uint16_t HALL_OVERSPEED_TIMEOUT_MS = 100U;
 
@@ -93,11 +105,19 @@ constexpr uint8_t MOTOR_IN1_PIN = 6U;
 constexpr uint8_t MOTOR_IN2_PIN = 8U;
 constexpr int8_t MOTOR_SIGN = 1;
 constexpr uint16_t MAX_PWM = 100U;  // deliberately low for first lifted test
-// Bench testing showed that this motor/driver only starts reliably at PWM 80.
-// Closed-loop control uses this as its feed-forward operating point and adds
-// signed PID correction around it, so Hall feedback reduces torque smoothly
-// instead of switching directly from PWM 80 to dynamic braking.
-constexpr uint8_t MOTOR_MIN_ACTIVE_PWM = 80U;
+// Initial feed-forward model; PWM counts are on Arduino's 0..255 scale.
+// 30 is a bias, NOT a minimum output. Calibrate 60 at 0.08 m/s under load.
+constexpr uint8_t MOTOR_FF_BIAS_PWM = 30U;
+constexpr uint8_t MOTOR_FF_NOMINAL_PWM = 60U;
+constexpr float MOTOR_NOMINAL_MRAD_S = 0.08F / 0.115F * 1000.0F;
+constexpr float MOTOR_PWM_RISE_PER_S = 20.0F;
+constexpr float MOTOR_PWM_FALL_PER_S = 60.0F;
+constexpr uint32_t MOTOR_REVERSAL_BRAKE_US = 150000UL;
+constexpr float SPEED_BRAKE_MARGIN_MRAD_S = 0.05F / 0.115F * 1000.0F;
+constexpr float SPEED_BRAKE_RELEASE_MARGIN_MRAD_S = 0.02F / 0.115F * 1000.0F;
+constexpr float SPEED_BRAKE_ABSOLUTE_MRAD_S = 0.18F / 0.115F * 1000.0F;
+constexpr float SPEED_BRAKE_RELEASE_MRAD_S = 0.15F / 0.115F * 1000.0F;
+constexpr uint32_t SPEED_BRAKE_DWELL_US = 200000UL;
 
 // E-stop hardware is not implemented in the current build. Keep this false so
 // the input is not configured, the reported state stays normal, and the
@@ -107,9 +127,13 @@ constexpr bool ENABLE_ESTOP = false;
 constexpr uint8_t ESTOP_PIN = 12U;
 constexpr uint8_t ESTOP_ACTIVE_LEVEL = HIGH;
 
-// The two FSR channels replace the single digital dead-man switch. Each FSR
-// must be wired as a voltage divider that reads near zero when released. The
-// installed harness routes the physical left sensor to A2 and right to A1.
+// The two FSR channels replace the single digital dead-man switch. Motion is
+// permitted while either hand remains present and stops only after both are
+// released. Each FSR must be wired as a voltage divider that reads near zero
+// when released. The installed harness routes the physical left sensor to A2
+// and right to A1. This passive divider cannot distinguish a released FSR from
+// an open sensor wire; true disconnect detection needs a diagnostic resistor
+// or a separate continuity input.
 constexpr bool REQUIRE_DEADMAN = true;
 constexpr uint8_t PRESSURE_LEFT_PIN = A2;
 constexpr uint8_t PRESSURE_RIGHT_PIN = A1;
@@ -153,13 +177,23 @@ constexpr float CURRENT_MA_PER_V = 1000.0F;
 // require the ROS topics until real non-blocking drivers replace the sentinels.
 constexpr bool ENABLE_FRONT_RANGE_SENSORS = false;
 
+static_assert(MOTOR_FF_NOMINAL_PWM >= MOTOR_FF_BIAS_PWM &&
+    MOTOR_FF_NOMINAL_PWM <= MAX_PWM, "feed-forward bounds");
+static_assert(MOTOR_MIN_ACTIVE_PWM > 0U &&
+    MOTOR_MIN_ACTIVE_PWM <= MAX_PWM, "active PWM floor bounds");
+static_assert(
+    HALL_FAULTS_ARE_DIAGNOSTIC_ONLY && !ENABLE_HALL_SPEED_BRAKE,
+    "Hall feedback must never inhibit or brake motor output");
+
 // PID output is PWM counts. Keep both wheels lifted, tune the shared output,
 // and keep integrator gain at zero until direction and both Hall channels are
 // proven. These example gains are intentionally mild.
 constexpr float MOTOR_PID_KP = 12.0F;
 constexpr float MOTOR_PID_KI = 0.0F;
 constexpr float MOTOR_PID_KD = 0.0F;
-constexpr float MOTOR_FEEDFORWARD = 10.0F;
+
+static_assert(MOTOR_PID_KI == 0.0F && MOTOR_PID_KD == 0.0F,
+    "Implement final-output anti-windup and pulse timing before enabling I/D");
 constexpr float PID_INTEGRAL_LIMIT = 30.0F;
 constexpr float VELOCITY_FILTER_ALPHA = 0.35F;
 
@@ -176,11 +210,8 @@ static_assert(
     MAX_PWM > 0U && MAX_PWM <= 255U,
     "MAX_PWM must fit the Arduino analogue output range");
 static_assert(
-    MOTOR_MIN_ACTIVE_PWM > 0U && MOTOR_MIN_ACTIVE_PWM <= MAX_PWM,
-    "minimum active motor PWM must be positive and no higher than MAX_PWM");
-static_assert(
-    MOTOR_MIN_ACTIVE_PWM >= 80U,
-    "installed motor requires active PWM to remain at or above 80");
+    MOTOR_FF_BIAS_PWM > 0U && MOTOR_FF_BIAS_PWM <= MAX_PWM,
+    "feed-forward PWM bias must be positive and no higher than MAX_PWM");
 static_assert(
     DEADMAN_RELEASE_RAMP_MS > 0U && DEADMAN_RELEASE_RAMP_MS <= 5000U,
     "dead-man release ramp must be between 1 and 5000 ms");

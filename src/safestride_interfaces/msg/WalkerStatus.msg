@@ -6,8 +6,8 @@ uint8 STATE_SAFE_STOP=3
 uint8 STATE_ESTOP=4
 uint8 STATE_FAULT=5
 
-# Common fault-bit assignments. Firmware may reserve higher bits for
-# board-specific faults.
+# Common fault-bit assignments. Hall bits are advisory in the current drive
+# policy; communication, motor-driver and protocol faults remain critical.
 uint16 FAULT_NONE=0
 uint16 FAULT_COMMUNICATION=1
 uint16 FAULT_MOTOR_DRIVER=2
@@ -40,3 +40,14 @@ uint16 last_applied_command_sequence
 
 # Age of the underlying MCU telemetry when this status was published, seconds.
 float32 telemetry_age
+
+# Protocol v5 drive telemetry. Direction is inferred, never measured.
+int16 ff_pwm
+int16 feedback_pwm
+int16 applied_pwm
+float32 speed_age
+bool speed_valid
+bool new_pulse
+bool direction_valid
+bool braking
+float32 measured_speed_m_s
