@@ -10,15 +10,14 @@ SafeStride Terrain Uno에 연결하는 절차를 설명한다.
 - Arduino Uno ATmega328P 기반 Terrain MCU
 - Raspberry Pi 4, ROS 2 Jazzy 기반 SafeStride
 
-`prototypes/ezhmi_display/gui/safestride-cockpit.html`은 화면 디자인을 확인하는
-브라우저 시뮬레이터다. VisualTFT 프로젝트 파일이 아니므로 LCD에 직접 다운로드할
-수 없다. 실제 화면, 변수와 스크립트는 이 문서에 따라 VisualTFT에서 생성한다.
+`display/ezhmi/visualtft/Project.tftprj`는 바로 열어 컴파일할 수 있는 VisualTFT
+3.0 네이티브 소스 프로젝트다. `prototypes/ezhmi_display/gui/safestride-cockpit.html`은
+디자인 확인용 브라우저 시뮬레이터이며 LCD 다운로드 파일은 아니다.
 
-현재 제공물은 운영 Pi/Terrain 코드, Lua 화면 로직, CSV 설정표다. CSV는
-VisualTFT에 수동으로 반영할 명세이며 자동 import를 가정하지 않는다.
-컴파일된 VisualTFT 네이티브 프로젝트/SD 패키지는 아직 포함하지 않았다.
-이 개발 환경에서 Uno 컴파일과 ROS/Lua 로직 검증은 수행했지만, 실제 LCD의
-Lua 지원 펌웨어·프로젝트 컴파일·한글 출력·다운로드는 아직 검증하지 않았다.
+저장소에는 화면, Modbus 변수, Lua와 필요한 프로젝트 글꼴 리소스가 포함되어 있다.
+VisualTFT가 생성하는 `output`, `script.map` 및 SD 패키지는 재생성 가능하므로 Git에
+포함하지 않는다. 이 개발 환경에서 XML·컨트롤·레지스터·Lua 일치 검증은 수행하지만,
+실제 VisualTFT 컴파일·한글 출력·LCD 다운로드는 Windows 도구와 실물에서 확인해야 한다.
 
 ## 1. 전체 데이터 경로
 
@@ -120,7 +119,11 @@ arduino-cli lib list
 
 ### 4.1 화면과 컨트롤
 
-다음 파일을 VisualTFT 프로젝트의 입력 명세로 사용한다.
+VisualTFT에서 다음 네이티브 프로젝트를 연다.
+
+- `display/ezhmi/visualtft/Project.tftprj`
+
+아래 파일은 프로젝트가 따라야 하는 원본 명세와 디자인 참고 자료다.
 
 - `display/ezhmi/controls.csv`: 화면 번호, 컨트롤 ID, 위치, 크기와 초기 문구
 - `display/ezhmi/registers.csv`: Modbus 레지스터 이름, 주소와 의미
@@ -128,13 +131,14 @@ arduino-cli lib list
 - `prototypes/ezhmi_display/gui/safestride-cockpit.html`: 시각 디자인 미리보기
 - `prototypes/ezhmi_display/gui/UI_LAYOUT_KO.md`: 문구와 상태 해석 원칙
 
-화면은 두 개를 만든다.
+포함된 프로젝트에는 화면 두 개가 구성되어 있다.
 
 1. 화면 `0`: SafeStride 로고 부팅 화면
 2. 화면 `1`: 속도, 주행 여부, 도로 상황과 경사 상태 화면
 
-`controls.csv`의 ID는 Lua에서 직접 사용하므로 임의로 바꾸지 않는다. DEV 버튼은
-화면 `1`, ID `11`로 만들되 Lua가 비활성화하도록 유지한다.
+`controls.csv`의 기능 ID 1~16은 Lua에서 직접 사용하므로 임의로 바꾸지 않는다.
+ID 17~21은 카드 배경과 하단 상태 바다. DEV 버튼은 화면 `1`, ID `11`이며
+동작·송신 데이터가 없고 Lua도 비활성화한다.
 
 한글 문구가 표시되도록 사용하는 모든 글꼴과 글리프를 VisualTFT 프로젝트에
 포함한다. Windows 가상 화면에서 `연결 대기`, `주행 가능`, `경사 확인 불가`가
@@ -188,7 +192,8 @@ VisualTFT의 `도구 → 프로토콜 및 변수 설정`에서 다음과 같이 
 
 ### 4.3 Lua 추가
 
-`display/ezhmi/safestride.lua` 내용을 VisualTFT M시리즈 Lua 편집기에 추가한다.
+네이티브 프로젝트의 `main.lua`에는 `display/ezhmi/safestride.lua` 내용이 반영되어
+있다. 후자를 편집 가능한 UTF-8 원본으로 유지하며 두 파일의 내용이 일치해야 한다.
 프로젝트에서 사용하는 API 이름이 다음과 일치하는지 VisualTFT 컴파일 결과로 확인한다.
 
 - `set_text`
@@ -376,7 +381,7 @@ ros2 topic echo /diagnostics
 ## 10. 최종 체크리스트
 
 - [ ] LCD 라벨과 16P 인터페이스 보드 모델을 확인했다.
-- [ ] VisualTFT M series 480 × 272 프로젝트를 만들었다.
+- [ ] 저장소의 VisualTFT M series 480 × 272 프로젝트를 열고 컴파일했다.
 - [ ] Modbus slave 1, 19200 8N1, holding register 0000..000F를 설정했다.
 - [ ] `controls.csv`, `registers.csv`, `safestride.lua`를 프로젝트에 반영했다.
 - [ ] 한글과 모든 상태를 VisualTFT 가상 화면에서 확인했다.

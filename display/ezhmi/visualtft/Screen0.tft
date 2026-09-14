@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<DrawPage name="Screen0" bk_transparent="0" bk_color="11;21;30" bk_image="" size_option="0" width="480" height="272">
+  <item name="Brand" id="1" type="text" multi_lang="1" text_align="1" text_align_v="1" text="SafeStride" text1="" text2="" text3="" text4="" text5="" text6="" text7="" text8="" text9="" text10="" text11="" text12="" text13="" text14="" text15="" font="14" encode="0" show_bk="0" fore_color="121;233;199" bk_color="11;21;30" xOffset="80" yOffset="98" width="320" height="64" row_gap="0" col_gap="0"/>
+</DrawPage>
