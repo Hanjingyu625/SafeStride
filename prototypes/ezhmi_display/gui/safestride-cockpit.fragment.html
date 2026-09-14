@@ -1,0 +1,112 @@
+<div id="ss-cockpit" aria-label="SafeStride 디스플레이 UI 미리보기">
+<style>
+#ss-cockpit{--ss-bg:#0b151e;--ss-panel:#142330;--ss-line:#283b48;--ss-text:#f0f6fa;--ss-muted:#a0b3bf;--ss-mint:#79e9c7;--ss-soft:#173f3b;--ss-amber:#ffd18a;--ss-red:#ffaaaa;font-family:"Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;max-width:736px;width:100%;margin:auto;color:var(--ss-text);color-scheme:dark}
+#ss-cockpit *{box-sizing:border-box}
+#ss-cockpit .ss-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;font-size:12px;color:var(--ss-muted)}
+#ss-cockpit .ss-toolbar label{display:flex;align-items:center;gap:8px}
+#ss-cockpit .ss-toolbar select,#ss-cockpit .ss-toolbar button{font:inherit;font-size:13px;padding:9px 11px;border:1px solid var(--ss-line);border-radius:8px;background:var(--ss-panel);color:var(--ss-text);min-height:36px}
+#ss-cockpit .ss-demo-label{margin-left:auto;letter-spacing:.1em;font-size:11px}
+#ss-cockpit .ss-frame{container-type:inline-size;width:100%;border:1px solid var(--ss-line);border-radius:24px;background:var(--ss-bg);padding:10px;box-shadow:0 14px 35px #0002}
+#ss-cockpit .ss-lcd{position:relative;aspect-ratio:480/272;min-width:0;display:grid;grid-template-rows:17% 1fr;gap:3.1%;padding:2.2%;background:var(--ss-bg);border-radius:15px}
+#ss-cockpit .ss-header{display:flex;align-items:center;justify-content:space-between;min-height:0}
+#ss-cockpit .ss-brand{display:flex;gap:9px;align-items:center;min-width:0}
+#ss-cockpit .ss-mark{font-family:system-ui,sans-serif;font-style:italic;font-weight:700;font-size:clamp(18px,4.9cqw,36px);letter-spacing:-.14em;padding-right:.2em;color:var(--ss-mint);line-height:1}
+#ss-cockpit .ss-wordmark{font-family:system-ui,sans-serif;font-size:clamp(14px,3.2cqw,24px);font-weight:650;letter-spacing:-.045em;line-height:1}
+#ss-cockpit .ss-wordmark span{color:var(--ss-mint)}
+#ss-cockpit .ss-tagline{color:var(--ss-muted);font-size:clamp(9px,1.65cqw,12px);letter-spacing:.12em;margin-top:5px}
+#ss-cockpit .ss-dev{font:500 clamp(11px,2.3cqw,17px) system-ui,sans-serif;color:var(--ss-muted);background:var(--ss-panel);border:1px solid var(--ss-line);border-radius:7px;padding:7px 12px;letter-spacing:.05em;cursor:default;opacity:1}
+#ss-cockpit .ss-dev:before{content:'‹/›';margin-right:7px;color:var(--ss-mint)}
+#ss-cockpit .ss-grid{display:grid;grid-template-columns:43% 1fr;grid-template-rows:56% 1fr;gap:4%;min-height:0}
+#ss-cockpit .ss-tile{background:var(--ss-panel);border:1px solid var(--ss-line);border-radius:10px;padding:4.4% 6%;min-height:0;min-width:0;display:flex;flex-direction:column;justify-content:space-between}
+#ss-cockpit .ss-title{font-size:clamp(11px,2.45cqw,18px);color:var(--ss-muted);font-weight:500;margin:0;line-height:1.25}
+#ss-cockpit .ss-speed-line{display:flex;align-items:baseline;gap:9px}
+#ss-cockpit .ss-speed{font:500 clamp(32px,10.8cqw,80px)/1 system-ui,sans-serif;letter-spacing:-.07em;font-variant-numeric:tabular-nums}
+#ss-cockpit .ss-unit{color:var(--ss-muted);font-size:clamp(11px,2.4cqw,17px)}
+#ss-cockpit .ss-caption{font-size:clamp(11px,2.05cqw,15px);line-height:1.3;color:var(--ss-muted);margin:0;overflow-wrap:anywhere}
+#ss-cockpit .ss-road-location{font-size:clamp(11px,2.5cqw,18px);line-height:1.3;color:var(--ss-text);margin:3px 0 0}
+#ss-cockpit .ss-crossrow{display:flex;align-items:center;justify-content:space-between;gap:5px}
+#ss-cockpit .ss-crossvalue{color:var(--ss-mint);font-size:clamp(14px,4.15cqw,30px);font-weight:600;line-height:1.15;letter-spacing:-.04em}
+#ss-cockpit .ss-cross-label{font-size:clamp(11px,2.1cqw,15px);color:var(--ss-muted)}
+#ss-cockpit .ss-state-line{display:flex;align-items:center;gap:8px}
+#ss-cockpit .ss-symbol{width:clamp(24px,6.2cqw,45px);height:clamp(24px,6.2cqw,45px);display:grid;place-items:center;border-radius:50%;background:var(--ss-soft);color:var(--ss-mint);font:600 clamp(18px,4.2cqw,30px)/1 system-ui,sans-serif;flex-shrink:0}
+#ss-cockpit .ss-state,#ss-cockpit .ss-slope-name{font-size:clamp(13px,3.6cqw,26px);font-weight:600;line-height:1.15;letter-spacing:-.04em}
+#ss-cockpit .ss-slope-line{display:flex;align-items:baseline;justify-content:space-between;gap:4px}
+#ss-cockpit .ss-angle{font:500 clamp(14px,4cqw,28px)/1 system-ui,sans-serif;color:var(--ss-mint);font-variant-numeric:tabular-nums}
+#ss-cockpit [data-tone="warning"] .ss-state,#ss-cockpit [data-tone="warning"] .ss-slope-name,#ss-cockpit [data-tone="warning"] .ss-crossvalue,#ss-cockpit [data-tone="warning"] .ss-angle{color:var(--ss-amber)}
+#ss-cockpit [data-tone="danger"] .ss-state,#ss-cockpit [data-tone="danger"] .ss-slope-name,#ss-cockpit [data-tone="danger"] .ss-crossvalue,#ss-cockpit [data-tone="danger"] .ss-angle{color:var(--ss-red)}
+#ss-cockpit [data-tone="danger"] .ss-symbol{background:#582d37;color:var(--ss-red)}
+#ss-cockpit [data-tone="warning"] .ss-symbol{background:#4a3a27;color:var(--ss-amber)}
+#ss-cockpit .ss-splash{position:absolute;inset:0;background:var(--ss-bg);border-radius:15px;z-index:2;display:grid;place-items:center;text-align:center}
+#ss-cockpit .ss-splash[hidden]{display:none}
+#ss-cockpit .ss-splash .ss-mark{font-size:12cqw;margin-bottom:18px}
+#ss-cockpit .ss-splash .ss-wordmark{font-size:7cqw}
+#ss-cockpit .ss-splash .ss-caption{margin-top:16px;letter-spacing:.1em}
+#ss-cockpit .ss-screenreader{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@media(max-width:390px){#ss-cockpit .ss-frame{padding:5px;border-radius:17px}#ss-cockpit .ss-lcd{aspect-ratio:auto;min-height:330px;grid-template-rows:40px 1fr;gap:10px}#ss-cockpit .ss-tagline{display:none}#ss-cockpit .ss-grid{gap:8px;grid-template-rows:54% 1fr}#ss-cockpit .ss-tile{padding:9px}#ss-cockpit .ss-dev{padding:7px}#ss-cockpit .ss-state-line{gap:5px}#ss-cockpit .ss-crossrow{align-items:flex-start;flex-direction:column}#ss-cockpit .ss-demo-label{margin-left:0}}
+</style>
+<div class="ss-toolbar">
+  <label>화면 상태 <select id="ss-scenario" aria-label="화면 상태">
+    <option value="normal">정상 주행</option><option value="hands">손잡이 놓음</option>
+    <option value="cross">횡단보도 · 진입 가능</option><option value="wait">횡단보도 · 대기</option>
+    <option value="obstacle">전방 장애물</option><option value="up">오르막</option>
+    <option value="down">내리막</option><option value="steep">급경사 · 정지</option>
+    <option value="lost">데이터 수신 끊김</option>
+  </select></label>
+  <button type="button" id="ss-power" aria-pressed="true">전원 OFF</button>
+  <span class="ss-demo-label">UI PREVIEW · 예시 데이터</span>
+</div>
+<div class="ss-frame">
+ <div class="ss-lcd" aria-label="480 × 272 SafeStride LCD">
+  <header class="ss-header">
+   <div class="ss-brand"><span class="ss-mark" aria-hidden="true">S/</span><div><div class="ss-wordmark">Safe<span>Stride</span></div><div class="ss-tagline">CONFIDENCE IN EVERY STEP</div></div></div>
+   <button type="button" class="ss-dev" disabled aria-label="DEV 모드, 추후 지원 예정">DEV 모드</button>
+  </header>
+  <div class="ss-grid">
+   <section class="ss-tile" aria-label="속도"><h2 class="ss-title">현재 속도</h2><div class="ss-speed-line"><span class="ss-speed" id="ss-speed">0.8</span><span class="ss-unit">km/h</span></div><p class="ss-caption" id="ss-speed-note">양쪽 손잡이 감지됨</p></section>
+   <section class="ss-tile" id="ss-road" aria-label="도로 상황"><h2 class="ss-title">도로 상황</h2><div class="ss-road-location" id="ss-location">서울시 광진구</div><div class="ss-crossrow"><span class="ss-cross-label">횡단보도</span><span class="ss-crossvalue" id="ss-cross">N/A</span></div><p class="ss-caption" id="ss-road-note">주변에 감지된 횡단보도가 없어요</p></section>
+   <section class="ss-tile" id="ss-drive" aria-label="주행 여부"><h2 class="ss-title">주행 여부</h2><div class="ss-state-line"><span class="ss-symbol" id="ss-symbol">O</span><span class="ss-state" id="ss-drive-state">주행 가능</span></div><p class="ss-caption" id="ss-drive-note">양쪽 손잡이를 유지하세요</p></section>
+   <section class="ss-tile" id="ss-slope" aria-label="경사 정보"><h2 class="ss-title">경사 정보</h2><div class="ss-slope-line"><span class="ss-slope-name" id="ss-slope-name">평지</span><span class="ss-angle" id="ss-angle">+0.8°</span></div><p class="ss-caption" id="ss-slope-note">완만한 지면입니다</p></section>
+  </div>
+  <div class="ss-splash" id="ss-splash" hidden><div id="ss-intro"><div class="ss-mark" aria-hidden="true">S/</div><div class="ss-wordmark">Safe<span>Stride</span></div><p class="ss-caption">당신의 한 걸음에, 안심을 더하다</p></div></div>
+ </div>
+</div>
+<div class="ss-screenreader" id="ss-announcement" aria-live="polite"></div>
+<script>
+(() => {
+ const root=document.getElementById('ss-cockpit');
+ const get=id=>root.querySelector('#ss-'+id);
+ const presets={
+  normal:{},
+  hands:{speed:'0.0',speedNote:'손잡이 미감지',symbol:'X',drive:'주행 대기',driveNote:'양쪽 손잡이를 더 세게 잡으세요',driveTone:'warning'},
+  cross:{speed:'0.5',cross:'진입 가능',roadNote:'보행 신호를 직접 확인하세요',roadTone:'normal'},
+  wait:{speed:'0.0',cross:'대기하세요',roadNote:'횡단보도 앞에서 기다려 주세요',roadTone:'warning',symbol:'X',drive:'주행 대기',driveNote:'횡단보도 진입 대기 중',driveTone:'warning'},
+  obstacle:{speed:'0.0',symbol:'X',drive:'정지',driveNote:'앞에 장애물이 있습니다',driveTone:'danger'},
+  up:{speed:'0.6',slope:'오르막',angle:'+6.2°',slopeNote:'오르막입니다 · 천천히 이동하세요',slopeTone:'warning'},
+  down:{speed:'0.4',slope:'내리막',angle:'−5.8°',slopeNote:'내리막입니다 · 속도에 주의하세요',slopeTone:'warning'},
+  steep:{speed:'0.0',symbol:'X',drive:'정지',driveNote:'급격한 경사입니다',driveTone:'danger',slope:'급경사',angle:'−14.2°',slopeNote:'이동을 멈추고 지면을 확인하세요',slopeTone:'danger'},
+  lost:{speed:'--',speedNote:'속도 데이터 확인 불가',location:'위치 확인 불가',cross:'N/A',roadNote:'도로 정보 수신을 기다리는 중',roadTone:'warning',symbol:'?',drive:'확인 불가',driveNote:'주행 상태를 수신하지 못했습니다',driveTone:'warning',slope:'확인 불가',angle:'--°',slopeNote:'센서 연결을 확인하세요',slopeTone:'warning'}
+ };
+ let on=true,booting=false,timer=null;
+ const design={appearance:'Midnight'};
+ const palettes={Midnight:['#0b151e','#142330','#283b48','#f0f6fa','#a0b3bf','#79e9c7','#173f3b','#ffd18a','#ffaaaa'],Daylight:['#eef3f4','#ffffff','#d8e2e4','#142c34','#516b73','#08765d','#d9f4e9','#8b5100','#ad293d']};
+ function render(){
+  const p=palettes[design.appearance];['bg','panel','line','text','muted','mint','soft','amber','red'].forEach((key,i)=>root.style.setProperty('--ss-'+key,p[i]));
+  root.style.colorScheme=design.appearance==='Daylight'?'light':'dark';
+  const s=Object.assign({speed:'0.8',speedNote:'양쪽 손잡이 감지됨',location:'서울시 광진구',cross:'N/A',roadNote:'주변에 감지된 횡단보도가 없어요',roadTone:'normal',symbol:'O',drive:'주행 가능',driveNote:'양쪽 손잡이를 유지하세요',driveTone:'normal',slope:'평지',angle:'+0.8°',slopeNote:'완만한 지면입니다',slopeTone:'normal'},presets[get('scenario').value]);
+  const ids={speed:s.speed,'speed-note':s.speedNote,location:s.location,cross:s.cross,'road-note':s.roadNote,symbol:s.symbol,'drive-state':s.drive,'drive-note':s.driveNote,'slope-name':s.slope,angle:s.angle,'slope-note':s.slopeNote};
+  Object.entries(ids).forEach(([id,text])=>get(id).textContent=text);
+  ['road','drive','slope'].forEach(id=>get(id).dataset.tone=s[id+'Tone']);
+  get('splash').hidden=on&&!booting;get('intro').hidden=!on;
+  root.querySelector('.ss-header').style.visibility=on&&!booting?'visible':'hidden';
+  root.querySelector('.ss-grid').style.visibility=on&&!booting?'visible':'hidden';
+  get('power').textContent=on?'전원 OFF':'전원 ON';get('power').setAttribute('aria-pressed',String(on));
+  get('scenario').disabled=!on||booting;
+  get('announcement').textContent=!on?'전원 꺼짐':booting?'SafeStride 시작 화면':s.drive+', '+s.slope+', 횡단보도 '+s.cross;
+ }
+ get('power').addEventListener('click',()=>{clearTimeout(timer);on=!on;booting=on;render();if(on)timer=setTimeout(()=>{booting=false;render()},2200)});
+ get('scenario').addEventListener('change',render);
+ render();
+ if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:render});tweak.addSelect(design,'appearance',{label:'화면 테마',options:['Midnight','Daylight']});}
+})();
+</script>
+</div>
