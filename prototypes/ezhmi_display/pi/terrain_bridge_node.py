@@ -35,7 +35,6 @@ from .protocol import (
 )
 from .validation import bounded_int, finite_float
 from .hmi_relay import HmiRelay
-from .hmi_model import STATUS_PACKET_TYPE
 
 
 CAP_TOF10120 = 1 << 8
@@ -224,7 +223,6 @@ class TerrainBridgeNode(Node):
         return now - self._last_telemetry_time <= self._telemetry_timeout
 
     def _reset_link(self) -> None:
-        self._hmi.reset()
         self._parser.reset()
         self._session_id = 0
         self._boot_id = 0
@@ -302,12 +300,6 @@ class TerrainBridgeNode(Node):
                 return
             self._handle_hello(hello)
             return
-        if frame.packet_type == STATUS_PACKET_TYPE:
-            if not self._session_started or frame.session_id != self._session_id:
-                self._session_errors += 1
-            elif not self._hmi.accept_status(frame, now):
-                self._payload_errors += 1
-            return
         if frame.packet_type != PacketType.TERRAIN_TELEMETRY:
             self._payload_errors += 1
             return
@@ -370,7 +362,6 @@ class TerrainBridgeNode(Node):
         # a fresh session ID, even if the MCU boot ID did not change.
         new_session = True
         if new_session:
-            self._hmi.reset()
             session_id = secrets.randbits(32)
             if session_id == 0 or session_id == self._session_id:
                 session_id = (self._session_id + 1) & 0xFFFFFFFF or 1
@@ -543,7 +534,7 @@ class TerrainBridgeNode(Node):
             message.tof_change_m = telemetry.tof_change_mm / 1000.0
             message.tof_alert = telemetry.tof_alert
             message.terrain_hazard = (
-                bool(telemetry.tof_valid)
+                telemetry.tof_valid
                 and telemetry.tof_alert
                 in (TerrainStatus.TOF_RAISED, TerrainStatus.TOF_DROP)
             )
@@ -682,7 +673,7 @@ class TerrainBridgeNode(Node):
         ]
         array = DiagnosticArray()
         array.header.stamp = self.get_clock().now().to_msg()
-        array.status = [status, self._hmi.diagnostic(now)]
+        array.status = [status]
         self._diagnostics_pub.publish(array)
 
     def destroy_node(self) -> bool:

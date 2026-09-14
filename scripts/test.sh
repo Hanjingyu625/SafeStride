@@ -27,5 +27,6 @@ set +u
 source install/setup.bash
 set -u
 bash "${workspace}/scripts/test_firmware.sh"
+python3 -m unittest discover -s "${workspace}/test" -p test_display_lua.py
 colcon test --event-handlers console_cohesion+
 colcon test-result --verbose

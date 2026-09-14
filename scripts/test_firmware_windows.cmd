@@ -34,6 +34,11 @@ if errorlevel 1 goto :fail
 cl /nologo /utf-8 /std:c++14 /EHsc /W4 /I"%ROOT%\test\arduino_stub" /I"%ROOT%\firmware\terrain_mcu" "%ROOT%\test\firmware_terrain_state_test.cpp" "%ROOT%\firmware\terrain_mcu\mpu6050_sensor.cpp" "%ROOT%\firmware\terrain_mcu\tof10120_sensor.cpp" "%ROOT%\firmware\terrain_mcu\protocol.cpp" /Fe:"%OUT%\terrain_state_test.exe"
 if errorlevel 1 goto :fail
 
+cl /nologo /utf-8 /std:c++14 /EHsc /W4 /I"%ROOT%\test\arduino_stub" "%ROOT%\test\firmware_hmi_test.cpp" /Fe:"%OUT%\hmi_test.exe"
+if errorlevel 1 goto :fail
+"%OUT%\hmi_test.exe"
+if errorlevel 1 goto :fail
+
 "%OUT%\protocol_test.exe"
 if errorlevel 1 goto :fail
 if not errorlevel 0 goto :fail

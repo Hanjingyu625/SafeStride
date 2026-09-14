@@ -1,0 +1,17 @@
+address_hex,name,type,default,meaning
+0000,ss_version,uint16,2,Snapshot version
+0001,ss_heartbeat,uint16,0,Changes every 200 ms
+0002,ss_valid,uint16,0,Validity bits speed=1 hands=2 crosswalk=4 pitch=8 tof=16 walker=32
+0003,ss_speed,uint16,65535,Speed km/h x100; 65535 unknown
+0004,ss_hands,uint16,0,Left=1 right=2
+0005,ss_crosswalk,uint16,0,CrosswalkStatus state 0..6
+0006,ss_seconds,uint16,65535,Signal remaining seconds; 65535 unknown
+0007,ss_distance,uint16,65535,Edge distance metres x10; 65535 unknown
+0008,ss_pitch,uint16,0,Two's complement int16 degrees x10; Lua decodes signed value
+0009,ss_tof,uint16,5,ToF alert 0..5; 5 invalid
+000A,ss_hazard,uint16,0,Confirmed hazard latch
+000B,ss_walker,uint16,0,WalkerStatus state 0..5
+000C,ss_braking,uint16,0,Braking flag
+000D,ss_faults,uint16,0,Drive fault bitmask
+000E,ss_host_link,uint16,0,Fresh Pi snapshot present
+000F,ss_flags,uint16,0,Armed=1 deadman=2 estop=4 watchdog=8 entry_allowed=16 urgent=32 signal_valid=64

@@ -170,6 +170,33 @@ int main() {
     assert(frame.payload[index] == 0U);
   }
 
-  printf("firmware terrain session/telemetry tests: OK\n");
+  // Route real COBS/CRC HMI packets only within the negotiated session.
+  uint8_t hmi_payload[32]={2,0,1,0,1,0,125,0};
+  BufferStream wrong_session;
+  assert(proto::sendFrame(wrong_session, safestride_hmi::PACKET_TYPE,
+      10, 0xBADUL, 0, hmi_payload, sizeof(hmi_payload)));
+  loadSerialRx(wrong_session.data(), wrong_session.length());
+  processHostProtocol();
+  assert(g_display.words[safestride_hmi::HOST_LINK]==0);
+  BufferStream display;
+  assert(proto::sendFrame(display, safestride_hmi::PACKET_TYPE,
+      10, g_session_id, 0, hmi_payload, sizeof(hmi_payload)));
+  loadSerialRx(display.data(), display.length());
+  processHostProtocol();
+  assert(g_display.words[safestride_hmi::SPEED]==125);
+  assert(g_display.words[safestride_hmi::HOST_LINK]==1);
+  // Repeated session-start frames must not invalidate a live snapshot.
+  loadSerialRx(start.data(), start.length()); processHostProtocol();
+  assert(g_display.words[safestride_hmi::HOST_LINK]==1);
+  g_display.tick(g_now_ms+600);
+  assert(g_display.words[safestride_hmi::HOST_LINK]==0);
+  g_serial_tx_length=0;
+  sendDisplayStatus(g_now_ms);
+  for (size_t i=0; i<g_serial_tx_length; ++i) result=receiver.push(g_serial_tx[i],frame);
+  assert(result==proto::ReceiveResult::FRAME_READY);
+  assert(frame.type==safestride_hmi::STATUS_PACKET_TYPE && frame.payload_length==12);
+  assert(frame.payload[0]==2 && frame.payload[1]==0);
+
+  printf("firmware terrain session/telemetry/HMI tests: OK\n");
   return 0;
 }
