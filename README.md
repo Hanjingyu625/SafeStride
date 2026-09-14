@@ -44,6 +44,9 @@ Raspberry Pi: BE-220 GPS + serial bridges -> safety supervisor -> diagnostics/Fo
 
 ## 빠른 시작
 
+ezHMI LCD 통합: [디스플레이 최초 설정·배선·배포](docs/DISPLAY_KO.md).
+출고 LCD에는 VisualTFT 화면 다운로드가 필요하며 HTML 미리보기는 LCD에서 실행되지 않는다.
+
 ```bash
 bash scripts/install_ubuntu_24_04.sh
 bash scripts/build.sh
@@ -71,6 +74,7 @@ ToF 장애물·낙차 확정 감지는 기본 활성화되며, 3초 PWM 감속 �
 
 ```bash
 arduino-cli compile --fqbn arduino:avr:uno firmware/safestride_mcu
+arduino-cli lib install AltSoftSerial@1.4
 arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
 ```
 
