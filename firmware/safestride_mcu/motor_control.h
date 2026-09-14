@@ -78,6 +78,7 @@ class DriveController {
   float ff_pwm_ = 0.0F;
   float feedback_pwm_ = 0.0F;
   bool braking_ = true;
+  bool startup_pending_ = true;
   bool terrain_stop_active_ = false;
   bool terrain_recovering_ = false;
   uint32_t terrain_stop_elapsed_us_ = 0UL;

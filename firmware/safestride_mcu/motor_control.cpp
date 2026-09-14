@@ -121,6 +121,7 @@ void DriveController::begin() {
   pinMode(cfg::MOTOR_IN2_PIN, OUTPUT);
   analogWrite(cfg::MOTOR_PWM_PIN, 0);
   last_commanded_pwm_ = 0.0F;
+  startup_pending_ = true;
   release_start_pwm_ = 0.0F;
   release_pwm_fade_active_ = false;
 }
@@ -137,6 +138,7 @@ void DriveController::disableImmediately() {
   ff_pwm_ = feedback_pwm_ = 0.0F;
   applied_target_mrad_s_ = 0.0F;
   last_commanded_pwm_ = 0.0F;
+  startup_pending_ = true;
   release_start_pwm_ = 0.0F;
   release_pwm_fade_active_ = false;
   motor_pid_ = {0.0F, 0.0F};
@@ -384,6 +386,7 @@ void DriveController::update(
        (terrain_stop_active_ && terrain_stop_elapsed_us_ < 3000000UL)) && !brake_requested &&
       !fade_pwm_during_deceleration) {
     if (!terrain_stop_active_) {
+      startup_pending_ = false;
       terrain_stop_active_ = true;
       terrain_recovering_ = true;
       terrain_stop_elapsed_us_ = 0UL;
@@ -494,7 +497,7 @@ void DriveController::update(
   }
 
   // 정상 제어식: u = sign(ω) × [30 + (60-30)|ω|/ω_nom] + 경사 FF + Kp(ω-측정).
-  // ω_nom은 0.08m/s에 해당한다. 30은 계산 bias이며 최종 PWM의 하한이 아니다.
+  // Nominal speed is 1.0 m/s. The bias is not a minimum output.
   const float target = applied_target_mrad_s_;
   const float direction = target >= 0.0F ? 1.0F : -1.0F;
   ff_pwm_ = fabsf(target) < 20.0F ? 0.0F : direction *
@@ -512,10 +515,18 @@ void DriveController::update(
   if (!speed_valid_) output = clampFloat(output,
       -cfg::MOTOR_FF_NOMINAL_PWM, cfg::MOTOR_FF_NOMINAL_PWM);
   // 출력 크기를 늘릴 때 20count/s, 줄일 때 60count/s로 제한한다.
-  // 0→60은 약 3초 이상 걸리며 실제 지면 속도 도달 시간과 같지 않다.
+  // After the one-time launch step, 20->60 takes at least two seconds.
   // After a terrain stop, retain the slower rise limit. The speed controller
   // determines the PWM needed at target speed; there is no blind PWM sweep.
   const float desired_output = output;
+  // One forward launch step, bounded by the controller and cap. A later
+  // feedback-driven zero must not retrigger it; terrain recovery keeps its ramp.
+  if (startup_pending_ && fabsf(target) > 20.0F) {
+    startup_pending_ = false;
+    if (target > 20.0F && output > 0.0F && !terrain_recovering_) {
+      last_commanded_pwm_ = fminf(output, cfg::MOTOR_START_PWM);
+    }
+  }
   const float rise = terrain_recovering_
       ? cfg::TERRAIN_RECOVERY_PWM_RISE_PER_S : cfg::MOTOR_PWM_RISE_PER_S;
   const float rate = fabsf(output) > fabsf(last_commanded_pwm_)

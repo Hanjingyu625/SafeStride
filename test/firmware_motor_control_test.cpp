@@ -72,6 +72,40 @@ void run(DriveController& d, int ticks, int32_t target, uint32_t period,
 }
 
 int main() {
+  // A forward launch jumps to 20 once, with stop and cap priority intact.
+  DriveController launch; launch.begin(); primeFeedback(launch);
+  HallSample no_speed = {0, 0, 0xFFFFFFFFUL};
+  for (int i = 0; i < 4; ++i) launch.update(5000,no_speed,no_speed,8696,true);
+  assert(launch.appliedPwm() == 20);
+  launch.update(5000,no_speed,no_speed,0,true);
+  assert(launch.appliedPwm() == 0);
+  for (int i = 0; i < 4; ++i)
+    launch.update(5000,no_speed,no_speed,8696,true,true,0,false,0,10);
+  assert(launch.appliedPwm() == 10);
+  launch.update(5000,no_speed,no_speed,0,true,true,0,false,0,100,true);
+  assert(launch.appliedPwm() == 0);
+
+  DriveController once; once.begin(); primeFeedback(once);
+  for (int i = 0; i < 4; ++i) once.update(5000,no_speed,no_speed,8696,true);
+  assert(once.appliedPwm() == 20);
+  once.update(5000,no_speed,no_speed,8696,true,true,0,false,0,0);
+  assert(once.appliedPwm() == 0);
+  once.update(5000,no_speed,no_speed,8696,true);
+  assert(once.appliedPwm() < 2);  // A cap release is not a new launch.
+
+  // Deployed walking targets must reach the MCU without clipping.
+  DriveController walking; walking.begin(); primeFeedback(walking);
+  run(walking,2400,8696,60214UL);
+  assert(walking.appliedTargetMradS() == 8696);
+  assert(walking.feedforwardPwm() >= 59 && walking.feedforwardPwm() <= 61);
+  assert(abs(walking.feedbackPwm()) <= 1);
+  assert(walking.appliedPwm() >= 59 && walking.appliedPwm() <= 61);
+  run(walking,1600,10000,52360UL,30);
+  assert(walking.appliedTargetMradS() == 10000);
+  assert(walking.appliedPwm() >= 93 && walking.appliedPwm() <= 95);
+  run(walking,1,0,52360UL,0,100,true);
+  assert(walking.appliedPwm() == 0);
+
   // Twelve magnets: one second per pulse is pi/6 rad/s, not pi/3.
   DriveController calibrated; calibrated.begin(); primeFeedback(calibrated);
   run(calibrated,100,696,1000000UL);
@@ -117,9 +151,9 @@ int main() {
     // Recovery uses 10 count/s only until it catches the normal controller
     // output. A later demand change returns to the ordinary 20 count/s slew.
     run(terrain,1020,696,752297UL);
-    assert(g_motor_pwm == 60);
+    assert(g_motor_pwm == 32);
     run(terrain,20,696,752297UL,30);
-    assert(g_motor_pwm >= 62);
+    assert(g_motor_pwm >= 34);
     terrain.update(5000,absent,absent,0,true,true,0,false,0,100,false,true);
     terrain.update(5000,absent,absent,0,false);
     terrain.update(5000,absent,absent,0,true,true,0,false,0,100,false,true);
@@ -128,11 +162,11 @@ int main() {
   // Feed-forward replaces the old FF10 plus hard minimum 80.
   DriveController d; d.begin(); primeFeedback(d);
   run(d,800,696,752297UL);
-  assert(g_motor_pwm >= 59 && g_motor_pwm <= 61);
+  assert(g_motor_pwm >= 31 && g_motor_pwm <= 33);
   run(d,400,696,752297UL,8);
-  assert(g_motor_pwm >= 67 && g_motor_pwm <= 69);
+  assert(g_motor_pwm >= 39 && g_motor_pwm <= 41);
   run(d,400,696,752297UL,-45);
-  assert(g_motor_pwm >= 14 && g_motor_pwm <= 16);
+  assert(g_motor_pwm == 0);
   run(d,400,696,752297UL,-60);
   assert(g_motor_pwm <= 1); // Can reduce all the way to BRAKE without reverse.
   run(d,800,696,752297UL,30,40);
@@ -140,13 +174,13 @@ int main() {
   run(d,1,0,752297UL,0,100,true);
   assert(g_motor_pwm==0 && g_motor_in1_level==LOW && g_motor_in2_level==LOW);
   run(d,800,696,752297UL);
-  assert(g_motor_pwm >= 59); // No restart latch.
+  assert(g_motor_pwm >= 31); // No restart latch.
   d.disableImmediately(); assert(g_motor_pwm==0);
 
   // Output slew, zero target, fault/explicit brake bypass normal ramp.
   DriveController slew; slew.begin(); primeFeedback(slew);
   run(slew,100,696,752297UL);
-  assert(g_motor_pwm <= 10);
+  assert(g_motor_pwm >= 20 && g_motor_pwm <= 30);
   int before=g_motor_pwm;
   HallSample h={2000,752297UL,0};
   slew.update(5000,h,h,0,true,true,1160,true);
@@ -179,34 +213,34 @@ int main() {
   // BRAKE. Replaying that stale measurement at 200 Hz must not turn it into
   // false evidence of sustained overspeed.
   DriveController fast; fast.begin(); primeFeedback(fast);
-  run(fast,800,696,752297UL);
+  run(fast,2400,8696,60214UL);
 
-  // 0.15 m/s is above the former target+0.05 m/s trip point but below the
+  // 1.095 m/s is above the 1.0 m/s target but below the
   // absolute 8 km/h safety limit. PID correction must continue driving.
-  run(fast,100,696,400000UL);
+  run(fast,100,8696,55000UL);
   assert(g_motor_pwm>0 && !fast.braking());
 
   HallSample one_fast_period={10000,25000UL,0}; // 8.67 km/h, absolute overspeed.
-  fast.update(5000,one_fast_period,one_fast_period,696,true);
+  fast.update(5000,one_fast_period,one_fast_period,8696,true);
   for(int i=0;i<100;++i) {
     one_fast_period.age_us+=5000UL;
-    fast.update(5000,one_fast_period,one_fast_period,696,true);
+    fast.update(5000,one_fast_period,one_fast_period,8696,true);
   }
   assert(g_motor_pwm>0 && !fast.braking());
 
   // A second independent absolute-overspeed period confirms the condition.
   one_fast_period.pulse_count++;
   one_fast_period.age_us=0;
-  fast.update(5000,one_fast_period,one_fast_period,696,true);
+  fast.update(5000,one_fast_period,one_fast_period,8696,true);
   assert(g_motor_pwm==0 && fast.braking());
   assert(fast.hallFaultMask()==0);
 
   // A newly observed low-speed period releases the transient BRAKE.
-  HallSample recovered={one_fast_period.pulse_count+1,752297UL,0};
-  fast.update(5000,recovered,recovered,696,true);
-  for(int i=0;i<900;++i) {
+  HallSample recovered={one_fast_period.pulse_count+1,60214UL,0};
+  fast.update(5000,recovered,recovered,8696,true);
+  for(int i=0;i<2400;++i) {
     recovered.pulse_count++;
-    fast.update(5000,recovered,recovered,696,true);
+    fast.update(5000,recovered,recovered,8696,true);
   }
   assert(g_motor_pwm>=59);
 

@@ -126,13 +126,13 @@ class TestSupervisedDrive(unittest.TestCase):
         self.assertAlmostEqual(msg.target_speed_kmh, 0.288)
         self.assertEqual((msg.mode, msg.slope_ff_pwm), (0, 0))
         for _ in range(20):
-            msg = self.tick(5.5)
-        self.assertAlmostEqual(msg.target_linear_m_s, 0.08)
-        self.assertEqual(msg.slope_ff_pwm, 10)
-        msg = self.tick(-11)
+            msg = self.tick(-11)
+        self.assertAlmostEqual(msg.target_linear_m_s, 0.08 * 1.15)
+        self.assertEqual(msg.slope_ff_pwm, 30)
+        msg = self.tick(16)
         self.assertEqual((msg.mode, msg.target_linear_m_s, msg.slope_ff_pwm), (2, 0.0, 0))
         for _ in range(20):
-            self.assertEqual(self.tick(-8).mode, 2)
+            self.assertEqual(self.tick(13).mode, 2)
         for _ in range(30):
             msg = self.tick(0)
         self.assertEqual(msg.mode, 0)
@@ -149,16 +149,18 @@ class TestSupervisedDrive(unittest.TestCase):
             msg = self.tick(0)
         self.assertEqual(msg.mode, 0)
 
-    def test_downhill_continuous_scale_and_surface_disabled(self):
+    def test_default_downhill_has_no_slowdown_below_fifteen_degrees(self):
         # Even a live surface result cannot modify this deployment's speed.
         self.node._last_surface = NS(valid=True, recommended_speed_scale=0.0)
         for _ in range(20):
-            msg = self.tick(-6)
-        self.assertAlmostEqual(msg.target_linear_m_s, 0.08 * 0.76)
+            msg = self.tick(10)
+        self.assertAlmostEqual(msg.target_linear_m_s, 0.08)
+        self.assertEqual(msg.mode, Message.DRIVE)
         self.assertEqual(msg.slope_ff_pwm, 0)
         for _ in range(20):
-            msg = self.tick(-8)
-        self.assertAlmostEqual(msg.target_linear_m_s, 0.08 * 0.6)
+            msg = self.tick(14.9)
+        self.assertAlmostEqual(msg.target_linear_m_s, 0.08)
+        self.assertEqual(msg.mode, Message.DRIVE)
         self.assertEqual(msg.slope_ff_pwm, 0)
 
     def test_existing_fault_still_suppresses_stream(self):
@@ -201,6 +203,7 @@ class TestSupervisedDrive(unittest.TestCase):
             self.assertEqual(params[key], launch_params[key], key)
         n = self.node
         n.params.update(params)
+        n._last_command.twist.linear.x = 1.0
         n._slope_policy = SlopeSpeedPolicy(**{
             key: params['slope_' + key] if 'slope_' + key in params else params[key]
             for key in ('enter_angle_rad', 'exit_angle_rad', 'confirmation_time_s',
@@ -208,31 +211,31 @@ class TestSupervisedDrive(unittest.TestCase):
                         'downhill_speed_scale', 'uphill_speed_scale')})
         n._brake_policy = SlopeBrakePolicy(params['brake_enter_deg'],
             params['brake_release_deg'], params['brake_recovery_s'])
-        for _ in range(20):
-            msg = self.tick(-9.9)
+        for _ in range(150):
+            msg = self.tick(-4.9)
         self.assertEqual((msg.mode, msg.slope_ff_pwm), (Message.DRIVE, 0))
-        for _ in range(20):
-            msg = self.tick(-10.0)
+        for _ in range(150):
+            msg = self.tick(-5.0)
         self.assertGreater(msg.slope_ff_pwm, 0)
         self.assertEqual(msg.mode, Message.DRIVE)
-        self.assertAlmostEqual(msg.target_linear_m_s, 0.08 * 1.15)
-        self.assertEqual(self.tick(-9.9).slope_ff_pwm, 0)
-        for angle in (0.0, 10.0, 20.0, 29.9):
+        self.assertAlmostEqual(msg.target_linear_m_s, 1.15)
+        self.assertEqual(self.tick(-4.9).slope_ff_pwm, 0)
+        for angle in (0.0, 5.0, 10.0, 14.9):
             for _ in range(30):
                 msg = self.tick(angle)
             self.assertEqual(msg.mode, Message.DRIVE)
             self.assertEqual(msg.slope_ff_pwm, 0)
-            self.assertAlmostEqual(msg.target_linear_m_s, 0.08)
-        self.assertEqual(self.tick(30.0).mode, Message.TERRAIN_STOP)
+            self.assertAlmostEqual(msg.target_linear_m_s, 1.0)
+        self.assertEqual(self.tick(15.0).mode, Message.TERRAIN_STOP)
         for _ in range(20):
-            self.assertEqual(self.tick(27.1).mode, Message.TERRAIN_STOP)
+            self.assertEqual(self.tick(12.1).mode, Message.TERRAIN_STOP)
         for _ in range(20):
-            msg = self.tick(27.0)
+            msg = self.tick(12.0)
         self.assertEqual(msg.mode, Message.DRIVE)
-        self.assertEqual(self.tick(30.0).mode, Message.TERRAIN_STOP)
-        self.assertEqual(self.tick(30.0, valid=False).mode, Message.BRAKE)
+        self.assertEqual(self.tick(15.0).mode, Message.TERRAIN_STOP)
+        self.assertEqual(self.tick(15.0, valid=False).mode, Message.BRAKE)
         n._status_reasons = lambda now: ['deadman_released']
-        self.assertEqual(self.tick(30.0).mode, Message.BRAKE)
+        self.assertEqual(self.tick(15.0).mode, Message.BRAKE)
 
     def test_terrain_invalid_does_not_stop_and_confirmed_hazard_ramps(self):
         n = self.node

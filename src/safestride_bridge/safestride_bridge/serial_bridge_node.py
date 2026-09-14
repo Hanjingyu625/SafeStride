@@ -217,7 +217,7 @@ class SerialBridgeNode(Node):
             ('base.wheel_radius_m', 0.115),
             ('base.wheel_separation_m', 0.55),
             ('base.hall_pulses_per_revolution', 12),
-            ('base.max_wheel_speed_rad_s', 3.0),
+            ('base.max_wheel_speed_rad_s', 10.0),
             ('range.min_m', 0.02),
             ('range.max_m', 4.0),
             ('range.field_of_view_rad', 0.35),

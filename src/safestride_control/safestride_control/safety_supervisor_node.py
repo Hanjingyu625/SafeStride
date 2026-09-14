@@ -63,8 +63,8 @@ class SafetySupervisor(Node):
         self.declare_parameter('slope_control_enabled', True)
         self.declare_parameter('surface_control_enabled', False)
         self.declare_parameter('drive_command_topic', '/drive/command')
-        self.declare_parameter('brake_enter_deg', 10.0)
-        self.declare_parameter('brake_release_deg', 7.0)
+        self.declare_parameter('brake_enter_deg', 15.0)
+        self.declare_parameter('brake_release_deg', 12.0)
         self.declare_parameter('brake_recovery_s', 0.5)
         self.declare_parameter('drive_pwm_cap', 100)
         self._surface_control_enabled = bool(self.get_parameter('surface_control_enabled').value)
@@ -77,7 +77,7 @@ class SafetySupervisor(Node):
         self._slope_braking = False
         self._slope_ff_pwm = 0
 
-        self.declare_parameter('max_forward_velocity', 0.15)
+        self.declare_parameter('max_forward_velocity', 1.15)
         self.declare_parameter('max_reverse_velocity', 0.08)
         self.declare_parameter('max_angular_velocity', 0.35)
         self.declare_parameter('max_surface_speed_scale', 1.25)
@@ -88,10 +88,10 @@ class SafetySupervisor(Node):
         self.declare_parameter('slope_enter_angle_rad', math.radians(5.0))
         self.declare_parameter('slope_exit_angle_rad', math.radians(3.0))
         self.declare_parameter('slope_confirmation_time_s', 0.50)
-        self.declare_parameter('uphill_pitch_sign', 1.0)
+        self.declare_parameter('uphill_pitch_sign', -1.0)
         self.declare_parameter('pitch_offset_rad', 0.0)
-        self.declare_parameter('downhill_speed_scale', 0.60)
-        self.declare_parameter('uphill_speed_scale', 1.0)
+        self.declare_parameter('downhill_speed_scale', 1.0)
+        self.declare_parameter('uphill_speed_scale', 1.15)
         self.declare_parameter('max_combined_speed_scale', 1.25)
 
         self.declare_parameter('stop_distance', 0.35)
@@ -970,9 +970,15 @@ class SafetySupervisor(Node):
         diagnostic.message = ', '.join(all_reasons) if all_reasons else 'ready'
         status = self._last_status
         diagnostic.values = [
+            KeyValue(key='brake_enter_deg', value=str(self._brake_policy.enter)),
+            KeyValue(key='brake_release_deg', value=str(self._brake_policy.release)),
+            KeyValue(key='uphill_pitch_sign', value=str(self.get_parameter('uphill_pitch_sign').value)),
+            KeyValue(key='raw_pitch_deg', value=str(
+                math.degrees(self._last_terrain.pitch_rad) if self._last_terrain else math.nan)),
             KeyValue(key='drive_mode', value='BRAKE' if (
                 (self._slope_braking and not math.isfinite(normalized_pitch))
-                or any(reason != 'disarmed' for reason in hard_stop_reasons))
+                or any(reason != 'disarmed' for reason in hard_stop_reasons)
+                or 'obstacle_stop' in operating_notes or 'surface_stop' in operating_notes)
                 else ('TERRAIN_STOP' if self._terrain_stopping or self._slope_braking else 'DRIVE')),
             KeyValue(key='slope_ff_pwm', value=str(self._slope_ff_pwm)),
             KeyValue(key='surface_control_enabled', value=_bool_text(self._surface_control_enabled)),

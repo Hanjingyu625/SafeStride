@@ -30,7 +30,7 @@ constexpr uint16_t COMMAND_WATCHDOG_MAX_MS = 250U;
 constexpr uint16_t COMMAND_TTL_MIN_MS = 20U;
 
 // Motion limits at the wheel output shaft.
-constexpr int32_t MAX_WHEEL_TARGET_MRAD_S = 3000L;
+constexpr int32_t MAX_WHEEL_TARGET_MRAD_S = 10000L;
 constexpr int32_t MAX_ACCEL_MRAD_S2 = 1200L;
 constexpr int32_t MAX_DECEL_MRAD_S2 = 2500L;
 constexpr int32_t ARM_MAX_MEASURED_SPEED_MRAD_S = 100L;
@@ -102,11 +102,12 @@ constexpr uint8_t MOTOR_IN2_PIN = 8U;
 constexpr int8_t MOTOR_SIGN = 1;
 constexpr uint16_t MAX_PWM = 100U;  // deliberately low for first lifted test
 // Initial feed-forward model; PWM counts are on Arduino's 0..255 scale.
-// 30 is a bias, NOT a minimum output. Calibrate 60 at 0.08 m/s under load.
-// 평지 0.08m/s에서 기본 FF=60count(약 23.5% duty). 실측 보정 전 초기 모델이다.
+// 30 is a bias, NOT a minimum output. Calibrate 60 at 1.0 m/s under load.
+// Nominal FF=60 is an initial model, not a measured speed calibration.
 constexpr uint8_t MOTOR_FF_BIAS_PWM = 30U;
 constexpr uint8_t MOTOR_FF_NOMINAL_PWM = 60U;
-constexpr float MOTOR_NOMINAL_MRAD_S = 0.08F / 0.115F * 1000.0F;
+constexpr uint8_t MOTOR_START_PWM = 20U;
+constexpr float MOTOR_NOMINAL_MRAD_S = 1.0F / 0.115F * 1000.0F;
 constexpr float MOTOR_PWM_RISE_PER_S = 20.0F;
 constexpr float TERRAIN_RECOVERY_PWM_RISE_PER_S = 10.0F;
 constexpr float MOTOR_PWM_FALL_PER_S = 60.0F;
@@ -144,8 +145,8 @@ constexpr uint8_t PRESSURE_RELEASE_DEBOUNCE_SAMPLES = 2U;
 // polarity and threshold halfway between its released and held readings.
 constexpr bool PRESSURE_LEFT_ACTIVE_HIGH = true;
 constexpr bool PRESSURE_RIGHT_ACTIVE_HIGH = true;
-constexpr float PRESSURE_LEFT_PRESENT_THRESHOLD = 80.0F;
-constexpr float PRESSURE_RIGHT_PRESENT_THRESHOLD = 80.0F;
+constexpr float PRESSURE_LEFT_PRESENT_THRESHOLD = 40.0F;
+constexpr float PRESSURE_RIGHT_PRESENT_THRESHOLD = 40.0F;
 constexpr bool PRESSURE_THRESHOLDS_CALIBRATED = true;
 constexpr float PRESSURE_IMBALANCE_THRESHOLD = 300.0F;
 constexpr float PRESSURE_SUDDEN_CHANGE_THRESHOLD = 150.0F;

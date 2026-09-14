@@ -37,8 +37,8 @@ duty다. 30은 약 11.8%, 현재 상한 100은 약 39.2%다.
 
 ```text
 wheel_radius = 0.115 m
-v_nom = 0.08 m/s
-omega_nom = 0.08 / 0.115 ≈ 0.696 rad/s
+v_nom = 1.0 m/s
+omega_nom = 1.0 / 0.115 ≈ 8.696 rad/s
 
 u_ff = sign(omega_ref) × [30 + (60 - 30) × abs(omega_ref) / omega_nom]
 u_P  = 12 × (omega_ref - omega_measured)     # rad/s 단위
@@ -50,12 +50,13 @@ u_raw = u_ff + u_slope + u_P
 -cap~0으로 제한하므로 감속 중 30 아래나 0까지 내려갈 수 있다. 속도 오차만으로
 목표 반대 방향 PWM을 만들지 않는다. Ki=Kd=0을 코드 assertion으로 고정했다.
 
-평지에서 목표·측정 속도가 모두 0.08 m/s이면 모델 출력은 약 60이다.
+평지에서 목표·측정 속도가 모두 1.0 m/s이면 모델 출력은 약 60이다.
 이는 실측 보정 전 초기 기준이며, 부하에 따라 P 항이 출력을 수정한다.
 기존 `MOTOR_FEEDFORWARD=10`과 deadzone bias 중복 덧셈은 제거했다.
 
-정상 PWM 크기는 상승 20 count/s, 하강 60 count/s로 제한한다. 예를 들어 출력
-0→60은 목표·오차가 충분하더라도 약 3초 이상 걸린다. Pi 목표속도 slew 및 MCU
+최초 전진 구동은 제어 출력과 cap 범위 내에서 PWM 20까지 바로 시작한다.
+이후 정상 PWM 크기는 상승 20 count/s, 하강 60 count/s로 제한한다. 출력
+20→60은 목표·오차가 충분하더라도 약 2초 이상 걸린다. Pi 목표속도 slew 및 MCU
 목표각속도 ramp와 최종 PWM slew는 별개다. 새 cap은 즉시 지킨다.
 BRAKE·fault·watchdog은 정상 slew를 기다리지 않는다.
 
@@ -64,17 +65,17 @@ BRAKE·fault·watchdog은 정상 slew를 기다리지 않는다.
 정규화는 `(pitch_rad - pitch_offset_rad) * uphill_pitch_sign` 순서다.
 현재 offset `0 rad`, sign `-1`이다. 원본 Pitch 양수는 내리막, 음수는 오르막이다.
 
-아래 표는 기본 Cruise 요청 0.08 m/s와 현재 Pi 설정 기준이다.
+아래 표는 기본 Cruise 요청 1.0 m/s와 현재 Pi 설정 기준이다.
 
 | 원본 Pitch / 조건 | 목표속도와 출력 동작 |
 |---|---|
-| 평지 | 목표속도 0.08 m/s |
-| 내리막 0~+30° 미만 | 목표속도 0.08 m/s 유지, 별도 내리막 FF 차감 없음 |
-| 내리막 +30° 이상 | 진입 당시 PWM에서 3초 동안 0으로 감속 |
-| 경사 정지 후 +27° 이하 | 유효 상태 0.5초 유지 시 해제 요청, 시작한 MCU ramp는 완료 |
-| 오르막 -10° 이하 0.5초 유지 | 목표속도 0.092 m/s와 최대 +30 PWM 경사 FF |
+| 평지 | 목표속도 1.0 m/s |
+| 내리막 0~+15° 미만 | 목표속도 1.0 m/s 유지, 별도 내리막 FF 차감 없음 |
+| 내리막 +15° 이상 | 진입 당시 PWM에서 3초 동안 0으로 감속 |
+| 경사 정지 후 +12° 이하 | 유효 상태 0.5초 유지 시 해제 요청, 시작한 MCU ramp는 완료 |
+| 오르막 -5° 이하 0.5초 유지 | 목표속도 1.15 m/s와 최대 +30 PWM 경사 FF |
 
-오르막 상태는 -7°까지의 히스테리시스로 유지되며, 양의 경사 FF는 -10°보다
+오르막 상태는 -3°까지의 히스테리시스로 유지되며, 양의 경사 FF는 -5°보다
 완만해지면 0이 된다. 속도 피드백과 손잡이/통신/ToF 정지는 표보다 우선한다.
 FF 60은 명목속도의 계산값이며 PWM 하한이 아니다. Ki=0을 유지한다.
 PWM을 0으로 줄이는 시간과 실제 보행기의 제동거리/정지시간은 별도로 검증한다.
@@ -86,15 +87,15 @@ cd /home/pi/SafeStride-pdj1
 SAFESTRIDE_CONFIG="$PWD/config/raspberry_pi.yaml" SAFESTRIDE_ENABLE_FOXGLOVE=true bash scripts/run.sh
 ```
 
-경사 상태 진입 10°, 이탈 7°, 확인 0.5초의 히스테리시스를 사용한다.
-오르막 목표속도 배율은 **1.15**이다. 기본 0.08 m/s 요청은 0.092 m/s가 되며
-기존 최대속도 0.15 m/s와 가속도 제한을 유지한다. 내리막 배율은 **1.0**이다.
+경사 상태 진입 5°, 이탈 3°, 확인 0.5초의 히스테리시스를 사용한다.
+오르막 목표속도 배율은 **1.15**이다. 기본 1.0 m/s 요청은 1.15 m/s가 되며
+최대 전진속도는 1.15 m/s이며 기존 가속도 제한을 유지한다. 내리막 배율은 **1.0**이다.
 
 ```text
 downhill_scale = 1.0
 ```
 
-원본 +30° 미만에서는 경사 자체로 목표속도나 FF를 줄이지 않는다.
+원본 +15° 미만에서는 경사 자체로 목표속도나 FF를 줄이지 않는다.
 속도 피드백, ToF, 손잡이 및 통신 안전 정지는 별도로 작동한다.
 
 | 확정 상태 | 경사 FF (PWM count) |
@@ -103,8 +104,8 @@ downhill_scale = 1.0
 | 오르막 | `min(30, max(0, 4 × (각도 - 3)))` |
 | 내리막 | 0 |
 
-오르막 FF는 원본 -10° 이하이고 오르막 상태가 확정됐을 때 적용한다.
-원본 -10°에서 +28, -17°에서 +30이다. 기본 FF 60은 명목속도에서의
+오르막 FF는 원본 -5° 이하이고 오르막 상태가 확정됐을 때 적용한다.
+원본 -5°에서 +8, -17°에서 +30이다. 기본 FF 60은 명목속도에서의
 계산값이지 실제 PWM 하한이 아니다. 실제 출력은 FF와 P, PWM 상한과 slew로 결정된다.
 후진 명령에는 전진 기준 경사 FF를 적용하지 않는다. MPU의 현재 pitch는 가속도
 기반 추정이므로 가감속·충격 영향을 받는다. 위 값은 검증된 보행 안전 기준이 아니다.
@@ -123,7 +124,7 @@ PWM 핀은 0으로 두지만 보드 전원은 유지하고 BRAKE 핀 상태를 �
 
 | 조건 | 동작·복귀 |
 |---|---|
-| 원본 pitch ≥ +30° | MCU TERRAIN_STOP 모드로 진입 당시 PWM을 3초 동안 0으로 감속. 원본 +27° 이하가 유효하게 0.5초 유지되면 해제 요청; MCU는 시작한 3초 ramp를 완료 |
+| 원본 pitch ≥ +15° | MCU TERRAIN_STOP 모드로 진입 당시 PWM을 3초 동안 0으로 감속. 원본 +12° 이하가 유효하게 0.5초 유지되면 해제 요청; MCU는 시작한 3초 ramp를 완료 |
 | MPU invalid, fault, nonfinite 또는 stale | BRAKE 명령 스트림 유지. 유효 복구 조건에서 자동 재개 |
 | 새 Hall 구간속도 >8 km/h가 2회 연속 관측 | MCU BRAKE |
 | 과속 후 새 Hall 구간속도 <7 km/h | 자동 복귀 |
@@ -230,3 +231,8 @@ Python 62개(bridge/프로토콜 36, 감독 명령 7, 경사 정책 6, 설정 �
 최종 Drive 빌드는 flash 15,230/32,256 bytes, 전역 RAM 988/2,048 bytes,
 Terrain은 flash 10,648 bytes, 전역 RAM 1,065 bytes다.
 이 검사는 실제 DDS 통신, Pi에서의 ROS 실행, USB 연결, 모터 부하 시험을 대체하지 않는다.
+
+Deployment note: nominal walking speed is 1.0 m/s; uphill target is 1.15 m/s.
+ROS forward limit is 1.15 m/s and bridge/MCU wheel limits are 10 rad/s.
+FF 60 at 1.0 m/s is an initial model requiring loaded hardware calibration.
+Deploy both ROS configuration and Drive Uno firmware together.
