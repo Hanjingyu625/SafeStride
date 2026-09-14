@@ -89,9 +89,13 @@ class VisualTftProjectTests(unittest.TestCase):
             self.assertEqual(int(actual.attrib["value"]), int(contract["default"]))
 
     def test_visualtft_lua_matches_canonical_source(self):
-        canonical = (DISPLAY / "safestride.lua").read_text(encoding="utf-8")
-        visualtft = (PROJECT / "main.lua").read_text(encoding="cp949")
+        canonical = (DISPLAY / "safestride.lua").read_text(encoding="ascii")
+        visualtft = (PROJECT / "main.lua").read_text(encoding="ascii")
         self.assertEqual(visualtft.replace("\r\n", "\n"), canonical.replace("\r\n", "\n"))
+
+        for item in ET.parse(PROJECT / "Screen1.tft").getroot():
+            for key in ("text", "text_state_up", "text_state_down"):
+                item.attrib.get(key, "").encode("ascii")
 
 
 if __name__ == "__main__":

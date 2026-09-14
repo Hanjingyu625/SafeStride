@@ -17,7 +17,7 @@ SafeStride Terrain Uno에 연결하는 절차를 설명한다.
 저장소에는 화면, Modbus 변수, Lua와 필요한 프로젝트 글꼴 리소스가 포함되어 있다.
 VisualTFT가 생성하는 `output`, `script.map` 및 SD 패키지는 재생성 가능하므로 Git에
 포함하지 않는다. 이 개발 환경에서 XML·컨트롤·레지스터·Lua 일치 검증은 수행하지만,
-실제 VisualTFT 컴파일·한글 출력·LCD 다운로드는 Windows 도구와 실물에서 확인해야 한다.
+실제 VisualTFT 컴파일·화면 출력·LCD 다운로드는 Windows 도구와 실물에서 확인해야 한다.
 
 ## 1. 전체 데이터 경로
 
@@ -140,9 +140,9 @@ VisualTFT에서 다음 네이티브 프로젝트를 연다.
 ID 17~21은 카드 배경과 하단 상태 바다. DEV 버튼은 화면 `1`, ID `11`이며
 동작·송신 데이터가 없고 Lua도 비활성화한다.
 
-한글 문구가 표시되도록 사용하는 모든 글꼴과 글리프를 VisualTFT 프로젝트에
-포함한다. Windows 가상 화면에서 `연결 대기`, `주행 가능`, `경사 확인 불가`가
-깨지지 않는지 확인한다.
+VisualTFT 기본 글꼴의 한글이 가상 화면에서 `?`로 대체되는 것을 확인했으므로 실제
+LCD 문구는 ASCII 영문으로 구성한다. UTF-8 한글 글꼴을 별도로 검증하기 전에는
+Screen 파일이나 Lua에 한글 표시 문자열을 다시 넣지 않는다.
 
 ### 4.2 Modbus RTU 설정
 
@@ -204,8 +204,8 @@ VisualTFT의 `도구 → 프로토콜 및 변수 설정`에서 다음과 같이 
 - `get_variant`
 
 스크립트는 부팅 후 2.2초에 상태 화면으로 이동한다. heartbeat가 약 1초 동안
-변하지 않거나 `ss_host_link`가 0이면 녹색 주행 상태를 지우고 `통신 끊김 / 연결 대기`를
-표시한다. 이 fail-safe 표시 동작을 삭제하지 않는다.
+변하지 않거나 `ss_host_link`가 0이면 녹색 주행 상태를 지우고
+`Link lost / waiting`을 표시한다. 이 fail-safe 표시 동작을 삭제하지 않는다.
 
 ### 4.4 가상 화면 검사
 
@@ -213,7 +213,7 @@ VisualTFT에서 프로젝트를 컴파일하고 가상 화면을 실행한다. �
 각각 확인한다.
 
 - 최초 부팅 로고와 2.2초 뒤 화면 전환
-- 레지스터 초기값일 때 `연결 대기`
+- 레지스터 초기값일 때 `Waiting for link`
 - 정상 속도와 양손 감지
 - 제동 및 위험 감지
 - 횡단보도 N/A, 대기와 진입 가능
@@ -248,8 +248,8 @@ M시리즈와 실제 16P 보드가 SD 업데이트를 지원하면 다음 절차
 5. LCD 전원을 켜고 `update finished`가 표시될 때까지 기다린다.
 6. 자동 재부팅 또는 전원 차단 후 SD 카드를 제거한다.
 
-LCD 단독 부팅에서 SafeStride 인트로, 상태 화면과 한글이 정상인지 확인한다.
-Terrain이 없으므로 상태 화면에 `통신 끊김 / 연결 대기`가 나오는 것이 정상이다.
+LCD 단독 부팅에서 SafeStride 인트로, 상태 화면과 영문 문구가 정상인지 확인한다.
+Terrain이 없으므로 상태 화면에 `Link lost / waiting`이 나오는 것이 정상이다.
 
 ## 6. Terrain 펌웨어 준비
 
@@ -338,7 +338,7 @@ PWM D10을 사용할 수 없다. Terrain Uno의 TOF-10120과 MPU6050은 A4/A5 I2
 1. 모터드라이버 12 V 전원을 분리한다.
 2. Terrain Uno와 LCD 사이 VCC가 연결되지 않았고 공통 GND만 공유하는지 확인한다.
 3. LCD 별도 5 V의 극성과 무부하 전압을 측정한다.
-4. LCD만 켜서 `통신 끊김 / 연결 대기` 화면을 확인한다.
+4. LCD만 켜서 `Link lost / waiting` 화면을 확인한다.
 5. 전원을 모두 끈다.
 6. D9→DIN/RX, D8←DOUT/TX를 연결한다.
 7. Pi와 Terrain Uno를 USB로 연결한다.
@@ -370,8 +370,8 @@ ros2 topic echo /diagnostics
 | LCD가 켜지지 않음 | 별도 5 V 극성·전압, 전원 전류 여유, 16P 케이블 방향 |
 | Windows COM 포트 없음 | USB-UART 칩과 전용 드라이버, 케이블의 데이터 지원 여부 |
 | 프로젝트 다운로드 실패 | 정확한 M시리즈 모델, COM 포트 점유, 다운로드 보드 TX/RX/GND |
-| 한글이 네모로 표시됨 | VisualTFT 글꼴에 필요한 한글 글리프 포함 여부 |
-| 계속 연결 대기 | ROS 실행, Terrain USB serial, HMI capability와 `hmi.enabled` |
+| 문구가 `?`로 표시됨 | 저장소의 ASCII 영문 프로젝트를 다시 열고 컴파일했는지 확인 |
+| 계속 `Waiting for link` | ROS 실행, Terrain USB serial, HMI capability와 `hmi.enabled` |
 | LCD ACK 없음 | TTL/RS232 단자 구분, TX/RX 교차, 공통 GND, slave ID와 19200 8N1 |
 | Modbus exception | holding register 0x0000..0x000F와 FC16 허용 여부 |
 | 값은 바뀌지만 문구가 이상함 | 변수 이름·주소·uint16 형식, Lua와 control ID |
@@ -384,9 +384,9 @@ ros2 topic echo /diagnostics
 - [ ] 저장소의 VisualTFT M series 480 × 272 프로젝트를 열고 컴파일했다.
 - [ ] Modbus slave 1, 19200 8N1, holding register 0000..000F를 설정했다.
 - [ ] `controls.csv`, `registers.csv`, `safestride.lua`를 프로젝트에 반영했다.
-- [ ] 한글과 모든 상태를 VisualTFT 가상 화면에서 확인했다.
+- [ ] 영문 문구와 모든 상태를 VisualTFT 가상 화면에서 확인했다.
 - [ ] Terrain과 분리된 LCD에 프로젝트를 다운로드했다.
-- [ ] LCD 단독 부팅에서 연결 대기 화면을 확인했다.
+- [ ] LCD 단독 부팅에서 `Link lost / waiting` 화면을 확인했다.
 - [ ] AltSoftSerial 1.4를 설치하고 Terrain 펌웨어를 컴파일했다.
 - [ ] LCD 전원은 별도 5 V이고 USB 5 V와 병렬 연결되지 않는다.
 - [ ] D9→DIN/RX, D8←DOUT/TX, 공통 GND를 전원 OFF 상태에서 연결했다.

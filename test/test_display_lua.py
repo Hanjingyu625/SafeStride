@@ -44,26 +44,26 @@ function get_variant(name) return values[string.sub(name,4)] end
 '''
         checks = '''
 on_init(); assert(screen==0)
-on_timer(0); assert(texts[3]=='? 확인 불가')
+on_timer(0); assert(texts[3]=='? UNAVAILABLE')
 for i=1,21 do values.heartbeat=i; on_timer(0) end
 assert(screen==1 and texts[1]=='1.25 km/h')
-assert(texts[3]=='O 주행 가능' and texts[5]=='진입 가능')
-assert(texts[8]=='-1.0 deg' and texts[10]=='위치: N/A')
+assert(texts[3]=='O READY' and texts[5]=='ENTRY ALLOWED')
+assert(texts[8]=='-1.0 deg' and texts[10]=='Location: N/A')
 values.flags=67; values.heartbeat=22; on_timer(0)
-assert(texts[5]=='횡단보도: 대기') -- no explicit entry permission
-values.braking=1; on_timer(0); assert(texts[3]=='X 감속 / 제동')
-values.braking=0; values.flags=65; on_timer(0); assert(texts[3]=='X 대기')
-values.flags=83; values.hazard=1; on_timer(0); assert(texts[3]=='X 위험 감지')
-values.hazard=0; values.valid=31; on_timer(0); assert(texts[3]=='? 확인 불가')
+assert(texts[5]=='WAIT AT CROSSWALK') -- no explicit entry permission
+values.braking=1; on_timer(0); assert(texts[3]=='X BRAKING')
+values.braking=0; values.flags=65; on_timer(0); assert(texts[3]=='X STANDBY')
+values.flags=83; values.hazard=1; on_timer(0); assert(texts[3]=='X HAZARD')
+values.hazard=0; values.valid=31; on_timer(0); assert(texts[3]=='? UNAVAILABLE')
 values.valid=63
 for i=1,10 do on_timer(0) end
-assert(texts[3]=='? 확인 불가' and texts[1]=='-- km/h')
-values.heartbeat=23; on_timer(0); assert(texts[3]=='O 주행 가능')
-values.host_link=0; on_timer(0); assert(texts[3]=='? 확인 불가')
+assert(texts[3]=='? UNAVAILABLE' and texts[1]=='-- km/h')
+values.heartbeat=23; on_timer(0); assert(texts[3]=='O READY')
+values.host_link=0; on_timer(0); assert(texts[3]=='? UNAVAILABLE')
 values.host_link=1; values.version=1; on_timer(0)
-assert(texts[4]=='화면 / 펌웨어 버전 확인')
+assert(texts[4]=='Display / firmware mismatch')
 values.version=2; values.pitch=nil; on_timer(0)
-assert(texts[4]=='LCD 변수 설정 확인')
+assert(texts[4]=='Check LCD variables')
 '''
         try:
             code = (setup + source + checks).encode('utf-8')
