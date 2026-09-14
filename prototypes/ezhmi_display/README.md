@@ -1,5 +1,9 @@
 # ezHMI 디스플레이 초안
 
+> 현재 운영 통합은 `firmware/terrain_mcu`, `src/safestride_bridge`,
+> `display/ezhmi` 및 [디스플레이 안내](../../docs/DISPLAY_KO.md)를 따른다.
+> 아래 코드는 역사적 v1 초안이며 운영 폴더 위에 복사하지 않는다.
+
 대상 LCD: ezHMI EZ48270M043-LE + M-LE 16P 인터페이스 보드
 
 ## 최신 UI (v2)

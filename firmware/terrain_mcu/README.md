@@ -1,5 +1,9 @@
 # Terrain Uno firmware
 
+ezHMI는 AltSoftSerial 1.4.0으로 D9(TX)→DIN, D8(RX)←DOUT에 연결한다.
+LCD의 VisualTFT 최초 구성과 배포 절차는 [디스플레이 안내](../../docs/DISPLAY_KO.md)를 따른다.
+설치: `arduino-cli lib install AltSoftSerial@1.4.0`.
+
 TOF-10120과 GY-521 MPU6050을 읽어 protocol v6 텔레메트리로 보낸다. BE-220
 GPS는 Raspberry Pi의 `gps_node`가 별도 serial 장치로 직접 수신한다.
 

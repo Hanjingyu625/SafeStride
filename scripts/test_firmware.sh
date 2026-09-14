@@ -67,6 +67,11 @@ common=(
   "${workspace}/firmware/terrain_mcu/protocol.cpp" \
   -o "${build_dir}/terrain_state_test"
 
+"${cxx}" "${common[@]}" \
+  "${workspace}/test/firmware_hmi_test.cpp" \
+  -o "${build_dir}/hmi_test"
+
+"${build_dir}/hmi_test"
 "${build_dir}/protocol_test"
 "${build_dir}/pressure_test"
 "${build_dir}/analog_hall_test"

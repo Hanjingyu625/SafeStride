@@ -14,6 +14,12 @@ SafeStride Terrain Uno에 연결하는 절차를 설명한다.
 브라우저 시뮬레이터다. VisualTFT 프로젝트 파일이 아니므로 LCD에 직접 다운로드할
 수 없다. 실제 화면, 변수와 스크립트는 이 문서에 따라 VisualTFT에서 생성한다.
 
+현재 제공물은 운영 Pi/Terrain 코드, Lua 화면 로직, CSV 설정표다. CSV는
+VisualTFT에 수동으로 반영할 명세이며 자동 import를 가정하지 않는다.
+컴파일된 VisualTFT 네이티브 프로젝트/SD 패키지는 아직 포함하지 않았다.
+이 개발 환경에서 Uno 컴파일과 ROS/Lua 로직 검증은 수행했지만, 실제 LCD의
+Lua 지원 펌웨어·프로젝트 컴파일·한글 출력·다운로드는 아직 검증하지 않았다.
+
 ## 1. 전체 데이터 경로
 
 ```text
@@ -105,7 +111,7 @@ Arduino IDE에서는 Library Manager에서 `AltSoftSerial`을 검색해 Paul Sto
 ```powershell
 arduino-cli core update-index
 arduino-cli core install arduino:avr
-arduino-cli lib install "AltSoftSerial@1.4"
+arduino-cli lib install "AltSoftSerial@1.4.0"
 arduino-cli core list
 arduino-cli lib list
 ```
@@ -173,6 +179,12 @@ VisualTFT의 `도구 → 프로토콜 및 변수 설정`에서 다음과 같이 
 주소는 VisualTFT에서 16진수로 입력한다. `ss_pitch`는 레지스터 자체는 unsigned
 16-bit로 만들고 Lua에서 2의 보수 signed 값으로 변환한다. `40001` 방식의 표시
 주소를 요구하는 도구가 있더라도 실제 Modbus PDU 시작 주소는 `0x0000`이어야 한다.
+
+모든 변수는 읽기/쓰기 허용, 배율 1, Flash 저장 비활성으로 설정한다.
+기본값은 `registers.csv`의 `default` 열을 따른다. 특히 `ss_version=2`,
+`ss_valid=0`, `ss_host_link=0`, `ss_speed/ss_seconds/ss_distance=65535`로
+초기화해야 출고·재부팅 시 예전 주행 값을 정상 상태처럼 표시하지 않는다.
+텍스트 컨트롤은 문자열 모드로 만들고 Lua가 갱신하도록 자동 숫자 바인딩을 끈다.
 
 ### 4.3 Lua 추가
 
@@ -248,6 +260,12 @@ VisualTFT 프로젝트의 slave ID, 시작 주소와 baudrate가 확정되기 �
 이 문서의 설정과 일치하는 프로젝트를 LCD에 다운로드하고 가상 화면 검사를 통과한
 뒤에만 `EZHMI_ENABLED=1`을 사용한다.
 
+운영 코드 기본값은 `1`이다. LCD 설정 전 UART 출력을 끈 빌드는 다음과 같다.
+
+```powershell
+arduino-cli compile --fqbn arduino:avr:uno --build-property compiler.cpp.extra_flags=-DEZHMI_ENABLED=0 firmware/terrain_mcu
+```
+
 Terrain Uno 업로드 예시는 다음과 같다. Windows의 실제 COM 포트로 바꾼다.
 
 ```powershell
@@ -256,6 +274,32 @@ arduino-cli upload --fqbn arduino:avr:uno --port COM5 firmware/terrain_mcu
 
 업로드 중에는 Arduino Serial Monitor와 ROS bridge가 같은 Uno serial 포트를 열고
 있으면 안 된다.
+
+### 6.1 Pi 코드 적용
+
+Git push는 Pi/Uno/LCD를 자동 업데이트하지 않는다. Pi의 작업 중인 변경을 보존하고
+최신 `pdj1`을 반영한 다음 기존 ROS 실행을 종료하고 아래처럼 빌드한다.
+Terrain 펌웨어와 Pi bridge는 함께 업데이트한다. 이미 protocol v6/schema 0x0601인
+Drive 펌웨어는 이번 디스플레이 변경 때문에 재업로드할 필요가 없다.
+
+```bash
+source /opt/ros/jazzy/setup.bash
+colcon build --symlink-install --packages-up-to safestride_bridge safestride_bringup
+source install/setup.bash
+```
+
+두 운영 YAML의 `terrain_bridge.ros__parameters.hmi` 기본값은
+`enabled=true`, `pitch_sign=-1.0`, `pitch_offset_rad=0.0`이다.
+경사 보정 변경 시 safety supervisor의 `uphill_pitch_sign`과 `pitch_offset_rad`도
+일치시킨다. `/terrain/status`의 raw pitch를 LCD relay가 한 번 보정한다.
+
+Pi는 기존 TerrainBridgeNode의 USB 연결만 사용하여 200 ms마다 32바이트
+HMI snapshot(`0x30`)을 보낸다. 별도 serial 프로세스를 실행하지 않는다.
+HMI v2 capability는 bit 11이며, bit 10의 과거 초안과 구별한다.
+Terrain은 600 ms 동안 snapshot이 없으면 데이터를 무효화하며 LCD는 자체
+heartbeat 감시로 Terrain 전원이 꺼져도 1초 내 연결 끊김을 표시한다.
+LCD 상태(`0x31`, `<BBHII`, 12 bytes)는 버전 2, ACK 유효 여부, exception code,
+누적 ACK 수, 누적 오류 수다. 센서 telemetry의 기존 payload는 유지한다.
 
 ## 7. Terrain Uno와 LCD 배선
 
@@ -343,3 +387,17 @@ ros2 topic echo /diagnostics
 - [ ] D9→DIN/RX, D8←DOUT/TX, 공통 GND를 전원 OFF 상태에서 연결했다.
 - [ ] 모터 12 V를 분리한 상태에서 ROS topic과 LCD ACK를 확인했다.
 - [ ] 마지막에만 제한된 실물 주행 시험으로 넘어간다.
+
+## 11. 코드 검증
+
+```bash
+bash scripts/test_firmware.sh
+PYTHONPATH=src/safestride_bridge python3 -m unittest discover -s src/safestride_bridge/test
+python3 -m unittest discover -s test -p test_display_lua.py
+arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
+```
+
+Lua 테스트는 system liblua5.3으로 제조사 API를 mock하여 로고 전환, 데이터
+무효화, 제동/진입 허가 문구를 검사한다. 라이브러리가 없으면 skip된다.
+ROS가 없는 환경에서는 실제 ROS 통합 테스트 2건도 skip되므로 ROS Jazzy의
+빌드된 workspace에서 검사한다. 이 테스트들은 실제 VisualTFT/LCD 검증을 대신하지 않는다.

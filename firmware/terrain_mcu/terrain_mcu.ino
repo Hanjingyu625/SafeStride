@@ -13,6 +13,13 @@
 #include "mpu6050_sensor.h"
 #include "protocol.h"
 #include "tof10120_sensor.h"
+#include "ezhmi_transport.h"
+
+safestride_hmi::State g_display;
+EzhmiTransport g_lcd;
+uint32_t g_last_display_status_ms = 0UL;
+
+void sendDisplayStatus(uint32_t now_ms);
 
 #if !defined(ARDUINO_ARCH_AVR) && !defined(SAFESTRIDE_HOST_BUILD)
 #error "Non-AVR port needs a persistent boot ID and hardware watchdog."
@@ -87,6 +94,9 @@ void sendHello() {
   uint8_t payload[proto::HELLO_PAYLOAD_SIZE];
   proto::writeU32(payload + 0U, g_boot_id);
   uint32_t capabilities = CAP_TOF10120;
+#if EZHMI_ENABLED
+  capabilities |= safestride_hmi::CAPABILITY;
+#endif
   if (cfg::ENABLE_MPU6050) {
     capabilities |= CAP_MPU6050;
   }
@@ -159,6 +169,12 @@ void processHostProtocol() {
         proto::ReceiveResult::FRAME_READY) {
       continue;
     }
+    if (frame.type == safestride_hmi::PACKET_TYPE) {
+      if (g_session_active && frame.session_id == g_session_id) {
+        g_display.accept(frame.payload, frame.payload_length, frame.sequence, millis());
+      }
+      continue;
+    }
     if (frame.type != proto::TYPE_SESSION_START ||
         frame.payload_length != proto::SESSION_START_PAYLOAD_SIZE ||
         frame.session_id == 0UL ||
@@ -169,6 +185,9 @@ void processHostProtocol() {
         proto::readU32(frame.payload + 8U) !=
             proto::FIRMWARE_RELEASE_ID) {
       continue;
+    }
+    if (!g_session_active || g_session_id != frame.session_id) {
+      g_display.newSession();
     }
     g_session_id = frame.session_id;
     g_session_active = true;
@@ -185,6 +204,7 @@ void setup() {
   Wire.begin();
   Serial.begin(cfg::SERIAL_BAUD);
   const uint32_t now_ms = millis();
+  g_lcd.begin(now_ms);
   g_tof.begin(now_ms);
   g_mpu.begin(now_ms);
   g_boot_id = makeBootId();
@@ -204,6 +224,12 @@ void loop() {
   const uint32_t now_ms = millis();
   g_tof.update(now_ms);
   g_mpu.update(now_ms);
+  g_display.tick(now_ms);
+  g_lcd.tick(now_ms, g_display);
+  if (g_session_active && now_ms - g_last_display_status_ms >= 500UL) {
+    g_last_display_status_ms = now_ms;
+    sendDisplayStatus(now_ms);
+  }
   if (now_ms - g_last_hello_ms >= cfg::HELLO_PERIOD_MS) {
     g_last_hello_ms = now_ms;
     sendHello();
@@ -213,4 +239,17 @@ void loop() {
     g_last_telemetry_ms = now_ms;
     sendTelemetry();
   }
+}
+
+void sendDisplayStatus(uint32_t now_ms) {
+#if EZHMI_ENABLED
+  uint8_t payload[12] = {2U, static_cast<uint8_t>(g_lcd.linkOk(now_ms)), 0U, 0U};
+  proto::writeU16(payload + 2U, g_lcd.exception_code);
+  proto::writeU32(payload + 4U, g_lcd.ack_count);
+  proto::writeU32(payload + 8U, g_lcd.error_count);
+  proto::sendFrame(Serial, safestride_hmi::STATUS_PACKET_TYPE, g_tx_sequence++,
+                  g_session_id, now_ms, payload, sizeof(payload));
+#else
+  (void)now_ms;
+#endif
 }

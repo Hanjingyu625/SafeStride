@@ -26,11 +26,15 @@ SZH-GNP521 하나의 OUT1/OUT2에 모터
 
 ## Terrain MCU (Terrain Uno)
 
+LCD 최초 설정 및 전원 배선은 [디스플레이 안내](../docs/DISPLAY_KO.md)를 따른다.
+
 | UNO 핀 | 연결 대상 |
 |---|---|
 | D0/D1 | 미연결, Raspberry Pi USB serial용 예약 |
 | A4 | TOF-10120 SDA, GY-521 MPU6050 SDA |
 | A5 | TOF-10120 SCL, GY-521 MPU6050 SCL |
+| D9 (TX) | ezHMI TTL DIN/RX |
+| D8 (RX) | ezHMI TTL DOUT/TX, ACK 수신 |
 | 5V | TOF-10120, GY-521 MPU6050 VCC |
 | GND | TOF-10120, GY-521 MPU6050 공통 GND |
 
