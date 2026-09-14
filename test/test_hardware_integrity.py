@@ -334,7 +334,7 @@ class TestHardwareIntegrity(unittest.TestCase):
             constant_expression(
                 self.config, "PRESSURE_LEFT_PRESENT_THRESHOLD"
             ),
-            "80.0F",
+            "40.0F",
         )
         self.assertEqual(
             constant_expression(self.config, "PRESSURE_LEFT_PIN"),
@@ -348,7 +348,7 @@ class TestHardwareIntegrity(unittest.TestCase):
             constant_expression(
                 self.config, "PRESSURE_RIGHT_PRESENT_THRESHOLD"
             ),
-            "80.0F",
+            "40.0F",
         )
         self.assertEqual(
             constant_expression(self.config, "PRESSURE_THRESHOLDS_CALIBRATED"),
