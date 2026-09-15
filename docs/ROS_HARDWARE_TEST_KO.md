@@ -9,13 +9,13 @@ arduino-cli compile --fqbn arduino:avr:uno firmware/safestride_mcu
 arduino-cli compile --fqbn arduino:avr:uno firmware/terrain_mcu
 ```
 
-두 Uno를 모두 protocol v4로 다시 업로드한다. ROS bridge와 Arduino 시리얼
+두 Uno를 모두 protocol v6로 다시 업로드한다. ROS bridge와 Arduino 시리얼
 모니터는 같은 포트를 동시에 열 수 없다.
 
 ## 2. 센서 단독 확인
 
 - 전원을 넣을 때 WSH135에서 자석을 떼어 기준값을 잡는다. 이후 왼쪽 휠
-  1회전에서 A3 Hall pulse가 정확히 6 증가하고, 자석을 센서 앞에서 흔들어도
+  1회전에서 A3 Hall pulse가 정확히 12 증가하고, 자석을 센서 앞에서 흔들어도
   자석이 빠져나가기 전에는 같은 pulse를 중복 계산하지 않는다.
 - 왼쪽 A2/오른쪽 A1을 누르면 각각 raw가 80 이상이고 양손에서 dead-man이 true다.
 - TOF 정지 기준면은 약 0.25 m이며 초기 10샘플 후 valid가 true가 된다.
@@ -60,6 +60,6 @@ disarmed 상태로 전환되어야 한다. cruise가 꺼져 있으면 장애물�
 - 두 ROS YAML과 Drive 펌웨어에서 `deadman_direct_drive=false`
 - 앞쪽을 들었을 때 `/terrain/status.pitch_rad`가 음수면
   `uphill_pitch_sign=-1.0`, 양수면 `1.0`
-- protocol v4/schema `0x0401`/release `20260826`
+- protocol v6/schema `0x0601`/release `20260908`
 - 지도/API가 없을 때 crosswalk 진단은 WARN이고 `/cmd_vel` 발행자는 아니다.
 - 시험 종료 후 `/walker/set_enabled false`와 물리 모터 전원 차단 완료

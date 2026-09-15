@@ -1,3 +1,6 @@
+// 양손 압력 센서 인터페이스. raw/filtered/difference/delta는 힘(N)이 아닌 ADC count 단위다.
+// WARNING은 좌우 불균형 또는 급변 진단이며, 양손 접촉 여부와 별도로 제공한다.
+
 #pragma once
 
 #include <Arduino.h>

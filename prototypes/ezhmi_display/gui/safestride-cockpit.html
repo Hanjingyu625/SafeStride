@@ -1,0 +1,1505 @@
+<!doctype html>
+<html lang="en" data-visualize-standalone>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Safestride Cockpit</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="Safestride Cockpit" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot; data-visualize-standalone&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;title&gt;Safestride Cockpit&lt;/title&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(
+    --background,
+    var(--color-background-primary, light-dark(rgb(255 255 255), rgb(24 24 24)))
+  ) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: var(
+    --color-background-primary,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --popover: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255), rgb(45 45 45))
+  );
+  --popover-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --primary: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --primary-foreground: var(
+    --color-text-inverse,
+    light-dark(rgb(255 255 255), rgb(13 13 13))
+  );
+  --secondary: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+  );
+  --secondary-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: var(
+    --color-text-secondary,
+    light-dark(rgb(26 28 31 / 49.4%), rgb(255 255 255 / 49.8%))
+  );
+  --accent: var(
+    --color-background-info,
+    light-dark(rgb(229 242 255), rgb(13 39 63))
+  );
+  --accent-foreground: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --destructive: var(
+    --color-text-warning,
+    light-dark(rgb(226 85 7), rgb(255 133 73))
+  );
+  --border: var(
+    --color-border-secondary,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+  --input: var(
+    --color-border-primary,
+    light-dark(
+      rgb(26 28 31 / 11.8%),
+      color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+    )
+  );
+  --ring: var(
+    --color-ring-primary,
+    light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
+  );
+  --font-size-base: var(--font-text-md-size, 14px);
+  --blue: light-dark(rgb(51 156 255), rgb(51 156 255));
+  --orange: light-dark(rgb(226 85 7), rgb(251 106 34));
+  --green: light-dark(rgb(0 162 64), rgb(64 201 119));
+  --red: light-dark(rgb(224 46 42), rgb(255 103 100));
+  --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
+  --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --icon-size: 16px;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --corner-shape: round;
+  --radius: var(--border-radius-lg, 10px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 17 17&#x27;%3E%3Cpath d=&#x27;M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z&#x27;/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  /* Preserve MCP aliases for older inline renderers without creating :root cycles. */
+  --color-background-primary: var(
+    --background,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --color-text-primary: var(
+    --foreground,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --color-border-secondary: var(
+    --border,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+
+  margin: 0;
+  padding: var(--visualize-paint-gutter, 0px);
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans) !important;
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: var(--corner-shape);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card, .progress) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+hr {
+  width: 100%;
+  height: 1px;
+  margin-block: 6px;
+  border: 0;
+  background: var(--border);
+}
+
+.nav {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.progress {
+  display: flex;
+  height: 8px;
+  margin-block: calc((var(--line-height-normal, 1.5em) - 8px) / 2);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+}
+
+.progress-bar:only-child {
+  border-radius: var(--radius-full);
+}
+
+.progress-bar {
+  height: 100%;
+  flex-shrink: 0;
+  border: 0;
+  background: var(--viz-series-1);
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.nav-link,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn,
+.nav-link {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover,
+.nav-link:not(:disabled):not([aria-disabled=&quot;true&quot;]):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.nav-pills .nav-link {
+  min-width: 0;
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.nav-justified .nav-link {
+  flex: 1 1 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.nav-pills .nav-link.active {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.btn:disabled,
+.nav-link:disabled,
+.nav-link[aria-disabled=&quot;true&quot;] {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: var(--corner-shape);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+  [aria-pressed=&quot;true&quot;],
+  [aria-selected=&quot;true&quot;],
+  .is-selected
+) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible,
+.nav-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .btn,
+  .nav-link,
+  .form-control,
+  .form-select {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Keep small-screen WebKit from zooming when a text field receives focus. */
+  .form-control,
+  .form-select {
+    font-size: max(16px, var(--font-size-normal));
+  }
+
+  .form-control[type=&quot;file&quot;]::file-selector-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .form-control-color[type=&quot;color&quot;] {
+    width: 44px;
+    height: 44px;
+  }
+
+  .form-control:is(
+    [type=&quot;date&quot;],
+    [type=&quot;datetime-local&quot;],
+    [type=&quot;month&quot;],
+    [type=&quot;time&quot;],
+    [type=&quot;week&quot;]
+  ) {
+    min-width: 0;
+    max-width: 100%;
+    padding-block: 8px;
+  }
+
+  .form-check {
+    min-height: 44px;
+    padding-inline: 15px;
+  }
+
+  .form-check-input {
+    position: relative;
+  }
+
+  .form-check-input::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    content: &quot;&quot;;
+    transform: translate(-50%, -50%);
+  }
+
+  .form-check-label {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+  }
+
+  .form-range {
+    height: 44px;
+    touch-action: pan-y;
+  }
+
+  .form-range::-webkit-slider-runnable-track {
+    height: 44px;
+  }
+
+  .form-range::-moz-range-track {
+    height: 44px;
+  }
+
+  .form-range::-webkit-slider-thumb {
+    margin-top: 12px;
+  }
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+/* Model-authored chart rules can otherwise stretch icons after these styles load. */
+svg.lucide {
+  display: block;
+  width: var(--icon-size) !important;
+  height: var(--icon-size) !important;
+  flex: none;
+  margin: 0 !important;
+  stroke-width: 1.6;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div id=&quot;ss-cockpit&quot; aria-label=&quot;SafeStride 디스플레이 UI 미리보기&quot;&gt;
+&lt;style&gt;
+#ss-cockpit{--ss-bg:#0b151e;--ss-panel:#142330;--ss-line:#283b48;--ss-text:#f0f6fa;--ss-muted:#a0b3bf;--ss-mint:#79e9c7;--ss-soft:#173f3b;--ss-amber:#ffd18a;--ss-red:#ffaaaa;font-family:&quot;Malgun Gothic&quot;,&quot;Apple SD Gothic Neo&quot;,system-ui,sans-serif;max-width:736px;width:100%;margin:auto;color:var(--ss-text);color-scheme:dark}
+#ss-cockpit *{box-sizing:border-box}
+#ss-cockpit .ss-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;font-size:12px;color:var(--ss-muted)}
+#ss-cockpit .ss-toolbar label{display:flex;align-items:center;gap:8px}
+#ss-cockpit .ss-toolbar select,#ss-cockpit .ss-toolbar button{font:inherit;font-size:13px;padding:9px 11px;border:1px solid var(--ss-line);border-radius:8px;background:var(--ss-panel);color:var(--ss-text);min-height:36px}
+#ss-cockpit .ss-demo-label{margin-left:auto;letter-spacing:.1em;font-size:11px}
+#ss-cockpit .ss-frame{container-type:inline-size;width:100%;border:1px solid var(--ss-line);border-radius:24px;background:var(--ss-bg);padding:10px;box-shadow:0 14px 35px #0002}
+#ss-cockpit .ss-lcd{position:relative;aspect-ratio:480/272;min-width:0;display:grid;grid-template-rows:17% 1fr;gap:3.1%;padding:2.2%;background:var(--ss-bg);border-radius:15px}
+#ss-cockpit .ss-header{display:flex;align-items:center;justify-content:space-between;min-height:0}
+#ss-cockpit .ss-brand{display:flex;gap:9px;align-items:center;min-width:0}
+#ss-cockpit .ss-mark{font-family:system-ui,sans-serif;font-style:italic;font-weight:700;font-size:clamp(18px,4.9cqw,36px);letter-spacing:-.14em;padding-right:.2em;color:var(--ss-mint);line-height:1}
+#ss-cockpit .ss-wordmark{font-family:system-ui,sans-serif;font-size:clamp(14px,3.2cqw,24px);font-weight:650;letter-spacing:-.045em;line-height:1}
+#ss-cockpit .ss-wordmark span{color:var(--ss-mint)}
+#ss-cockpit .ss-tagline{color:var(--ss-muted);font-size:clamp(9px,1.65cqw,12px);letter-spacing:.12em;margin-top:5px}
+#ss-cockpit .ss-dev{font:500 clamp(11px,2.3cqw,17px) system-ui,sans-serif;color:var(--ss-muted);background:var(--ss-panel);border:1px solid var(--ss-line);border-radius:7px;padding:7px 12px;letter-spacing:.05em;cursor:default;opacity:1}
+#ss-cockpit .ss-dev:before{content:&#x27;‹/›&#x27;;margin-right:7px;color:var(--ss-mint)}
+#ss-cockpit .ss-grid{display:grid;grid-template-columns:43% 1fr;grid-template-rows:56% 1fr;gap:4%;min-height:0}
+#ss-cockpit .ss-tile{background:var(--ss-panel);border:1px solid var(--ss-line);border-radius:10px;padding:4.4% 6%;min-height:0;min-width:0;display:flex;flex-direction:column;justify-content:space-between}
+#ss-cockpit .ss-title{font-size:clamp(11px,2.45cqw,18px);color:var(--ss-muted);font-weight:500;margin:0;line-height:1.25}
+#ss-cockpit .ss-speed-line{display:flex;align-items:baseline;gap:9px}
+#ss-cockpit .ss-speed{font:500 clamp(32px,10.8cqw,80px)/1 system-ui,sans-serif;letter-spacing:-.07em;font-variant-numeric:tabular-nums}
+#ss-cockpit .ss-unit{color:var(--ss-muted);font-size:clamp(11px,2.4cqw,17px)}
+#ss-cockpit .ss-caption{font-size:clamp(11px,2.05cqw,15px);line-height:1.3;color:var(--ss-muted);margin:0;overflow-wrap:anywhere}
+#ss-cockpit .ss-road-location{font-size:clamp(11px,2.5cqw,18px);line-height:1.3;color:var(--ss-text);margin:3px 0 0}
+#ss-cockpit .ss-crossrow{display:flex;align-items:center;justify-content:space-between;gap:5px}
+#ss-cockpit .ss-crossvalue{color:var(--ss-mint);font-size:clamp(14px,4.15cqw,30px);font-weight:600;line-height:1.15;letter-spacing:-.04em}
+#ss-cockpit .ss-cross-label{font-size:clamp(11px,2.1cqw,15px);color:var(--ss-muted)}
+#ss-cockpit .ss-state-line{display:flex;align-items:center;gap:8px}
+#ss-cockpit .ss-symbol{width:clamp(24px,6.2cqw,45px);height:clamp(24px,6.2cqw,45px);display:grid;place-items:center;border-radius:50%;background:var(--ss-soft);color:var(--ss-mint);font:600 clamp(18px,4.2cqw,30px)/1 system-ui,sans-serif;flex-shrink:0}
+#ss-cockpit .ss-state,#ss-cockpit .ss-slope-name{font-size:clamp(13px,3.6cqw,26px);font-weight:600;line-height:1.15;letter-spacing:-.04em}
+#ss-cockpit .ss-slope-line{display:flex;align-items:baseline;justify-content:space-between;gap:4px}
+#ss-cockpit .ss-angle{font:500 clamp(14px,4cqw,28px)/1 system-ui,sans-serif;color:var(--ss-mint);font-variant-numeric:tabular-nums}
+#ss-cockpit [data-tone=&quot;warning&quot;] .ss-state,#ss-cockpit [data-tone=&quot;warning&quot;] .ss-slope-name,#ss-cockpit [data-tone=&quot;warning&quot;] .ss-crossvalue,#ss-cockpit [data-tone=&quot;warning&quot;] .ss-angle{color:var(--ss-amber)}
+#ss-cockpit [data-tone=&quot;danger&quot;] .ss-state,#ss-cockpit [data-tone=&quot;danger&quot;] .ss-slope-name,#ss-cockpit [data-tone=&quot;danger&quot;] .ss-crossvalue,#ss-cockpit [data-tone=&quot;danger&quot;] .ss-angle{color:var(--ss-red)}
+#ss-cockpit [data-tone=&quot;danger&quot;] .ss-symbol{background:#582d37;color:var(--ss-red)}
+#ss-cockpit [data-tone=&quot;warning&quot;] .ss-symbol{background:#4a3a27;color:var(--ss-amber)}
+#ss-cockpit .ss-splash{position:absolute;inset:0;background:var(--ss-bg);border-radius:15px;z-index:2;display:grid;place-items:center;text-align:center}
+#ss-cockpit .ss-splash[hidden]{display:none}
+#ss-cockpit .ss-splash .ss-mark{font-size:12cqw;margin-bottom:18px}
+#ss-cockpit .ss-splash .ss-wordmark{font-size:7cqw}
+#ss-cockpit .ss-splash .ss-caption{margin-top:16px;letter-spacing:.1em}
+#ss-cockpit .ss-screenreader{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@media(max-width:390px){#ss-cockpit .ss-frame{padding:5px;border-radius:17px}#ss-cockpit .ss-lcd{aspect-ratio:auto;min-height:330px;grid-template-rows:40px 1fr;gap:10px}#ss-cockpit .ss-tagline{display:none}#ss-cockpit .ss-grid{gap:8px;grid-template-rows:54% 1fr}#ss-cockpit .ss-tile{padding:9px}#ss-cockpit .ss-dev{padding:7px}#ss-cockpit .ss-state-line{gap:5px}#ss-cockpit .ss-crossrow{align-items:flex-start;flex-direction:column}#ss-cockpit .ss-demo-label{margin-left:0}}
+&lt;/style&gt;
+&lt;div class=&quot;ss-toolbar&quot;&gt;
+  &lt;label&gt;화면 상태 &lt;select id=&quot;ss-scenario&quot; aria-label=&quot;화면 상태&quot;&gt;
+    &lt;option value=&quot;normal&quot;&gt;정상 주행&lt;/option&gt;&lt;option value=&quot;hands&quot;&gt;손잡이 놓음&lt;/option&gt;
+    &lt;option value=&quot;cross&quot;&gt;횡단보도 · 진입 가능&lt;/option&gt;&lt;option value=&quot;wait&quot;&gt;횡단보도 · 대기&lt;/option&gt;
+    &lt;option value=&quot;obstacle&quot;&gt;전방 장애물&lt;/option&gt;&lt;option value=&quot;up&quot;&gt;오르막&lt;/option&gt;
+    &lt;option value=&quot;down&quot;&gt;내리막&lt;/option&gt;&lt;option value=&quot;steep&quot;&gt;급경사 · 정지&lt;/option&gt;
+    &lt;option value=&quot;lost&quot;&gt;데이터 수신 끊김&lt;/option&gt;
+  &lt;/select&gt;&lt;/label&gt;
+  &lt;button type=&quot;button&quot; id=&quot;ss-power&quot; aria-pressed=&quot;true&quot;&gt;전원 OFF&lt;/button&gt;
+  &lt;span class=&quot;ss-demo-label&quot;&gt;UI PREVIEW · 예시 데이터&lt;/span&gt;
+&lt;/div&gt;
+&lt;div class=&quot;ss-frame&quot;&gt;
+ &lt;div class=&quot;ss-lcd&quot; aria-label=&quot;480 × 272 SafeStride LCD&quot;&gt;
+  &lt;header class=&quot;ss-header&quot;&gt;
+   &lt;div class=&quot;ss-brand&quot;&gt;&lt;span class=&quot;ss-mark&quot; aria-hidden=&quot;true&quot;&gt;S/&lt;/span&gt;&lt;div&gt;&lt;div class=&quot;ss-wordmark&quot;&gt;Safe&lt;span&gt;Stride&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;ss-tagline&quot;&gt;CONFIDENCE IN EVERY STEP&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
+   &lt;button type=&quot;button&quot; class=&quot;ss-dev&quot; disabled aria-label=&quot;DEV 모드, 추후 지원 예정&quot;&gt;DEV 모드&lt;/button&gt;
+  &lt;/header&gt;
+  &lt;div class=&quot;ss-grid&quot;&gt;
+   &lt;section class=&quot;ss-tile&quot; aria-label=&quot;속도&quot;&gt;&lt;h2 class=&quot;ss-title&quot;&gt;현재 속도&lt;/h2&gt;&lt;div class=&quot;ss-speed-line&quot;&gt;&lt;span class=&quot;ss-speed&quot; id=&quot;ss-speed&quot;&gt;0.8&lt;/span&gt;&lt;span class=&quot;ss-unit&quot;&gt;km/h&lt;/span&gt;&lt;/div&gt;&lt;p class=&quot;ss-caption&quot; id=&quot;ss-speed-note&quot;&gt;양쪽 손잡이 감지됨&lt;/p&gt;&lt;/section&gt;
+   &lt;section class=&quot;ss-tile&quot; id=&quot;ss-road&quot; aria-label=&quot;도로 상황&quot;&gt;&lt;h2 class=&quot;ss-title&quot;&gt;도로 상황&lt;/h2&gt;&lt;div class=&quot;ss-road-location&quot; id=&quot;ss-location&quot;&gt;서울시 광진구&lt;/div&gt;&lt;div class=&quot;ss-crossrow&quot;&gt;&lt;span class=&quot;ss-cross-label&quot;&gt;횡단보도&lt;/span&gt;&lt;span class=&quot;ss-crossvalue&quot; id=&quot;ss-cross&quot;&gt;N/A&lt;/span&gt;&lt;/div&gt;&lt;p class=&quot;ss-caption&quot; id=&quot;ss-road-note&quot;&gt;주변에 감지된 횡단보도가 없어요&lt;/p&gt;&lt;/section&gt;
+   &lt;section class=&quot;ss-tile&quot; id=&quot;ss-drive&quot; aria-label=&quot;주행 여부&quot;&gt;&lt;h2 class=&quot;ss-title&quot;&gt;주행 여부&lt;/h2&gt;&lt;div class=&quot;ss-state-line&quot;&gt;&lt;span class=&quot;ss-symbol&quot; id=&quot;ss-symbol&quot;&gt;O&lt;/span&gt;&lt;span class=&quot;ss-state&quot; id=&quot;ss-drive-state&quot;&gt;주행 가능&lt;/span&gt;&lt;/div&gt;&lt;p class=&quot;ss-caption&quot; id=&quot;ss-drive-note&quot;&gt;양쪽 손잡이를 유지하세요&lt;/p&gt;&lt;/section&gt;
+   &lt;section class=&quot;ss-tile&quot; id=&quot;ss-slope&quot; aria-label=&quot;경사 정보&quot;&gt;&lt;h2 class=&quot;ss-title&quot;&gt;경사 정보&lt;/h2&gt;&lt;div class=&quot;ss-slope-line&quot;&gt;&lt;span class=&quot;ss-slope-name&quot; id=&quot;ss-slope-name&quot;&gt;평지&lt;/span&gt;&lt;span class=&quot;ss-angle&quot; id=&quot;ss-angle&quot;&gt;+0.8°&lt;/span&gt;&lt;/div&gt;&lt;p class=&quot;ss-caption&quot; id=&quot;ss-slope-note&quot;&gt;완만한 지면입니다&lt;/p&gt;&lt;/section&gt;
+  &lt;/div&gt;
+  &lt;div class=&quot;ss-splash&quot; id=&quot;ss-splash&quot; hidden&gt;&lt;div id=&quot;ss-intro&quot;&gt;&lt;div class=&quot;ss-mark&quot; aria-hidden=&quot;true&quot;&gt;S/&lt;/div&gt;&lt;div class=&quot;ss-wordmark&quot;&gt;Safe&lt;span&gt;Stride&lt;/span&gt;&lt;/div&gt;&lt;p class=&quot;ss-caption&quot;&gt;당신의 한 걸음에, 안심을 더하다&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;
+ &lt;/div&gt;
+&lt;/div&gt;
+&lt;div class=&quot;ss-screenreader&quot; id=&quot;ss-announcement&quot; aria-live=&quot;polite&quot;&gt;&lt;/div&gt;
+&lt;script&gt;
+(() =&gt; {
+ const root=document.getElementById(&#x27;ss-cockpit&#x27;);
+ const get=id=&gt;root.querySelector(&#x27;#ss-&#x27;+id);
+ const presets={
+  normal:{},
+  hands:{speed:&#x27;0.0&#x27;,speedNote:&#x27;손잡이 미감지&#x27;,symbol:&#x27;X&#x27;,drive:&#x27;주행 대기&#x27;,driveNote:&#x27;양쪽 손잡이를 더 세게 잡으세요&#x27;,driveTone:&#x27;warning&#x27;},
+  cross:{speed:&#x27;0.5&#x27;,cross:&#x27;진입 가능&#x27;,roadNote:&#x27;보행 신호를 직접 확인하세요&#x27;,roadTone:&#x27;normal&#x27;},
+  wait:{speed:&#x27;0.0&#x27;,cross:&#x27;대기하세요&#x27;,roadNote:&#x27;횡단보도 앞에서 기다려 주세요&#x27;,roadTone:&#x27;warning&#x27;,symbol:&#x27;X&#x27;,drive:&#x27;주행 대기&#x27;,driveNote:&#x27;횡단보도 진입 대기 중&#x27;,driveTone:&#x27;warning&#x27;},
+  obstacle:{speed:&#x27;0.0&#x27;,symbol:&#x27;X&#x27;,drive:&#x27;정지&#x27;,driveNote:&#x27;앞에 장애물이 있습니다&#x27;,driveTone:&#x27;danger&#x27;},
+  up:{speed:&#x27;0.6&#x27;,slope:&#x27;오르막&#x27;,angle:&#x27;+6.2°&#x27;,slopeNote:&#x27;오르막입니다 · 천천히 이동하세요&#x27;,slopeTone:&#x27;warning&#x27;},
+  down:{speed:&#x27;0.4&#x27;,slope:&#x27;내리막&#x27;,angle:&#x27;−5.8°&#x27;,slopeNote:&#x27;내리막입니다 · 속도에 주의하세요&#x27;,slopeTone:&#x27;warning&#x27;},
+  steep:{speed:&#x27;0.0&#x27;,symbol:&#x27;X&#x27;,drive:&#x27;정지&#x27;,driveNote:&#x27;급격한 경사입니다&#x27;,driveTone:&#x27;danger&#x27;,slope:&#x27;급경사&#x27;,angle:&#x27;−14.2°&#x27;,slopeNote:&#x27;이동을 멈추고 지면을 확인하세요&#x27;,slopeTone:&#x27;danger&#x27;},
+  lost:{speed:&#x27;--&#x27;,speedNote:&#x27;속도 데이터 확인 불가&#x27;,location:&#x27;위치 확인 불가&#x27;,cross:&#x27;N/A&#x27;,roadNote:&#x27;도로 정보 수신을 기다리는 중&#x27;,roadTone:&#x27;warning&#x27;,symbol:&#x27;?&#x27;,drive:&#x27;확인 불가&#x27;,driveNote:&#x27;주행 상태를 수신하지 못했습니다&#x27;,driveTone:&#x27;warning&#x27;,slope:&#x27;확인 불가&#x27;,angle:&#x27;--°&#x27;,slopeNote:&#x27;센서 연결을 확인하세요&#x27;,slopeTone:&#x27;warning&#x27;}
+ };
+ let on=true,booting=false,timer=null;
+ const design={appearance:&#x27;Midnight&#x27;};
+ const palettes={Midnight:[&#x27;#0b151e&#x27;,&#x27;#142330&#x27;,&#x27;#283b48&#x27;,&#x27;#f0f6fa&#x27;,&#x27;#a0b3bf&#x27;,&#x27;#79e9c7&#x27;,&#x27;#173f3b&#x27;,&#x27;#ffd18a&#x27;,&#x27;#ffaaaa&#x27;],Daylight:[&#x27;#eef3f4&#x27;,&#x27;#ffffff&#x27;,&#x27;#d8e2e4&#x27;,&#x27;#142c34&#x27;,&#x27;#516b73&#x27;,&#x27;#08765d&#x27;,&#x27;#d9f4e9&#x27;,&#x27;#8b5100&#x27;,&#x27;#ad293d&#x27;]};
+ function render(){
+  const p=palettes[design.appearance];[&#x27;bg&#x27;,&#x27;panel&#x27;,&#x27;line&#x27;,&#x27;text&#x27;,&#x27;muted&#x27;,&#x27;mint&#x27;,&#x27;soft&#x27;,&#x27;amber&#x27;,&#x27;red&#x27;].forEach((key,i)=&gt;root.style.setProperty(&#x27;--ss-&#x27;+key,p[i]));
+  root.style.colorScheme=design.appearance===&#x27;Daylight&#x27;?&#x27;light&#x27;:&#x27;dark&#x27;;
+  const s=Object.assign({speed:&#x27;0.8&#x27;,speedNote:&#x27;양쪽 손잡이 감지됨&#x27;,location:&#x27;서울시 광진구&#x27;,cross:&#x27;N/A&#x27;,roadNote:&#x27;주변에 감지된 횡단보도가 없어요&#x27;,roadTone:&#x27;normal&#x27;,symbol:&#x27;O&#x27;,drive:&#x27;주행 가능&#x27;,driveNote:&#x27;양쪽 손잡이를 유지하세요&#x27;,driveTone:&#x27;normal&#x27;,slope:&#x27;평지&#x27;,angle:&#x27;+0.8°&#x27;,slopeNote:&#x27;완만한 지면입니다&#x27;,slopeTone:&#x27;normal&#x27;},presets[get(&#x27;scenario&#x27;).value]);
+  const ids={speed:s.speed,&#x27;speed-note&#x27;:s.speedNote,location:s.location,cross:s.cross,&#x27;road-note&#x27;:s.roadNote,symbol:s.symbol,&#x27;drive-state&#x27;:s.drive,&#x27;drive-note&#x27;:s.driveNote,&#x27;slope-name&#x27;:s.slope,angle:s.angle,&#x27;slope-note&#x27;:s.slopeNote};
+  Object.entries(ids).forEach(([id,text])=&gt;get(id).textContent=text);
+  [&#x27;road&#x27;,&#x27;drive&#x27;,&#x27;slope&#x27;].forEach(id=&gt;get(id).dataset.tone=s[id+&#x27;Tone&#x27;]);
+  get(&#x27;splash&#x27;).hidden=on&amp;&amp;!booting;get(&#x27;intro&#x27;).hidden=!on;
+  root.querySelector(&#x27;.ss-header&#x27;).style.visibility=on&amp;&amp;!booting?&#x27;visible&#x27;:&#x27;hidden&#x27;;
+  root.querySelector(&#x27;.ss-grid&#x27;).style.visibility=on&amp;&amp;!booting?&#x27;visible&#x27;:&#x27;hidden&#x27;;
+  get(&#x27;power&#x27;).textContent=on?&#x27;전원 OFF&#x27;:&#x27;전원 ON&#x27;;get(&#x27;power&#x27;).setAttribute(&#x27;aria-pressed&#x27;,String(on));
+  get(&#x27;scenario&#x27;).disabled=!on||booting;
+  get(&#x27;announcement&#x27;).textContent=!on?&#x27;전원 꺼짐&#x27;:booting?&#x27;SafeStride 시작 화면&#x27;:s.drive+&#x27;, &#x27;+s.slope+&#x27;, 횡단보도 &#x27;+s.cross;
+ }
+ get(&#x27;power&#x27;).addEventListener(&#x27;click&#x27;,()=&gt;{clearTimeout(timer);on=!on;booting=on;render();if(on)timer=setTimeout(()=&gt;{booting=false;render()},2200)});
+ get(&#x27;scenario&#x27;).addEventListener(&#x27;change&#x27;,render);
+ render();
+ if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:render});tweak.addSelect(design,&#x27;appearance&#x27;,{label:&#x27;화면 테마&#x27;,options:[&#x27;Midnight&#x27;,&#x27;Daylight&#x27;]});}
+})();
+&lt;/script&gt;
+&lt;/div&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+  let lastPointerWasTouch = false;
+  let pinnedByTouch = false;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    pinnedByTouch = false;
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handlePointer = (event) =&gt; {
+    lastPointerWasTouch =
+      event.type === &quot;pointerdown&quot; &amp;&amp; event.pointerType === &quot;touch&quot;;
+  };
+  const handleTouchClick = (event) =&gt; {
+    const isTouch = event.pointerType === &quot;touch&quot; || lastPointerWasTouch;
+    lastPointerWasTouch = false;
+    if (!isTouch || event.detail === 0) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (
+      trigger == null ||
+      !trigger.isConnected ||
+      getContent(trigger).length === 0 ||
+      (pinnedByTouch &amp;&amp; activeTrigger === trigger)
+    ) {
+      if (pinnedByTouch) {
+        closeTooltip();
+      }
+      return;
+    }
+    openTooltip(trigger);
+    pinnedByTouch = activeTrigger === trigger;
+    window.setTimeout(() =&gt; {
+      if (activeTrigger === trigger &amp;&amp; !trigger.isConnected) {
+        closeTooltip(false);
+      }
+    }, 0);
+  };
+  const handleLeave = (event) =&gt; {
+    if (pinnedByTouch) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    lastPointerWasTouch = false;
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    lastPointerWasTouch = false;
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerdown&quot;, handlePointer);
+    document.removeEventListener(&quot;pointercancel&quot;, handlePointer);
+    document.removeEventListener(&quot;click&quot;, handleTouchClick);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerdown&quot;, handlePointer);
+  document.addEventListener(&quot;pointercancel&quot;, handlePointer);
+  document.addEventListener(&quot;click&quot;, handleTouchClick);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-tabs&quot;&gt;
+(() =&gt; {
+  const selector = &#x27;.nav[role=&quot;tablist&quot;] [role=&quot;tab&quot;]&#x27;;
+  const disabled = &#x27;:disabled,[aria-disabled=&quot;true&quot;]&#x27;;
+  const selectTab = (selected) =&gt; {
+    const panelId = selected.getAttribute(&quot;aria-controls&quot;);
+    for (const tab of selected.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;)) {
+      const active = tab === selected;
+      tab.classList.toggle(&quot;active&quot;, active);
+      tab.setAttribute(&quot;aria-selected&quot;, String(active));
+      const id = tab.getAttribute(&quot;aria-controls&quot;);
+      const panel = id &amp;&amp; document.getElementById(id);
+      if (panel != null) {
+        panel.hidden = id !== panelId;
+        if (!panel.hidden &amp;&amp; selected.id) {
+          panel.setAttribute(&quot;aria-labelledby&quot;, selected.id);
+        }
+      }
+    }
+  };
+  const interact = (event) =&gt; {
+    const tab = event.target?.closest?.(selector);
+    if (event.defaultPrevented || tab == null || tab.matches(disabled)) {
+      return;
+    }
+    if (event.type === &quot;click&quot;) {
+      selectTab(tab);
+      return;
+    }
+    const tabs = Array.from(
+      tab.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;),
+    ).filter((candidate) =&gt; !candidate.matches(disabled));
+    const current = tabs.indexOf(tab);
+    let next;
+    if (event.key === &quot;ArrowRight&quot; || event.key === &quot;ArrowDown&quot;) {
+      next = (current + 1) % tabs.length;
+    } else if (event.key === &quot;ArrowLeft&quot; || event.key === &quot;ArrowUp&quot;) {
+      next = (current + tabs.length - 1) % tabs.length;
+    } else if (event.key === &quot;Home&quot;) {
+      next = 0;
+    } else if (event.key === &quot;End&quot;) {
+      next = tabs.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    tabs[next].focus();
+    selectTab(tabs[next]);
+  };
+
+  for (const list of document.querySelectorAll(&#x27;.nav[role=&quot;tablist&quot;]&#x27;)) {
+    const selected =
+      list.querySelector(&#x27;[role=&quot;tab&quot;][aria-selected=&quot;true&quot;]&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;].active&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;]&#x27;);
+    if (selected != null) {
+      selectTab(selected);
+    }
+  }
+  document.addEventListener(&quot;click&quot;, interact);
+  document.addEventListener(&quot;keydown&quot;, interact);
+  window.addEventListener(&quot;pagehide&quot;, () =&gt; {
+    document.removeEventListener(&quot;click&quot;, interact);
+    document.removeEventListener(&quot;keydown&quot;, interact);
+  }, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+</body>
+</html>

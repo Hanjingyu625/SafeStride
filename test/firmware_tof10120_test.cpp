@@ -9,7 +9,7 @@ TwoWire Wire;
 
 namespace {
 uint32_t g_now_ms = 0UL;
-uint16_t g_distance_mm = 250U;
+uint16_t g_distance_mm = 625U;
 uint8_t g_wire_byte_index = 0U;
 
 void sample(Tof10120Sensor& tof, uint16_t distance, int count = 1) {
@@ -21,9 +21,10 @@ void sample(Tof10120Sensor& tof, uint16_t distance, int count = 1) {
 }
 
 void establishBaseline(Tof10120Sensor& tof) {
+  g_distance_mm = 625U;
   tof.begin(g_now_ms);
   tof.update(g_now_ms);
-  sample(tof, 250U, 9);
+  sample(tof, 625U, 9);
   assert(tof.valid());
   assert(tof.alert() == TofAlert::NORMAL);
 }
@@ -71,8 +72,8 @@ int main() {
     Tof10120Sensor tof;
     establishBaseline(tof);
     // One raw spike must decay without reaching the four-frame decision.
-    sample(tof, 650U);
-    sample(tof, 250U, 4);
+    sample(tof, 1500U);
+    sample(tof, 625U, 4);
     assert(tof.alert() != TofAlert::DROP);
     assert(tof.alert() != TofAlert::RAISED);
   }
@@ -81,7 +82,7 @@ int main() {
     Tof10120Sensor tof;
     g_distance_mm = 250U;
     establishBaseline(tof);
-    sample(tof, 650U, 6);
+    sample(tof, 1000U, 20);
     assert(tof.alert() == TofAlert::DROP);
   }
 
@@ -89,14 +90,33 @@ int main() {
     Tof10120Sensor tof;
     g_distance_mm = 250U;
     establishBaseline(tof);
-    sample(tof, 120U, 8);
+    sample(tof, 250U, 20);
     assert(tof.alert() == TofAlert::RAISED);
-    sample(tof, 250U, 10);
+    sample(tof, 625U, 10);
     assert(tof.alert() == TofAlert::RAISED);
-    sample(tof, 250U, 25);
+    sample(tof, 625U, 25);
     assert(tof.alert() == TofAlert::NORMAL);
   }
 
-  printf("firmware TOF-10120 adaptive hazard tests: OK\n");
+  {
+    Tof10120Sensor tof;
+    establishBaseline(tof);
+    sample(tof, 900U, 100);  // less than 25 cm, never a confirmed drop
+    assert(tof.alert() == TofAlert::NORMAL);
+    // A gradual approach must not be adapted away or require a sharp edge.
+    for (uint16_t mm = 900; mm <= 1000; ++mm) sample(tof, mm);
+    sample(tof, 1000U, 20);
+    assert(tof.alert() == TofAlert::DROP);
+    sample(tof, 0xFFFFU);
+    assert(!tof.valid() && tof.alert() == TofAlert::INVALID);
+  }
+  {
+    Tof10120Sensor tof;
+    g_distance_mm = 250U;  // power up facing an obstacle
+    tof.begin(g_now_ms);
+    sample(tof, 250U, 30);
+    assert(tof.alert() == TofAlert::RAISED);
+  }
+  printf("firmware TOF-10120 fixed geometry hazard tests: OK\n");
   return 0;
 }

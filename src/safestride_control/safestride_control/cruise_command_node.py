@@ -12,7 +12,7 @@ class CruiseCommandNode(Node):
 
     def __init__(self) -> None:
         super().__init__('cruise_command')
-        self.declare_parameter('speed_mps', 0.08)
+        self.declare_parameter('speed_mps', 1.0)
         self.declare_parameter('publish_rate_hz', 20.0)
         self.declare_parameter('command_topic', '/cmd_vel')
         self.declare_parameter('frame_id', 'base_link')

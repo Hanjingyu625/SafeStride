@@ -446,6 +446,10 @@ class GpsNode(Node):
                 key='raw_speed_mps',
                 value=self._format_float(self._last_raw_speed),
             ),
+            KeyValue(key='raw_speed_kmh',
+                     value=self._format_float(self._last_raw_speed * 3.6)),
+            KeyValue(key='filtered_speed_kmh',
+                     value=self._format_float(self._last_filtered_speed * 3.6)),
             KeyValue(
                 key='filtered_speed_mps',
                 value=self._format_float(self._last_filtered_speed),

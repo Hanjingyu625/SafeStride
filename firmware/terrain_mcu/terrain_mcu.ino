@@ -1,3 +1,6 @@
+// Terrain Uno 진입점: ToF 거리와 MPU 자세를 읽어 Pi에 전송한다. 모터를 직접 제어하지 않는다.
+// Pi가 여기서 받은 pitch/유효성으로 경사 제한과 BRAKE를 결정하여 Drive Uno로 보낸다.
+
 #include <Arduino.h>
 #include <Wire.h>
 
@@ -10,6 +13,13 @@
 #include "mpu6050_sensor.h"
 #include "protocol.h"
 #include "tof10120_sensor.h"
+#include "ezhmi_transport.h"
+
+safestride_hmi::State g_display;
+EzhmiTransport g_lcd;
+uint32_t g_last_display_status_ms = 0UL;
+
+void sendDisplayStatus(uint32_t now_ms);
 
 #if !defined(ARDUINO_ARCH_AVR) && !defined(SAFESTRIDE_HOST_BUILD)
 #error "Non-AVR port needs a persistent boot ID and hardware watchdog."
@@ -33,6 +43,7 @@ uint16_t g_tx_sequence = 0U;
 uint32_t g_last_hello_ms = 0UL;
 uint32_t g_last_telemetry_ms = 0UL;
 
+// 재부팅마다 바뀌는 식별자로 이전 부팅의 세션 시작 요청을 걸러낸다.
 uint32_t makeBootId() {
   uint32_t value = 0UL;
 #if defined(ARDUINO_ARCH_AVR)
@@ -78,10 +89,14 @@ int16_t roundedSigned16(float value) {
       value >= 0.0F ? value + 0.5F : value - 0.5F);
 }
 
+// Terrain 역할과 ToF/MPU 지원 여부를 Pi에 알린다.
 void sendHello() {
   uint8_t payload[proto::HELLO_PAYLOAD_SIZE];
   proto::writeU32(payload + 0U, g_boot_id);
   uint32_t capabilities = CAP_TOF10120;
+#if EZHMI_ENABLED
+  capabilities |= safestride_hmi::CAPABILITY;
+#endif
   if (cfg::ENABLE_MPU6050) {
     capabilities |= CAP_MPU6050;
   }
@@ -100,6 +115,8 @@ void sendHello() {
       sizeof(payload));
 }
 
+// 거리(mm), 가속도(mg), 자이로(mrad/s), 자세(mrad), 유효성/고장을 고정 offset으로 보낸다.
+// 31~44 바이트는 예약 영역으로 0을 유지하며 GPS는 Pi가 직접 수집한다.
 void sendTelemetry() {
   if (!g_session_active) {
     return;
@@ -140,6 +157,7 @@ void sendTelemetry() {
       sizeof(payload));
 }
 
+// 현재 부팅 ID와 보드 역할/규약이 맞는 SESSION_START만 수락한다. 주행 명령은 여기서 처리하지 않는다.
 void processHostProtocol() {
   proto::FrameView frame = {0U, 0U, 0U, 0U, 0UL, 0UL, NULL};
   while (Serial.available() > 0) {
@@ -149,6 +167,12 @@ void processHostProtocol() {
     }
     if (g_receiver.push(static_cast<uint8_t>(incoming), frame) !=
         proto::ReceiveResult::FRAME_READY) {
+      continue;
+    }
+    if (frame.type == safestride_hmi::PACKET_TYPE) {
+      if (g_session_active && frame.session_id == g_session_id) {
+        g_display.accept(frame.payload, frame.payload_length, frame.sequence, millis());
+      }
       continue;
     }
     if (frame.type != proto::TYPE_SESSION_START ||
@@ -162,12 +186,16 @@ void processHostProtocol() {
             proto::FIRMWARE_RELEASE_ID) {
       continue;
     }
+    if (!g_session_active || g_session_id != frame.session_id) {
+      g_display.newSession();
+    }
     g_session_id = frame.session_id;
     g_session_active = true;
     g_last_telemetry_ms = millis() - cfg::TELEMETRY_PERIOD_MS;
   }
 }
 
+// I2C/직렬과 센서를 초기화하고 AVR의 500ms 하드웨어 watchdog을 켠다.
 void setup() {
 #if defined(ARDUINO_ARCH_AVR)
   MCUSR = 0U;
@@ -176,6 +204,7 @@ void setup() {
   Wire.begin();
   Serial.begin(cfg::SERIAL_BAUD);
   const uint32_t now_ms = millis();
+  g_lcd.begin(now_ms);
   g_tof.begin(now_ms);
   g_mpu.begin(now_ms);
   g_boot_id = makeBootId();
@@ -186,6 +215,7 @@ void setup() {
 #endif
 }
 
+// 통신 처리와 주기별 센서 갱신을 반복한다. 센서 오류/무효 정보도 Pi가 판단하도록 전송한다.
 void loop() {
 #if defined(ARDUINO_ARCH_AVR)
   wdt_reset();
@@ -194,6 +224,12 @@ void loop() {
   const uint32_t now_ms = millis();
   g_tof.update(now_ms);
   g_mpu.update(now_ms);
+  g_display.tick(now_ms);
+  g_lcd.tick(now_ms, g_display);
+  if (g_session_active && now_ms - g_last_display_status_ms >= 500UL) {
+    g_last_display_status_ms = now_ms;
+    sendDisplayStatus(now_ms);
+  }
   if (now_ms - g_last_hello_ms >= cfg::HELLO_PERIOD_MS) {
     g_last_hello_ms = now_ms;
     sendHello();
@@ -203,4 +239,17 @@ void loop() {
     g_last_telemetry_ms = now_ms;
     sendTelemetry();
   }
+}
+
+void sendDisplayStatus(uint32_t now_ms) {
+#if EZHMI_ENABLED
+  uint8_t payload[12] = {2U, static_cast<uint8_t>(g_lcd.linkOk(now_ms)), 0U, 0U};
+  proto::writeU16(payload + 2U, g_lcd.exception_code);
+  proto::writeU32(payload + 4U, g_lcd.ack_count);
+  proto::writeU32(payload + 8U, g_lcd.error_count);
+  proto::sendFrame(Serial, safestride_hmi::STATUS_PACKET_TYPE, g_tx_sequence++,
+                  g_session_id, now_ms, payload, sizeof(payload));
+#else
+  (void)now_ms;
+#endif
 }

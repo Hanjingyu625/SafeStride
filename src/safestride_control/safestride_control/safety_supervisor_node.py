@@ -17,12 +17,15 @@ from rclpy.qos import (
 from sensor_msgs.msg import Range
 
 from safestride_interfaces.msg import (
+    DriveCommand,
     SurfaceCondition,
     TerrainStatus,
     WalkerStatus,
 )
 from .safety_logic import (
     SlopeSpeedPolicy,
+    SlopeBrakePolicy,
+    slope_feedforward_pwm,
     combine_speed_scales,
     finite_parameter,
 )
@@ -50,11 +53,31 @@ class SafetySupervisor(Node):
         self.declare_parameter('range_timeout', 0.35)
         self.declare_parameter('surface_timeout', 2.5)
         self.declare_parameter('require_range_sensors', False)
+        self.declare_parameter('terrain_stop_enabled', True)
+        self._terrain_stopping = False
+        self._terrain_stop_started = 0.0
+        self._terrain_clear_since = None
+        self._terrain_note = ''
         self.declare_parameter('require_surface_condition', False)
         self.declare_parameter('require_deadman', True)
         self.declare_parameter('slope_control_enabled', True)
+        self.declare_parameter('surface_control_enabled', False)
+        self.declare_parameter('drive_command_topic', '/drive/command')
+        self.declare_parameter('brake_enter_deg', 15.0)
+        self.declare_parameter('brake_release_deg', 12.0)
+        self.declare_parameter('brake_recovery_s', 0.5)
+        self.declare_parameter('drive_pwm_cap', 100)
+        self._surface_control_enabled = bool(self.get_parameter('surface_control_enabled').value)
+        self._brake_policy = SlopeBrakePolicy(
+            self.get_parameter('brake_enter_deg').value,
+            self.get_parameter('brake_release_deg').value,
+            self.get_parameter('brake_recovery_s').value)
+        self._drive_pwm_cap = int(finite_parameter('drive_pwm_cap',
+            self.get_parameter('drive_pwm_cap').value, minimum=0.0, maximum=100.0))
+        self._slope_braking = False
+        self._slope_ff_pwm = 0
 
-        self.declare_parameter('max_forward_velocity', 0.15)
+        self.declare_parameter('max_forward_velocity', 1.15)
         self.declare_parameter('max_reverse_velocity', 0.08)
         self.declare_parameter('max_angular_velocity', 0.35)
         self.declare_parameter('max_surface_speed_scale', 1.25)
@@ -65,10 +88,10 @@ class SafetySupervisor(Node):
         self.declare_parameter('slope_enter_angle_rad', math.radians(5.0))
         self.declare_parameter('slope_exit_angle_rad', math.radians(3.0))
         self.declare_parameter('slope_confirmation_time_s', 0.50)
-        self.declare_parameter('uphill_pitch_sign', 1.0)
+        self.declare_parameter('uphill_pitch_sign', -1.0)
         self.declare_parameter('pitch_offset_rad', 0.0)
-        self.declare_parameter('downhill_speed_scale', 0.60)
-        self.declare_parameter('uphill_speed_scale', 1.25)
+        self.declare_parameter('downhill_speed_scale', 1.0)
+        self.declare_parameter('uphill_speed_scale', 1.15)
         self.declare_parameter('max_combined_speed_scale', 1.25)
 
         self.declare_parameter('stop_distance', 0.35)
@@ -353,6 +376,8 @@ class SafetySupervisor(Node):
             qos_profile_sensor_data,
         )
 
+        self._drive_publisher = self.create_publisher(
+            DriveCommand, str(self.get_parameter('drive_command_topic').value), 10)
         self._command_publisher = self.create_publisher(
             TwistStamped,
             str(self.get_parameter('safe_command_topic').value),
@@ -494,42 +519,43 @@ class SafetySupervisor(Node):
         return []
 
     def _terrain_reasons(self, now: float) -> List[str]:
-        # The Terrain bridge may remain active for MPU slope assistance when
-        # the downward TOF is intentionally excluded from motor interlocks.
-        if not self._require_ranges:
+        # Invalid measurements report diagnostics only; they neither initiate
+        # a stop nor prove that a previously confirmed hazard has disappeared.
+        if not self.get_parameter('terrain_stop_enabled').value:
+            self._terrain_stopping = False
+            self._terrain_note = ''
             return []
-        if self._last_terrain is None:
-            return ['terrain_status_missing']
-        if self._age(now, self._last_terrain_time) > self._range_timeout:
-            return ['terrain_status_stale']
-
         terrain = self._last_terrain
-        reasons: List[str] = []
-        telemetry_age = float(terrain.telemetry_age)
-        if (
-            not math.isfinite(telemetry_age)
-            or telemetry_age < 0.0
-            or telemetry_age > self._max_telemetry_age
-        ):
-            reasons.append('terrain_telemetry_stale')
-        if (
-            not terrain.tof_valid
-            or terrain.tof_alert == TerrainStatus.TOF_INVALID
-        ):
-            reasons.append('terrain_tof_invalid')
-        elif terrain.tof_alert == TerrainStatus.TOF_RAISED:
-            reasons.append('terrain_raised_obstacle')
-        elif terrain.tof_alert == TerrainStatus.TOF_DROP:
-            reasons.append('terrain_drop')
-        elif terrain.tof_alert not in (
-            TerrainStatus.TOF_NORMAL,
-            TerrainStatus.TOF_CANDIDATE_RAISED,
-            TerrainStatus.TOF_CANDIDATE_DROP,
-        ):
-            reasons.append('terrain_alert_invalid')
-        if terrain.fault_bits & TerrainStatus.FAULT_TOF_INVALID:
-            reasons.append('terrain_tof_fault')
-        return reasons
+        age = float(terrain.telemetry_age) if terrain is not None else math.inf
+        valid = (
+            terrain is not None and self._last_terrain_time is not None
+            and math.isfinite(age) and age >= 0.0
+            and 0.0 <= self._age(now, self._last_terrain_time) <= self._range_timeout
+            and age + self._age(now, self._last_terrain_time) <= self._max_telemetry_age
+            and terrain.tof_valid
+            and terrain.tof_alert in (TerrainStatus.TOF_NORMAL,
+                TerrainStatus.TOF_CANDIDATE_RAISED, TerrainStatus.TOF_CANDIDATE_DROP,
+                TerrainStatus.TOF_RAISED, TerrainStatus.TOF_DROP)
+            and not (terrain.fault_bits & TerrainStatus.FAULT_TOF_INVALID)
+        )
+        self._terrain_note = '' if valid else 'terrain_tof_unavailable'
+        if valid and terrain.tof_alert in (TerrainStatus.TOF_RAISED, TerrainStatus.TOF_DROP):
+            if not self._terrain_stopping:
+                self._terrain_stop_started = now
+            self._terrain_stopping = True
+            self._terrain_clear_since = None
+        elif valid and terrain.tof_alert == TerrainStatus.TOF_NORMAL:
+            if self._terrain_clear_since is None:
+                self._terrain_clear_since = now
+            if (now - self._terrain_clear_since >= 0.5
+                    and now - self._terrain_stop_started >= 3.1):
+                self._terrain_stopping = False
+        else:
+            self._terrain_clear_since = None
+        # TODO(display): show warning while _terrain_stopping; use
+        # /terrain/status and /diagnostics. A single oblique beam cannot locate
+        # the edge at 40/15 cm, so confirmed hazards start the ramp immediately.
+        return []
 
     def _slope_state(
         self, now: float
@@ -542,6 +568,10 @@ class SafetySupervisor(Node):
         sample_valid = bool(
             terrain is not None
             and self._age(now, self._last_terrain_time)
+            <= self._range_timeout
+            and math.isfinite(float(terrain.telemetry_age))
+            and float(terrain.telemetry_age) >= 0.0
+            and 0.0 <= float(terrain.telemetry_age) + self._age(now, self._last_terrain_time)
             <= self._range_timeout
             and terrain.mpu_valid
             and not (
@@ -601,6 +631,8 @@ class SafetySupervisor(Node):
     def _surface_state(
         self, now: float
     ) -> Tuple[List[str], float, int, float]:
+        if not self._surface_control_enabled:
+            return [], 1.0, SurfaceCondition.UNKNOWN, math.nan
         if self._last_surface is None:
             reasons = ['surface_missing'] if self._require_surface else []
             return reasons, 1.0, SurfaceCondition.UNKNOWN, math.nan
@@ -724,6 +756,7 @@ class SafetySupervisor(Node):
         if (
             slope_state == SlopeSpeedPolicy.DOWNHILL
             and requested_linear > 0.0
+            and slope_scale < 1.0
         ):
             notes.append('downhill_slowdown')
         elif (
@@ -758,6 +791,12 @@ class SafetySupervisor(Node):
         ) = self._surface_state(now)
         hard_stop_reasons.extend(surface_reasons)
         slope_scale, slope_state, normalized_pitch = self._slope_state(now)
+        self._slope_braking = self._brake_policy.update(
+            normalized_pitch, now, self._slope_control_enabled)
+        self._slope_ff_pwm = slope_feedforward_pwm(normalized_pitch, slope_state)
+        if (self._slope_ff_pwm > 0 and normalized_pitch <
+                float(self.get_parameter('slope_enter_angle_rad').value)):
+            self._slope_ff_pwm = 0
         combined_speed_scale = combine_speed_scales(
             surface_scale,
             slope_scale,
@@ -806,6 +845,16 @@ class SafetySupervisor(Node):
                     dt,
                 )
 
+        if self._slope_braking:
+            self._output_linear = self._output_angular = 0.0
+            operating_notes.append('slope_ramp_stop' if math.isfinite(normalized_pitch) else 'imu_brake')
+
+        if self._terrain_note:
+            operating_notes.append(self._terrain_note)
+        if self._terrain_stopping:
+            self._output_linear = self._output_angular = 0.0
+            operating_notes.append('terrain_hazard_ramp_or_brake')
+
         # Keep forwarding a valid supervised command while DISARMED so the
         # automatic bridge can activate the controller as soon as the
         # physical dead-man input is active. Other invalid or stale inputs
@@ -822,6 +871,22 @@ class SafetySupervisor(Node):
             output.twist.linear.x = self._output_linear
             output.twist.angular.z = self._output_angular
             self._command_publisher.publish(output)
+            drive = DriveCommand()
+            drive.header = output.header
+            drive.target_linear_m_s = self._output_linear
+            drive.target_speed_kmh = self._output_linear * 3.6
+            drive.drive_pwm_cap = self._drive_pwm_cap
+            drive.mode = DriveCommand.BRAKE if (
+                (self._slope_braking and not math.isfinite(normalized_pitch)) or motion_stop_reasons or
+                'obstacle_stop' in operating_notes or 'surface_stop' in operating_notes
+            ) else DriveCommand.DRIVE
+            # Valid downhill angles use the MCU's existing three-second PWM ramp.
+            if (self._terrain_stopping or self._slope_braking) and drive.mode == DriveCommand.DRIVE:
+                drive.mode = DriveCommand.TERRAIN_STOP
+            drive.slope_ff_pwm = self._slope_ff_pwm if (
+                drive.mode == DriveCommand.DRIVE and self._output_linear > 0.0
+            ) else 0
+            self._drive_publisher.publish(drive)
         self._command_output_suppressed = not may_stream_command
 
         all_reasons = hard_stop_reasons + operating_notes
@@ -905,6 +970,29 @@ class SafetySupervisor(Node):
         diagnostic.message = ', '.join(all_reasons) if all_reasons else 'ready'
         status = self._last_status
         diagnostic.values = [
+            KeyValue(key='brake_enter_deg', value=str(self._brake_policy.enter)),
+            KeyValue(key='brake_release_deg', value=str(self._brake_policy.release)),
+            KeyValue(key='uphill_pitch_sign', value=str(self.get_parameter('uphill_pitch_sign').value)),
+            KeyValue(key='raw_pitch_deg', value=str(
+                math.degrees(self._last_terrain.pitch_rad) if self._last_terrain else math.nan)),
+            KeyValue(key='drive_mode', value='BRAKE' if (
+                (self._slope_braking and not math.isfinite(normalized_pitch))
+                or any(reason != 'disarmed' for reason in hard_stop_reasons)
+                or 'obstacle_stop' in operating_notes or 'surface_stop' in operating_notes)
+                else ('TERRAIN_STOP' if self._terrain_stopping or self._slope_braking else 'DRIVE')),
+            KeyValue(key='slope_ff_pwm', value=str(self._slope_ff_pwm)),
+            KeyValue(key='surface_control_enabled', value=_bool_text(self._surface_control_enabled)),
+            KeyValue(key='slope_restart_latched', value='false'),
+            KeyValue(key='ff_pwm', value=str(status.ff_pwm if status else 0)),
+            KeyValue(key='feedback_pwm', value=str(status.feedback_pwm if status else 0)),
+            KeyValue(key='applied_pwm', value=str(status.applied_pwm if status else 0)),
+            KeyValue(key='speed_valid', value=_bool_text(bool(status and status.speed_valid))),
+            KeyValue(key='speed_age_s', value=str(status.speed_age if status else math.inf)),
+            KeyValue(key='direction_valid', value='false'),
+            KeyValue(key='measured_speed_m_s', value=str(status.measured_speed_m_s if status else math.nan)),
+            KeyValue(key='measured_speed_kmh', value=str(status.measured_speed_m_s * 3.6 if status else math.nan)),
+            KeyValue(key='output_speed_kmh', value=str(self._output_linear * 3.6)),
+            KeyValue(key='mcu_braking', value=_bool_text(bool(status and status.braking))),
             KeyValue(
                 key='motion_inhibited',
                 value=_bool_text(bool(hard_stop_reasons)),

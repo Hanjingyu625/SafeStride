@@ -30,7 +30,7 @@ REQUIRED_TOPICS = {
     "/handle/pressure",
     "/terrain/status",
     "/gps/fix",
-    "/gps/speed",
+    "/gps/speed_kmh",
     "/crosswalk/status",
     "/perception/surface_condition",
     "/camera/image/compressed",
@@ -40,7 +40,7 @@ REQUIRED_TOPICS = {
 REQUIRED_EXPRESSIONS = {
     "/walker/status.state",
     "/walker/status.deadman",
-    "/wheel/hall.left_velocity_rad_s.@mul(0.115)",
+    "/wheel/hall.left_speed_kmh",
     "/handle/pressure.left_filtered",
     "/handle/pressure.right_filtered",
     "/terrain/status.tof_filtered_m",
@@ -49,7 +49,7 @@ REQUIRED_EXPRESSIONS = {
     "/terrain/status.tof_change_m",
     "/terrain/status.pitch_rad.@degrees",
     "/terrain/status.roll_rad.@degrees",
-    "/gps/speed.data",
+    "/gps/speed_kmh.data",
     "/crosswalk/status.state",
     "/perception/surface_condition.classification",
 }
@@ -111,7 +111,7 @@ class TestFoxgloveLayout(unittest.TestCase):
 
         self.assertIn('SAFESTRIDE_WHEEL_RADIUS_M:-0.115', run_script)
         self.assertIn(
-            "/wheel/hall.left_velocity_rad_s.@mul(0.115)",
+            "/wheel/hall.left_speed_kmh",
             configured_expressions(self.layout),
         )
         self.assertIn("PRESSURE_LEFT_PRESENT_THRESHOLD = 80.0F", drive_config)

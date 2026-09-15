@@ -1,3 +1,7 @@
+// Drive Uno 진입점: Pi 명령 수신 → 양손/통신/고장 조건 확인 → 모터 제어 → 상태 송신.
+// 처음 읽을 때 setup(), loop(), handleCommand(), runControlLoop() 순서로 확인한다.
+// 목표속도와 경사 보정은 Pi가 정하고, 실제 PWM 계산과 즉시 정지는 이 보드가 수행한다.
+
 #include <Arduino.h>
 
 #if defined(ARDUINO_ARCH_AVR)
@@ -54,6 +58,11 @@ AnalogHallSensor g_hall;
 ControllerState g_state = ControllerState::BOOT;
 uint16_t g_fault_bits = 0U;
 bool g_watchdog_timed_out = false;
+int16_t g_slope_ff_pwm = 0;
+uint8_t g_drive_pwm_cap = cfg::MAX_PWM;
+bool g_brake_requested = false;
+bool g_terrain_stop_requested = false;
+bool g_new_pulse_since_telemetry = false;
 bool g_valid_command_seen = false;
 bool g_session_active = false;
 bool g_session_offer_active = false;
@@ -77,6 +86,7 @@ uint32_t g_last_control_us = 0UL;
 uint32_t g_last_telemetry_ms = 0UL;
 uint32_t g_last_hello_ms = 0UL;
 
+// unsigned 뺄셈으로 millis() 카운터가 한 바퀴 돌아도 짧은 경과시간을 계산한다.
 uint32_t elapsedMs(uint32_t now, uint32_t then) {
   return now - then;
 }
@@ -103,6 +113,7 @@ bool driverFaultActive() {
              cfg::DRIVER_FAULT_ACTIVE_LEVEL;
 }
 
+// 실제 Hall은 왼쪽 하나뿐이다. 오른쪽 필드는 호환성을 위한 복제값이므로 독립 측정이 아니다.
 void readHallSamples(
     uint32_t now_us,
     HallSample& left,
@@ -115,6 +126,7 @@ void readHallSamples(
   right = left;
 }
 
+// EEPROM 부팅 카운터로 재부팅 전후를 구분한다. 이전 부팅에 대한 세션 요청을 거부하기 위한 식별자다.
 uint32_t makeBootId() {
   uint32_t value = 0UL;
 #if defined(ARDUINO_ARCH_AVR)
@@ -146,6 +158,7 @@ uint32_t makeBootId() {
   return value;
 }
 
+// 목표와 손 해제 ramp를 지우고 즉시 BRAKE 출력으로 전환한다. 정상 PWM slew를 기다리지 않는다.
 void immediateStop(ControllerState state, bool watchdog_timeout) {
   g_requested_mrad_s = 0L;
   g_deadman_release_ramp_active = false;
@@ -155,6 +168,7 @@ void immediateStop(ControllerState state, bool watchdog_timeout) {
   g_drive.disableImmediately();
 }
 
+// 현재 적용 목표를 600ms 내 0으로 내릴 감속률을 계산한다. 모터 모듈은 직전 실제 PWM도 함께 줄인다.
 void beginDeadmanReleaseRamp() {
   const int32_t applied_target = g_drive.appliedTargetMradS();
   const uint32_t magnitude = static_cast<uint32_t>(
@@ -195,6 +209,7 @@ void invalidateSessionForWatchdog() {
   g_last_hello_ms = millis() - cfg::HELLO_PERIOD_MS;
 }
 
+// 물리 입력 우선 처리: E-stop/드라이버 고장은 즉시 정지, 정상 손 해제는 별도 감속 경로로 보낸다.
 void refreshPhysicalSafety() {
   if (estopActive()) {
     if (g_state != ControllerState::ESTOP) {
@@ -299,6 +314,7 @@ int16_t readCurrentMa(uint8_t pin) {
       current_ma >= 0.0F ? current_ma + 0.5F : current_ma - 0.5F);
 }
 
+// 보드 역할/기능/부팅 ID/규약 버전을 알려 Pi가 맞는 보드와 세션을 만들게 한다.
 void sendHello() {
   uint8_t payload[proto::HELLO_PAYLOAD_SIZE];
   uint32_t capabilities = CAP_SINGLE_LEFT_HALL | CAP_DEADMAN |
@@ -336,6 +352,7 @@ void sendHello() {
   }
 }
 
+// 고정 offset에 상태를 직렬화한다. 위치는 펄스 수, 속도는 mrad/s, speed age는 us이다.
 void sendTelemetry() {
   if (!g_session_active) {
     return;
@@ -379,15 +396,23 @@ void sendTelemetry() {
   }
   payload[40U] = pressure_flags;
   payload[41U] = static_cast<uint8_t>(g_pressure.alert());
+  proto::writeI16(payload + 42U, g_drive.feedforwardPwm());
+  proto::writeI16(payload + 44U, g_drive.feedbackPwm());
+  proto::writeI16(payload + 46U, g_drive.appliedPwm());
+  proto::writeU32(payload + 48U, g_drive.speedAgeUs());
+  payload[52U] = (g_drive.speedValid() ? 1U : 0U) | (g_new_pulse_since_telemetry ? 2U : 0U);
+  payload[53U] = g_drive.braking() ? 1U : 0U;
 
-  proto::sendFrame(
+  if (proto::sendFrame(
       Serial,
       proto::TYPE_TELEMETRY,
       g_tx_sequence++,
       g_session_id,
       millis(),
       payload,
-      sizeof(payload));
+      sizeof(payload))) {
+    g_new_pulse_since_telemetry = false;
+  }
 }
 
 bool stationaryDwellMet() {
@@ -396,6 +421,7 @@ bool stationaryDwellMet() {
              cfg::ARM_STATIONARY_DWELL_MS;
 }
 
+// 검증을 통과한 새 명령만 watchdog 시각을 갱신한다. 수신 바이트가 있다는 이유만으로 갱신하지 않는다.
 void markAcceptedCommand(
     const safestride_protocol::FrameView& frame,
     uint16_t ttl_ms) {
@@ -408,6 +434,7 @@ void markAcceptedCommand(
   g_last_session_activity_ms = g_last_valid_command_ms;
 }
 
+// 현재 부팅/보드 역할/규약과 일치하는 세션만 수락하며, 연결만으로 모터를 켜지는 않는다.
 bool handleSessionStart(
     const safestride_protocol::FrameView& frame) {
   if (g_session_active || !g_session_offer_active ||
@@ -443,6 +470,8 @@ bool handleSessionStart(
   return true;
 }
 
+// 세션 → 순번 → 값 범위 → 물리 조건 → 상태 순서로 명령을 검사한다.
+// 목표(mrad/s), TTL(ms), 경사 FF(count), 상한(count), mode를 하나의 명령으로 적용한다.
 bool handleCommand(const safestride_protocol::FrameView& frame) {
   if (!g_session_active || frame.session_id != g_session_id ||
       frame.payload_length != proto::COMMAND_PAYLOAD_SIZE) {
@@ -458,6 +487,11 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   const uint16_t ttl_ms = proto::readU16(frame.payload + 4U);
   const uint8_t enable = frame.payload[6U];
   const uint8_t reserved = frame.payload[7U];
+  const int16_t slope_ff = static_cast<int16_t>(proto::readU16(frame.payload + 8U));
+  const uint8_t pwm_cap = frame.payload[10U];
+  const uint8_t mode = frame.payload[11U];
+  if (slope_ff < -60 || slope_ff > 30 || pwm_cap > cfg::MAX_PWM || mode > 2U ||
+      (mode != 0U && (target != 0L || slope_ff != 0))) return false;
   if ((enable != 0U && enable != 1U) || reserved != 0U) {
     return false;
   }
@@ -518,12 +552,16 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   }
 
   if (g_state == ControllerState::DISARMED) {
-    if (!cfg::MAGNET_BENCH_MODE && !cfg::DEADMAN_DIRECT_DRIVE &&
+    if (mode == 0U && !cfg::MAGNET_BENCH_MODE && !cfg::DEADMAN_DIRECT_DRIVE &&
         !stationaryDwellMet()) {
       return false;
     }
     markAcceptedCommand(frame, ttl_ms);
     g_state = ControllerState::ARMED;
+    g_slope_ff_pwm = slope_ff;
+    g_drive_pwm_cap = pwm_cap;
+    g_brake_requested = mode == 1U;
+    g_terrain_stop_requested = mode == 2U;
     g_requested_mrad_s = target;
     return true;
   }
@@ -532,6 +570,10 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
     return false;
   }
   markAcceptedCommand(frame, ttl_ms);
+  g_slope_ff_pwm = slope_ff;
+  g_drive_pwm_cap = pwm_cap;
+  g_brake_requested = mode == 1U;
+  g_terrain_stop_requested = mode == 2U;
   g_requested_mrad_s = target;
   return true;
 }
@@ -558,6 +600,7 @@ void processSerial() {
   }
 }
 
+// 명령 유효기간(TTL) 초과와 세션 활동 중단을 감시한다. ARMED에서 TTL 초과 시 세션도 무효화한다.
 void enforceWatchdogs(uint32_t now_ms) {
   if (g_session_active &&
       elapsedMs(now_ms, g_last_session_activity_ms) >
@@ -573,6 +616,8 @@ void enforceWatchdogs(uint32_t now_ms) {
   }
 }
 
+// 최소 5ms(200Hz) 간격으로 실행하되 실제 경과시간으로 ramp를 계산한다.
+// 계산 주기가 빠르더라도 Hall의 새 속도 측정은 자석이 통과할 때만 생긴다.
 void runControlLoop(uint32_t now_us) {
   const uint32_t elapsed_us = now_us - g_last_control_us;
   if (elapsed_us < cfg::CONTROL_PERIOD_US) {
@@ -611,8 +656,13 @@ void runControlLoop(uint32_t now_us) {
         g_deadman_release_ramp_active
             ? g_deadman_release_decel_mrad_s2
             : cfg::MAX_DECEL_MRAD_S2,
-        g_deadman_release_ramp_active);
+        g_deadman_release_ramp_active,
+        g_slope_ff_pwm,
+        g_drive_pwm_cap,
+        g_brake_requested,
+        g_terrain_stop_requested);
   }
+  g_new_pulse_since_telemetry |= g_drive.newPulse();
   const uint8_t hall_faults = g_drive.hallFaultMask();
   if (hall_faults != 0U) {
     if ((hall_faults & DriveController::HALL_FAULT_LEFT) != 0U) {
@@ -632,6 +682,7 @@ void runControlLoop(uint32_t now_us) {
 
   const int32_t left_speed = g_drive.leftVelocityMradS();
   const int32_t right_speed = g_drive.rightVelocityMradS();
+  // 필터 속도와 초기화 상태로 ARM 대기 조건을 판단한다. 방향 검증이나 물리적 정지의 직접 증명은 아니다.
   const bool stationary =
       g_drive.feedbackReady() &&
       left_speed >= -cfg::ARM_MAX_MEASURED_SPEED_MRAD_S &&
@@ -648,6 +699,7 @@ void runControlLoop(uint32_t now_us) {
   }
 }
 
+// 전원을 넣으면 모터 출력을 먼저 정지 상태로 만든 뒤 센서/통신과 하드웨어 watchdog을 초기화한다.
 void setup() {
 #if defined(ARDUINO_ARCH_AVR)
   // Avoid a watchdog-reset loop before enabling the configured timeout below.
@@ -682,6 +734,8 @@ void setup() {
 #endif
 }
 
+// 안전 입력/기한 확인 → 명령 수신 → 제어 → telemetry 순서.
+// 버퍼의 늦은 명령이 이미 지난 watchdog 기한을 덮어쓰지 않도록 수신 전에 검사한다.
 void loop() {
 #if defined(ARDUINO_ARCH_AVR)
   wdt_reset();

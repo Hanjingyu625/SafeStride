@@ -1,12 +1,15 @@
+// Pi와 MCU가 공유하는 바이너리 통신 규약. 상세 바이트 배치는 저장소 루트 PROTOCOL.md 참조.
+// 버전/스키마/릴리스 및 payload 크기는 Pi와 두 보드가 맞아야 한다.
+
 #pragma once
 
 #include <Arduino.h>
 
 namespace safestride_protocol {
 
-constexpr uint8_t VERSION = 4U;
-constexpr uint16_t SCHEMA_ID = 0x0401U;
-constexpr uint32_t FIRMWARE_RELEASE_ID = 20260826UL;
+constexpr uint8_t VERSION = 6U;
+constexpr uint16_t SCHEMA_ID = 0x0601U;
+constexpr uint32_t FIRMWARE_RELEASE_ID = 20260908UL;
 constexpr uint8_t BOARD_ROLE_DRIVE = 1U;
 constexpr uint8_t BOARD_ROLE_TERRAIN = 2U;
 constexpr uint8_t TYPE_HELLO = 0x01U;
@@ -22,8 +25,8 @@ constexpr size_t MAX_ENCODED_FRAME_SIZE = 160U;
 
 constexpr size_t HELLO_PAYLOAD_SIZE = 16U;
 constexpr size_t SESSION_START_PAYLOAD_SIZE = 12U;
-constexpr size_t COMMAND_PAYLOAD_SIZE = 8U;
-constexpr size_t TELEMETRY_PAYLOAD_SIZE = 42U;
+constexpr size_t COMMAND_PAYLOAD_SIZE = 12U;
+constexpr size_t TELEMETRY_PAYLOAD_SIZE = 54U;
 constexpr size_t TERRAIN_TELEMETRY_PAYLOAD_SIZE = 45U;
 
 enum class ReceiveResult : uint8_t {
@@ -33,6 +36,7 @@ enum class ReceiveResult : uint8_t {
   CRC_ERROR,
 };
 
+// payload는 수신기 내부 버퍼를 가리키는 뷰다. 다음 프레임 해석 전에 처리하거나 필요한 값을 복사한다.
 struct FrameView {
   uint8_t type;
   uint8_t flags;
@@ -43,6 +47,7 @@ struct FrameView {
   const uint8_t* payload;
 };
 
+// 고정 크기 버퍼를 사용한다. push()가 FRAME_READY일 때만 FrameView 내용을 사용한다.
 class FrameReceiver {
  public:
   FrameReceiver();

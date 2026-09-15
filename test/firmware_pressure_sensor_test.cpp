@@ -76,6 +76,7 @@ int main() {
   // Two consecutive low samples confirm release.
   assert(!pressure.bothHandsPresent());
   assert(pressure.alert() == PressureAlert::HANDS_OFF);
+  assert(pressure.leftFiltered() == 0.0F);
 
   // The low-pass filter remains above the presence threshold after release.
   // It must not re-arm the channel while the live ADC value remains low.
@@ -96,6 +97,23 @@ int main() {
   assert(pressure.leftFiltered() > cfg::PRESSURE_LEFT_PRESENT_THRESHOLD);
   assert(pressure.leftPresent());
   assert(pressure.bothHandsPresent());
+
+  // A light grip now activates both channels, while low readings release.
+  g_left_raw = g_right_raw = 45;
+  PressureSensorPair light;
+  light.begin(g_now_ms);
+  assert(light.bothHandsPresent());
+  g_left_raw = g_right_raw = 35;
+  g_now_ms += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  light.update(g_now_ms);
+  assert(light.bothHandsPresent());
+  g_now_ms += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  light.update(g_now_ms);
+  assert(!light.leftPresent() && !light.rightPresent());
+  g_left_raw = g_right_raw = 0;
+  g_now_ms += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+  light.update(g_now_ms);
+  assert(!light.bothHandsPresent());
 
   printf("firmware pressure-sensor tests: OK\n");
   return 0;

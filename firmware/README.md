@@ -19,18 +19,22 @@ USB serial용으로 예약하고 다른 장치를 연결하지 않는다.
 
 압력센서는 각각 FSR과 330 Ω 저항으로 분압회로를 구성하며, 운영
 임계값은 좌우 모두 ADC 80이다. WSH135는 왼쪽 휠에만 설치되어
-있고 무자계 아날로그 기준값과 히스테리시스로 회전당 6 pulse를 센다.
+있고 무자계 아날로그 기준값과 히스테리시스로 회전당 12 pulse를 센다.
 SZH-GNP521 하나의 OUT1/OUT2에 모터
 두 개가 같은 출력으로 연결되며, 드라이버의 5VO는 Uno에 연결하지
 않는다.
 
 ## Terrain MCU (Terrain Uno)
 
+LCD 최초 설정 및 전원 배선은 [디스플레이 안내](../docs/DISPLAY_KO.md)를 따른다.
+
 | UNO 핀 | 연결 대상 |
 |---|---|
 | D0/D1 | 미연결, Raspberry Pi USB serial용 예약 |
 | A4 | TOF-10120 SDA, GY-521 MPU6050 SDA |
 | A5 | TOF-10120 SCL, GY-521 MPU6050 SCL |
+| D9 (TX) | ezHMI TTL DIN/RX |
+| D8 (RX) | ezHMI TTL DOUT/TX, ACK 수신 |
 | 5V | TOF-10120, GY-521 MPU6050 VCC |
 | GND | TOF-10120, GY-521 MPU6050 공통 GND |
 

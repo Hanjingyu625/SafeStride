@@ -20,6 +20,7 @@ float32 signal_remaining_s
 float32 required_entry_s
 float32 crossing_eta_s
 float32 target_speed_mps
+float32 target_speed_kmh
 string command_mode
 string reason
 string intersection_id

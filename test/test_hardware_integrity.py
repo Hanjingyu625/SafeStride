@@ -170,7 +170,7 @@ class TestHardwareIntegrity(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn(
-            "if not self._require_ranges:\n            return []",
+            "if not self.get_parameter('terrain_stop_enabled').value:",
             supervisor,
         )
         self.assertIn("require_terrain_tof", launch)
@@ -218,7 +218,9 @@ class TestHardwareIntegrity(unittest.TestCase):
             self.assertIn("require_hall_calibration: false", text)
             self.assertIn("timeout_s: 0.50", text)
             self.assertIn("slope_control_enabled: true", text)
-            self.assertIn("uphill_pitch_sign: 1.0", text)
+            self.assertIn("uphill_pitch_sign: -1.0", text)
+            self.assertIn("pitch_offset_rad: 0.0", text)
+            self.assertIn("brake_enter_deg: 15.0", text)
         self.assertNotIn("_enabled_requested", self.bridge)
         self.assertNotIn("_arm_confirmed", self.bridge)
         self.assertNotIn("_clear_enable_request", self.bridge)
@@ -282,13 +284,13 @@ class TestHardwareIntegrity(unittest.TestCase):
 
     def test_protocol_compatibility_constants_are_synchronized(self):
         for protocol in (self.drive_protocol, self.terrain_protocol):
-            self.assertEqual(constant_expression(protocol, "VERSION"), "4U")
+            self.assertEqual(constant_expression(protocol, "VERSION"), "6U")
             self.assertEqual(
-                constant_expression(protocol, "SCHEMA_ID"), "0x0401U"
+                constant_expression(protocol, "SCHEMA_ID"), "0x0601U"
             )
             self.assertEqual(
                 constant_expression(protocol, "FIRMWARE_RELEASE_ID"),
-                "20260826UL",
+                "20260908UL",
             )
             self.assertEqual(
                 constant_expression(protocol, "HELLO_PAYLOAD_SIZE"),
@@ -298,10 +300,10 @@ class TestHardwareIntegrity(unittest.TestCase):
                 constant_expression(protocol, "SESSION_START_PAYLOAD_SIZE"),
                 "12U",
             )
-        self.assertIn("PROTOCOL_VERSION = 4", self.python_protocol)
-        self.assertIn("PROTOCOL_SCHEMA_ID = 0x0401", self.python_protocol)
+        self.assertIn("PROTOCOL_VERSION = 6", self.python_protocol)
+        self.assertIn("PROTOCOL_SCHEMA_ID = 0x0601", self.python_protocol)
         self.assertIn(
-            "FIRMWARE_RELEASE_ID = 20260826", self.python_protocol
+            "FIRMWARE_RELEASE_ID = 20260908", self.python_protocol
         )
 
     def test_calibrated_single_left_hall_and_pressure(self):
@@ -320,11 +322,11 @@ class TestHardwareIntegrity(unittest.TestCase):
         self.assertNotIn("attachInterrupt(", self.drive)
         self.assertEqual(
             constant_expression(self.config, "HALL_PULSES_PER_WHEEL_REV"),
-            "6UL",
+            "12UL",
         )
         for path in ROS_CONFIGS:
             text = path.read_text(encoding="utf-8")
-            self.assertRegex(text, r"hall_pulses_per_revolution:\s*6\b")
+            self.assertRegex(text, r"hall_pulses_per_revolution:\s*12\b")
         self.assertEqual(
             constant_expression(self.config, "HALL_CALIBRATED"), "true"
         )
@@ -332,7 +334,7 @@ class TestHardwareIntegrity(unittest.TestCase):
             constant_expression(
                 self.config, "PRESSURE_LEFT_PRESENT_THRESHOLD"
             ),
-            "80.0F",
+            "40.0F",
         )
         self.assertEqual(
             constant_expression(self.config, "PRESSURE_LEFT_PIN"),
@@ -346,7 +348,7 @@ class TestHardwareIntegrity(unittest.TestCase):
             constant_expression(
                 self.config, "PRESSURE_RIGHT_PRESENT_THRESHOLD"
             ),
-            "80.0F",
+            "40.0F",
         )
         self.assertEqual(
             constant_expression(self.config, "PRESSURE_THRESHOLDS_CALIBRATED"),

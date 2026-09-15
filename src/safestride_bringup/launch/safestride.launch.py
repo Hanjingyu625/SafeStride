@@ -195,6 +195,12 @@ def generate_launch_description() -> LaunchDescription:
                 parameters=[config_file],
             ),
             Node(
+                package='safestride_control',
+                executable='speed_display',
+                name='speed_display',
+                output='screen',
+            ),
+            Node(
                 package='safestride_bridge',
                 executable='serial_bridge_node',
                 name='serial_bridge',

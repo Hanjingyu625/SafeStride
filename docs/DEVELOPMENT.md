@@ -8,6 +8,16 @@ The production target is Raspberry Pi 4 running 64-bit Ubuntu Server 24.04
 (Noble), ROS 2 Jazzy and Python 3.12. Windows is an editing and host-unit-test
 environment; release acceptance happens on arm64 Linux.
 
+On Windows with Visual Studio C++ Build Tools installed, run the eight
+firmware host tests without WSL:
+
+```powershell
+cmd /c scripts\test_firmware_windows.cmd
+```
+
+The script locates the current Visual Studio toolchain with `vswhere` and
+writes compiler outputs only under `%TEMP%`.
+
 ## Raspberry Pi installation
 
 ```bash
@@ -42,7 +52,7 @@ expects `/dev/safestride-drive`, `/dev/safestride-terrain` and a GPIO UART.
 GPIO serial -> `gps_node`; Terrain Uno does not receive or relay GPS data.
 
 Both Arduino sketches must be flashed after a wire-protocol change. Protocol
-v4 is intentionally incompatible with older firmware, so
+v6 is intentionally incompatible with older firmware, so
 the Drive MCU, Terrain MCU and ROS bridge must be updated together.
 
 For unattended startup, first review `config/raspberry_pi.yaml`, install the
@@ -149,14 +159,13 @@ the manifest's test macro F1, every class recall, artifact hash, model size and
 CPU latency on the Pi. The exported input contract remains RGB 224x224 with
 ImageNet normalization, matching the ROS perception node.
 
-The surface and slope scales modify the ROS velocity target; neither is a raw
-Arduino PWM command. With the measured 0.115 m wheel radius, the 0.08 m/s
-default request is about 696 mrad/s. Firmware compares that target with the Hall
-measurement and changes the shared motor output through the PID. The tested
-minimum active PWM is still 80, so low-speed regulation may switch between
-minimum drive and zero/brake rather than vary smoothly. Tune the Hall scale,
-PID and dead zone from lifted-wheel and loaded logs before claiming accurate
-physical speed.
+The supervisor publishes atomic `DriveCommand` messages on `/drive/command`.
+Surface control remains disabled. Downhill pitch reduces the target continuously;
+uphill pitch adds feed-forward without increasing the target. The MCU uses a
+30-count bias and 60-count nominal feed-forward at 0.08 m/s, plus Hall P feedback
+and PWM slew. The output may fall below 30 to zero/BRAKE. Hall age timeout is 5 s.
+Slope/IMU BRAKE recovers automatically; existing hardware/watchdog interlocks remain.
+See [speed control](SPEED_CONTROL_KO.md) for tuning values and hardware limitations.
 
 The GitHub workflow builds Jazzy on Ubuntu 24.04 amd64. It catches ROS API and
 packaging errors; final arm64 performance and device tests still run on the Pi.

@@ -26,8 +26,8 @@ serial_bridge:
     telemetry: {timeout_s: 0.30}
     diagnostics: {publish_rate_hz: 1.0}
     base:
-      hall_pulses_per_revolution: 6
-      max_wheel_speed_rad_s: 3.0
+      hall_pulses_per_revolution: 12
+      max_wheel_speed_rad_s: 10.0
     range: {min_m: 0.02, max_m: 4.0, field_of_view_rad: 0.35}
     # Nominal pack voltage is known, but no battery-to-ADC divider is fitted.
     battery: {nominal_voltage: 12.0, empty_voltage: 0.0, full_voltage: 0.0}
@@ -53,6 +53,10 @@ serial_bridge:
 
 terrain_bridge:
   ros__parameters:
+    hmi:
+      enabled: true
+      pitch_sign: -1.0  # Match safety_supervisor.uphill_pitch_sign.
+      pitch_offset_rad: 0.0  # Match safety_supervisor.pitch_offset_rad.
     serial:
       port: /dev/safestride-terrain
       baudrate: 115200
@@ -81,10 +85,17 @@ safety_supervisor:
     # TOF is telemetry-only on the current hardware; MPU slope assistance stays
     # active, and an invalid MPU sample falls back to a neutral speed scale.
     require_range_sensors: false
+    terrain_stop_enabled: true  # confirmed ToF hazard only; invalid is diagnostic
     require_surface_condition: false
+    surface_control_enabled: false
+    drive_command_topic: /drive/command
+    brake_enter_deg: 15.0
+    brake_release_deg: 12.0
+    brake_recovery_s: 0.5
+    drive_pwm_cap: 100
     require_deadman: true
     slope_control_enabled: true
-    max_forward_velocity: 0.15
+    max_forward_velocity: 1.15
     max_reverse_velocity: 0.08
     max_angular_velocity: 0.0
     max_linear_acceleration: 0.20
@@ -94,14 +105,14 @@ safety_supervisor:
     # pitch_rad is used because accel Z alone has no uphill/downhill sign.
     # If lifting the walker front makes pitch_rad negative, change only this
     # value to -1.0 after the first stationary orientation check.
-    uphill_pitch_sign: 1.0
-    # Measured in the walker's normal level stance (2026-09-03, 146 samples).
-    pitch_offset_rad: -0.196164
-    slope_enter_angle_rad: 0.0872665  # 5 deg
-    slope_exit_angle_rad: 0.0523599   # 3 deg
+    uphill_pitch_sign: -1.0
+    # Raw sensor pitch: positive downhill, negative uphill; no mounting offset.
+    pitch_offset_rad: 0.0
+    slope_enter_angle_rad: 0.08726646259971647  # 5 deg
+    slope_exit_angle_rad: 0.05235987755982989  # 3 deg
     slope_confirmation_time_s: 0.50
-    downhill_speed_scale: 0.60
-    uphill_speed_scale: 1.25
+    downhill_speed_scale: 1.0
+    uphill_speed_scale: 1.15
     max_combined_speed_scale: 1.25
     stop_distance: 0.35
     slow_distance: 0.80
@@ -116,7 +127,7 @@ safety_supervisor:
 
 cruise_command:
   ros__parameters:
-    speed_mps: 0.08
+    speed_mps: 1.0
     publish_rate_hz: 20.0
     command_topic: /cmd_vel
     frame_id: base_link
@@ -233,7 +244,7 @@ foxglove_bridge:
     topic_whitelist:
       - ^/(diagnostics|walker/status|wheel/hall|handle/pressure|battery_state)$
       - ^/terrain/(tof|imu|status)$
-      - ^/(gps/fix|gps/speed|gps/speed_raw|gps/course|crosswalk/status|odom|tf|tf_static|robot_description)$
+      - ^/(gps/fix|gps/speed|gps/speed_kmh|gps/speed_raw|gps/speed_raw_kmh|gps/course|crosswalk/status|odom|odom_kmh|cmd_vel_kmh|cmd_vel_safe_kmh|tf|tf_static|robot_description)$
       - ^/perception/surface_condition$
       - ^/camera/image/compressed$
     service_whitelist: ['(?!)']

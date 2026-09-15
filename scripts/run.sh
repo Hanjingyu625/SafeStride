@@ -3,6 +3,11 @@ set -euo pipefail
 
 workspace="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 config="${SAFESTRIDE_CONFIG:-${workspace}/config/raspberry_pi.yaml}"
+echo "SafeStride workspace: ${workspace}"
+echo "SafeStride config: ${config}"
+if [[ "${config}" != "${workspace}/config/raspberry_pi.yaml" ]]; then
+  echo "WARNING: SAFESTRIDE_CONFIG overrides this checkout's Pi settings." >&2
+fi
 enable_terrain="${SAFESTRIDE_ENABLE_TERRAIN:-true}"
 require_terrain_tof="${SAFESTRIDE_REQUIRE_TERRAIN_TOF:-false}"
 enable_perception="${SAFESTRIDE_ENABLE_PERCEPTION:-false}"

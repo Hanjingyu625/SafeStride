@@ -29,6 +29,7 @@ common=(
   -I"${workspace}/firmware/safestride_mcu" \
   "${workspace}/test/firmware_analog_hall_sensor_test.cpp" \
   "${workspace}/firmware/safestride_mcu/analog_hall_sensor.cpp" \
+  "${workspace}/firmware/safestride_mcu/motor_control.cpp" \
   -o "${build_dir}/analog_hall_test"
 
 "${cxx}" "${common[@]}" \
@@ -66,6 +67,11 @@ common=(
   "${workspace}/firmware/terrain_mcu/protocol.cpp" \
   -o "${build_dir}/terrain_state_test"
 
+"${cxx}" "${common[@]}" \
+  "${workspace}/test/firmware_hmi_test.cpp" \
+  -o "${build_dir}/hmi_test"
+
+"${build_dir}/hmi_test"
 "${build_dir}/protocol_test"
 "${build_dir}/pressure_test"
 "${build_dir}/analog_hall_test"

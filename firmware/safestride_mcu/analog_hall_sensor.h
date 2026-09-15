@@ -1,3 +1,6 @@
+// Hall 측정 인터페이스. pulseCount는 누적 펄스 수, periodUs는 직전 두 펄스 간격,
+// ageUs는 마지막 펄스 이후 시간이다. 펄스가 없으면 age는 0xFFFFFFFF이며 회전 방향은 측정하지 않는다.
+
 #pragma once
 
 #include <Arduino.h>

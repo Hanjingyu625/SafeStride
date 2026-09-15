@@ -65,6 +65,7 @@ int main() {
   assert(g_watchdog_timed_out);
 
   uint8_t command_payload[proto::COMMAND_PAYLOAD_SIZE] = {};
+  command_payload[10U] = 100U;
   proto::writeU16(command_payload + 4U, 200U);
   command_payload[6U] = 0U;
   proto::FrameView old_command = {
@@ -190,10 +191,14 @@ int main() {
   // The dead-man is level-triggered. Reacquiring both pressure channels before
   // the ramp finishes cancels the release state, and the next fresh command
   // resumes closed-loop motion without waiting for a watchdog/session reset.
+  // A confirmed release resets the stale EMA value, so allow the live held
+  // samples to raise the filtered value back across the presence threshold.
   g_pressure_adc = 200;
-  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
-  g_pressure.update(g_test_millis);
-  refreshPhysicalSafety();
+  for (int i = 0; i < 3 && !deadmanActive(); ++i) {
+    g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+    g_pressure.update(g_test_millis);
+    refreshPhysicalSafety();
+  }
   assert(deadmanActive());
   assert(!g_deadman_release_ramp_active);
   motion_enable_command.sequence = next_sequence++;
@@ -234,8 +239,10 @@ int main() {
   assert(g_state == ControllerState::DISARMED);
 
   g_pressure_adc = 200;
-  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
-  g_pressure.update(g_test_millis);
+  for (int i = 0; i < 3 && !deadmanActive(); ++i) {
+    g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+    g_pressure.update(g_test_millis);
+  }
   assert(deadmanActive());
   g_stationary_tracking = true;
   g_stationary_since_ms =
@@ -270,8 +277,10 @@ int main() {
   assert(g_fault_bits == 0U);
 
   g_pressure_adc = 200;
-  g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
-  g_pressure.update(g_test_millis);
+  for (int i = 0; i < 3 && !deadmanActive(); ++i) {
+    g_test_millis += cfg::PRESSURE_SAMPLE_PERIOD_MS;
+    g_pressure.update(g_test_millis);
+  }
   assert(deadmanActive());
   g_stationary_tracking = true;
   g_stationary_since_ms =
@@ -280,6 +289,47 @@ int main() {
   motion_enable_command.sequence = next_sequence++;
   assert(handleCommand(motion_enable_command));
   assert(g_state == ControllerState::ARMED);
+
+  // v6 explicit BRAKE stays enabled and releases on a newer DRIVE command.
+  g_pressure_adc = 200;
+  g_pressure.begin(g_test_millis);
+  g_session_active = true;
+  g_session_id = 0x55667788UL;
+  g_state = ControllerState::ARMED;
+  g_fault_bits = 0U;
+  g_watchdog_timed_out = false;
+  g_deadman_release_ramp_active = false;
+  g_have_command_sequence = false;
+  uint8_t command[proto::COMMAND_PAYLOAD_SIZE] = {};
+  proto::writeU16(command + 4, 200U);
+  command[6] = 1U; command[10] = 100U; command[11] = 1U;
+  proto::FrameView brake_frame={proto::TYPE_COMMAND,0U,100U,
+      proto::COMMAND_PAYLOAD_SIZE,g_session_id,g_test_millis,command};
+  assert(handleCommand(brake_frame));
+  assert(g_state==ControllerState::ARMED && g_brake_requested);
+  assert(!handleCommand(brake_frame)); // duplicate cannot refresh/alter state
+  brake_frame.sequence=101U;
+  command[11]=0U; proto::writeI32(command,696L); proto::writeI16(command+8,8);
+  assert(handleCommand(brake_frame));
+  assert(!g_brake_requested && g_slope_ff_pwm==8 && g_requested_mrad_s==696L);
+  brake_frame.sequence=102U; command[10]=101U;
+  assert(!handleCommand(brake_frame));
+  assert(g_last_command_sequence==101U && g_drive_pwm_cap==100U);
+  command[10]=100U; brake_frame.payload_length=8U;
+  assert(!handleCommand(brake_frame)); // no implicit legacy command acceptance
+
+  brake_frame.payload_length=proto::COMMAND_PAYLOAD_SIZE;
+  brake_frame.sequence=102U;
+  proto::writeI32(command,0L); proto::writeI16(command+8,0);
+  command[11]=2U;
+  assert(handleCommand(brake_frame));
+  assert(g_terrain_stop_requested && !g_brake_requested);
+  brake_frame.sequence=103U;
+  proto::writeI32(command,696L);
+  assert(!handleCommand(brake_frame));  // stop mode cannot carry drive torque
+  command[11]=0U;
+  assert(handleCommand(brake_frame));
+  assert(!g_terrain_stop_requested);
 
   printf("firmware watchdog/session state-machine tests: OK\n");
   return 0;
