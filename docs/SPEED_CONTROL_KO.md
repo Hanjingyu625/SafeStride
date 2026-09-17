@@ -33,7 +33,7 @@ Drive Uno: 목표 ramp → FF + Hall P → 방향/상한 제한 → PWM slew →
 ## 2. 평지 출력과 속도 피드백
 
 PWM은 Arduino `analogWrite()`의 **0~255 count**다. 60은 60%가 아니라 약 23.5%
-duty다. 30은 약 11.8%, 현재 상한 100은 약 39.2%다.
+duty다. 30은 약 11.8%, 현재 상한 140은 약 54.9%다.
 
 ```text
 wheel_radius = 0.115 m
@@ -70,10 +70,11 @@ BRAKE·fault·watchdog은 정상 slew를 기다리지 않는다.
 | 원본 Pitch / 조건 | 목표속도와 출력 동작 |
 |---|---|
 | 평지 | 목표속도 1.0 m/s |
-| 내리막 0~+15° 미만 | 목표속도 1.0 m/s 유지, 별도 내리막 FF 차감 없음 |
+| 내리막 +5° 미만 (평지에서 진입) | 목표속도 1.0 m/s 유지 |
+| 내리막 +5° 이상 0.5초 유지 | +5°에서 0.84 m/s, +8° 이상에서 0.6 m/s로 감속 |
 | 내리막 +15° 이상 | 진입 당시 PWM에서 3초 동안 0으로 감속 |
 | 경사 정지 후 +12° 이하 | 유효 상태 0.5초 유지 시 해제 요청, 시작한 MCU ramp는 완료 |
-| 오르막 -5° 이하 0.5초 유지 | 목표속도 1.15 m/s와 최대 +30 PWM 경사 FF |
+| 오르막 -5° 이하 0.5초 유지 | 목표속도 1.0 m/s 유지, 최대 +30 PWM 경사 FF |
 
 오르막 상태는 -3°까지의 히스테리시스로 유지되며, 양의 경사 FF는 -5°보다
 완만해지면 0이 된다. 속도 피드백과 손잡이/통신/ToF 정지는 표보다 우선한다.
@@ -88,24 +89,27 @@ SAFESTRIDE_CONFIG="$PWD/config/raspberry_pi.yaml" SAFESTRIDE_ENABLE_FOXGLOVE=tru
 ```
 
 경사 상태 진입 5°, 이탈 3°, 확인 0.5초의 히스테리시스를 사용한다.
-오르막 목표속도 배율은 **1.15**이다. 기본 1.0 m/s 요청은 1.15 m/s가 되며
-최대 전진속도는 1.15 m/s이며 기존 가속도 제한을 유지한다. 내리막 배율은 **1.0**이다.
+오르막 목표속도 배율은 **1.0**으로 요청 속도를 유지하고 PWM 보상만 더한다.
+기존 최대 전진속도 1.15 m/s와 가감속 제한은 유지한다. 내리막 최저 배율은 **0.6**이다.
 
 ```text
-downhill_scale = 1.0
+downhill_scale = 1 - 0.4 × clamp((내리막 각도 - 3) / 5, 0, 1)
 ```
 
-원본 +15° 미만에서는 경사 자체로 목표속도나 FF를 줄이지 않는다.
-속도 피드백, ToF, 손잡이 및 통신 안전 정지는 별도로 작동한다.
+내리막 확정 후 +5°에서 요청 속도의 84%, +8° 이상에서 60%를 적용한다.
+평지로 복귀할 때는 3° 이탈 히스테리시스에 따라 감속 배율을 해제한다.
++15°에서는 기존 3초 PWM 정지를 유지한다. 속도 피드백, ToF, 손잡이 및
+통신 정지는 그대로 우선한다. PWM 상한 140은 ROS 명령·브리지·Drive MCU에
+함께 적용하므로 Pi 소프트웨어와 Drive 펌웨어를 함께 갱신해야 한다.
 
 | 확정 상태 | 경사 FF (PWM count) |
 |---|---|
 | 평지 | 0 |
-| 오르막 | `min(30, max(0, 4 × (각도 - 3)))` |
+| 오르막 | `min(30, max(0, 5 × (각도 - 3)))` |
 | 내리막 | 0 |
 
 오르막 FF는 원본 -5° 이하이고 오르막 상태가 확정됐을 때 적용한다.
-원본 -5°에서 +8, -17°에서 +30이다. 기본 FF 60은 명목속도에서의
+원본 -5°에서 +10, -7°에서 +20, -9° 이하에서 +30이다. 기본 FF 60은 명목속도에서의
 계산값이지 실제 PWM 하한이 아니다. 실제 출력은 FF와 P, PWM 상한과 slew로 결정된다.
 후진 명령에는 전진 기준 경사 FF를 적용하지 않는다. MPU의 현재 pitch는 가속도
 기반 추정이므로 가감속·충격 영향을 받는다. 위 값은 검증된 보행 안전 기준이 아니다.
@@ -232,7 +236,7 @@ Python 62개(bridge/프로토콜 36, 감독 명령 7, 경사 정책 6, 설정 �
 Terrain은 flash 10,648 bytes, 전역 RAM 1,065 bytes다.
 이 검사는 실제 DDS 통신, Pi에서의 ROS 실행, USB 연결, 모터 부하 시험을 대체하지 않는다.
 
-Deployment note: nominal walking speed is 1.0 m/s; uphill target is 1.15 m/s.
+Deployment note: nominal walking speed is 1.0 m/s; uphill target stays at 1.0 m/s with PWM assistance.
 ROS forward limit is 1.15 m/s and bridge/MCU wheel limits are 10 rad/s.
 FF 60 at 1.0 m/s is an initial model requiring loaded hardware calibration.
 Deploy both ROS configuration and Drive Uno firmware together.

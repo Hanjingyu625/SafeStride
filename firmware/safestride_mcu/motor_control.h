@@ -4,6 +4,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include "config.h"
 
 // 한 시점의 Hall 스냅샷. 누적 count와 직전 period/현재 age를 함께 전달해 오래된 측정을 구분한다.
 struct HallSample {
@@ -31,7 +32,7 @@ class DriveController {
       uint32_t deceleration_mrad_s2 = 0UL,
       bool fade_pwm_during_deceleration = false,
       int16_t slope_ff_pwm = 0,
-      uint8_t pwm_cap = 100U,
+      uint8_t pwm_cap = safestride_config::MAX_PWM,
       bool brake_requested = false,
       bool terrain_stop_requested = false);
   void updateMagnetBench(

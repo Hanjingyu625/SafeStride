@@ -115,7 +115,7 @@ class SerialBridgeNode(Node):
         self._last_command_time: Optional[float] = None
         self._target_linear = 0.0
         self._slope_ff_pwm = 0
-        self._drive_pwm_cap = 100
+        self._drive_pwm_cap = 140
         self._drive_mode = 1
         self._command_timed_out = True
 
@@ -830,7 +830,7 @@ class SerialBridgeNode(Node):
                (stamp.sec + stamp.nanosec / 1e9))
         valid = (math.isfinite(linear) and 0.0 <= age <= self._command_timeout and
                  -60 <= message.slope_ff_pwm <= 30 and
-                 0 <= message.drive_pwm_cap <= 100 and message.mode in (0, 1, 2) and
+                 0 <= message.drive_pwm_cap <= 140 and message.mode in (0, 1, 2) and
                  (message.mode == 0 or (linear == 0.0 and message.slope_ff_pwm == 0)))
         if not valid:
             with self._lock:
@@ -896,7 +896,7 @@ class SerialBridgeNode(Node):
             self._send_command(0, False)
             return
 
-        slope_ff, pwm_cap, mode = 0, 100, 0
+        slope_ff, pwm_cap, mode = 0, 140, 0
         if self._deadman_direct_drive:
             target_linear = self._deadman_forward_velocity
             self._command_timed_out = False
@@ -936,7 +936,7 @@ class SerialBridgeNode(Node):
             int(round(target * 1000.0)), True, slope_ff, pwm_cap, mode)
 
     def _send_command(
-        self, target_mrad_s: int, enable: bool, slope_ff_pwm=0, drive_pwm_cap=100, mode=0
+        self, target_mrad_s: int, enable: bool, slope_ff_pwm=0, drive_pwm_cap=140, mode=0
     ) -> bool:
         payload = CommandPayload(
             target_mrad_s=target_mrad_s,

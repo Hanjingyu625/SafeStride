@@ -67,7 +67,7 @@ MCU는 기존 CRC/session/단조 sequence 및 TTL 20~250ms 검사를 유지한�
 | 6 | uint8 | enable 0/1 |
 | 7 | uint8 | reserved, 반드시 0 |
 | 8 | int16 | slope FF PWM counts, -60~30 |
-| 10 | uint8 | drive PWM cap, 0~100 |
+| 10 | uint8 | drive PWM cap, 0~140 |
 | 11 | uint8 | 0 DRIVE / 1 BRAKE / 2 TERRAIN_STOP |
 
 BRAKE와 TERRAIN_STOP에서는 target=0, slope FF=0이어야 한다. enable=1인 BRAKE는 링크를 유지하면서

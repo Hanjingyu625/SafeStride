@@ -302,7 +302,7 @@ int main() {
   g_have_command_sequence = false;
   uint8_t command[proto::COMMAND_PAYLOAD_SIZE] = {};
   proto::writeU16(command + 4, 200U);
-  command[6] = 1U; command[10] = 100U; command[11] = 1U;
+  command[6] = 1U; command[10] = 140U; command[11] = 1U;
   proto::FrameView brake_frame={proto::TYPE_COMMAND,0U,100U,
       proto::COMMAND_PAYLOAD_SIZE,g_session_id,g_test_millis,command};
   assert(handleCommand(brake_frame));
@@ -312,9 +312,9 @@ int main() {
   command[11]=0U; proto::writeI32(command,696L); proto::writeI16(command+8,8);
   assert(handleCommand(brake_frame));
   assert(!g_brake_requested && g_slope_ff_pwm==8 && g_requested_mrad_s==696L);
-  brake_frame.sequence=102U; command[10]=101U;
+  brake_frame.sequence=102U; command[10]=141U;
   assert(!handleCommand(brake_frame));
-  assert(g_last_command_sequence==101U && g_drive_pwm_cap==100U);
+  assert(g_last_command_sequence==101U && g_drive_pwm_cap==140U);
   command[10]=100U; brake_frame.payload_length=8U;
   assert(!handleCommand(brake_frame)); // no implicit legacy command acceptance
 

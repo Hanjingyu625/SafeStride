@@ -204,7 +204,7 @@ class TestPayloads(unittest.TestCase):
         payload = CommandPayload(-12345, 150, 1)
         self.assertEqual(
             payload.pack(),
-            struct.pack('<iHBBhBB', -12345, 150, 1, 0, 0, 100, 0),
+            struct.pack('<iHBBhBB', -12345, 150, 1, 0, 0, 140, 0),
         )
         self.assertEqual(CommandPayload.unpack(payload.pack()), payload)
         self.assertEqual(len(payload.pack()), COMMAND_STRUCT.size)

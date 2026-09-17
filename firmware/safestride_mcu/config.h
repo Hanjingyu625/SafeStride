@@ -100,7 +100,7 @@ constexpr uint8_t MOTOR_PWM_PIN = 5U;
 constexpr uint8_t MOTOR_IN1_PIN = 6U;
 constexpr uint8_t MOTOR_IN2_PIN = 8U;
 constexpr int8_t MOTOR_SIGN = 1;
-constexpr uint16_t MAX_PWM = 100U;  // deliberately low for first lifted test
+constexpr uint16_t MAX_PWM = 140U;  // shared drive output ceiling
 // Initial feed-forward model; PWM counts are on Arduino's 0..255 scale.
 // 30 is a bias, NOT a minimum output. Calibrate 60 at 1.0 m/s under load.
 // Nominal FF=60 is an initial model, not a measured speed calibration.

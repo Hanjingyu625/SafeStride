@@ -61,10 +61,15 @@ class TestDriveCommand(unittest.TestCase):
         self.b._command_tick()
         self.assertEqual((self.packets[-1].mode, self.packets[-1].slope_ff_pwm), (0, -18))
 
+    def test_pwm_cap_140_reaches_wire(self):
+        self.b._on_cmd_vel(self.message(cap=140))
+        self.b._command_tick()
+        self.assertEqual(self.packets[-1].drive_pwm_cap, 140)
+
     def test_stale_future_invalid_messages_cannot_refresh_command(self):
         for msg in (self.message(stamp=9), self.message(stamp=11),
                     self.message(target=math.nan), self.message(ff=31),
-                    self.message(mode=2), self.message(cap=101), self.message(mode=1)):
+                    self.message(mode=2), self.message(cap=141), self.message(mode=1)):
             self.b._on_cmd_vel(self.message())
             self.b._on_cmd_vel(msg)
             self.assertIsNone(self.b._last_command_time)
@@ -85,7 +90,7 @@ class TestDriveCommand(unittest.TestCase):
         import struct
         for raw in (struct.pack('<iHBB', 0, 200, 1, 0),
                     struct.pack('<iHBBhBB', 0, 200, 1, 0, -61, 100, 0),
-                    struct.pack('<iHBBhBB', 0, 200, 1, 0, 0, 101, 0),
+                    struct.pack('<iHBBhBB', 0, 200, 1, 0, 0, 141, 0),
                     struct.pack('<iHBBhBB', 0, 200, 1, 0, 0, 100, 3)):
             with self.assertRaises(PayloadDecodeError):
                 CommandPayload.unpack(raw)

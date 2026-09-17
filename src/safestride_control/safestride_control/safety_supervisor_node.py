@@ -66,14 +66,14 @@ class SafetySupervisor(Node):
         self.declare_parameter('brake_enter_deg', 15.0)
         self.declare_parameter('brake_release_deg', 12.0)
         self.declare_parameter('brake_recovery_s', 0.5)
-        self.declare_parameter('drive_pwm_cap', 100)
+        self.declare_parameter('drive_pwm_cap', 140)
         self._surface_control_enabled = bool(self.get_parameter('surface_control_enabled').value)
         self._brake_policy = SlopeBrakePolicy(
             self.get_parameter('brake_enter_deg').value,
             self.get_parameter('brake_release_deg').value,
             self.get_parameter('brake_recovery_s').value)
         self._drive_pwm_cap = int(finite_parameter('drive_pwm_cap',
-            self.get_parameter('drive_pwm_cap').value, minimum=0.0, maximum=100.0))
+            self.get_parameter('drive_pwm_cap').value, minimum=0.0, maximum=140.0))
         self._slope_braking = False
         self._slope_ff_pwm = 0
 
@@ -90,8 +90,8 @@ class SafetySupervisor(Node):
         self.declare_parameter('slope_confirmation_time_s', 0.50)
         self.declare_parameter('uphill_pitch_sign', -1.0)
         self.declare_parameter('pitch_offset_rad', 0.0)
-        self.declare_parameter('downhill_speed_scale', 1.0)
-        self.declare_parameter('uphill_speed_scale', 1.15)
+        self.declare_parameter('downhill_speed_scale', 0.6)
+        self.declare_parameter('uphill_speed_scale', 1.0)
         self.declare_parameter('max_combined_speed_scale', 1.25)
 
         self.declare_parameter('stop_distance', 0.35)

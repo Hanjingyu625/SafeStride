@@ -142,7 +142,14 @@ class SlopeSpeedPolicy:
 
         scale = 1.0
         if self._state == self.UPHILL:
-            scale = self._uphill_scale
+            # Keep classification hysteresis, but release assistance as the
+            # measured slope flattens. A pending LEVEL confirmation must not
+            # retain the uphill target speed. The supervisor slews the reduced
+            # target using its normal deceleration limit.
+            amount = min(1.0, max(0.0,
+                (normalized_pitch - self._exit_angle)
+                / (self._enter_angle - self._exit_angle)))
+            scale = 1.0 + (self._uphill_scale - 1.0) * amount
         elif self._state == self.DOWNHILL:
             amount = min(1.0, max(0.0,
                 (-normalized_pitch - self._exit_angle) / math.radians(5.0)))
@@ -198,6 +205,6 @@ def slope_feedforward_pwm(pitch_rad, state):
         return 0
     degrees = math.degrees(pitch_rad)
     if state == SlopeSpeedPolicy.UPHILL:
-        return round(min(30.0, max(0.0, 4.0 * (degrees - 3.0))))
+        return round(min(30.0, max(0.0, 5.0 * (degrees - 3.0))))
     # Downhill stopping uses the explicit PWM ramp mode, not subtractive FF.
     return 0

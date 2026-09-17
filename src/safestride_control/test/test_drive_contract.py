@@ -127,7 +127,7 @@ class TestSupervisedDrive(unittest.TestCase):
         self.assertEqual((msg.mode, msg.slope_ff_pwm), (0, 0))
         for _ in range(20):
             msg = self.tick(-11)
-        self.assertAlmostEqual(msg.target_linear_m_s, 0.08 * 1.15)
+        self.assertAlmostEqual(msg.target_linear_m_s, 0.08)
         self.assertEqual(msg.slope_ff_pwm, 30)
         msg = self.tick(16)
         self.assertEqual((msg.mode, msg.target_linear_m_s, msg.slope_ff_pwm), (2, 0.0, 0))
@@ -139,6 +139,29 @@ class TestSupervisedDrive(unittest.TestCase):
         self.assertGreater(msg.target_linear_m_s, 0.0)
         self.assertFalse(self.node._command_output_suppressed)
 
+    def test_uphill_to_level_removes_pwm_assist_without_changing_target(self):
+        self.node._last_command.twist.linear.x = 1.0
+        for _ in range(150):
+            msg = self.tick(-7)
+        self.assertAlmostEqual(msg.target_linear_m_s, 1.0)
+        previous = msg.target_linear_m_s
+        for pitch in (-4, -3, 0, 0, 0, 0, 0, 0):
+            msg = self.tick(pitch)
+            self.assertEqual(msg.mode, Message.DRIVE)
+            self.assertEqual(msg.slope_ff_pwm, 0)
+            self.assertLessEqual(msg.target_linear_m_s, previous)
+            self.assertLessEqual(previous - msg.target_linear_m_s,
+                                 self.node._linear_decel * 0.05 + 1e-9)
+            previous = msg.target_linear_m_s
+        self.assertAlmostEqual(msg.target_linear_m_s, 1.0)
+        # Repeated transitions must not accumulate the uphill speed gain.
+        for _ in range(30):
+            msg = self.tick(-7)
+        self.assertAlmostEqual(msg.target_linear_m_s, 1.0)
+        for _ in range(8):
+            msg = self.tick(0)
+        self.assertAlmostEqual(msg.target_linear_m_s, 1.0)
+
     def test_invalid_imu_keeps_streaming_brake_then_recovers(self):
         for bad_age in (-1.0, math.nan, math.inf, 0.4):
             msg = self.tick(-6, age=bad_age)
@@ -149,19 +172,24 @@ class TestSupervisedDrive(unittest.TestCase):
             msg = self.tick(0)
         self.assertEqual(msg.mode, 0)
 
-    def test_default_downhill_has_no_slowdown_below_fifteen_degrees(self):
-        # Even a live surface result cannot modify this deployment's speed.
-        self.node._last_surface = NS(valid=True, recommended_speed_scale=0.0)
-        for _ in range(20):
-            msg = self.tick(10)
-        self.assertAlmostEqual(msg.target_linear_m_s, 0.08)
-        self.assertEqual(msg.mode, Message.DRIVE)
-        self.assertEqual(msg.slope_ff_pwm, 0)
-        for _ in range(20):
-            msg = self.tick(14.9)
-        self.assertAlmostEqual(msg.target_linear_m_s, 0.08)
-        self.assertEqual(msg.mode, Message.DRIVE)
-        self.assertEqual(msg.slope_ff_pwm, 0)
+    def test_downhill_slows_from_five_degrees_and_stops_at_fifteen(self):
+        for angle, scale in ((4.9, 1.0), (5.0, 0.84), (6.0, 0.76),
+                             (8.0, 0.6), (10.0, 0.6), (14.9, 0.6)):
+            for _ in range(30):
+                msg = self.tick(angle)
+            self.assertAlmostEqual(msg.target_linear_m_s, 0.08 * scale)
+            self.assertEqual(msg.mode, Message.DRIVE)
+            self.assertEqual(msg.slope_ff_pwm, 0)
+            self.assertEqual(msg.drive_pwm_cap, 140)
+        self.assertEqual(self.tick(15.0).mode, Message.TERRAIN_STOP)
+
+    def test_uphill_pwm_gain_without_target_speed_gain(self):
+        for angle, pwm in ((-5.0, 10), (-7.0, 20), (-9.0, 30), (-12.0, 30)):
+            for _ in range(30):
+                msg = self.tick(angle)
+            self.assertAlmostEqual(msg.target_linear_m_s, 0.08)
+            self.assertEqual(msg.slope_ff_pwm, pwm)
+        self.assertEqual(self.tick(-4.9).slope_ff_pwm, 0)
 
     def test_existing_fault_still_suppresses_stream(self):
         self.node._status_reasons = lambda now: ['mcu_fault']
@@ -218,14 +246,14 @@ class TestSupervisedDrive(unittest.TestCase):
             msg = self.tick(-5.0)
         self.assertGreater(msg.slope_ff_pwm, 0)
         self.assertEqual(msg.mode, Message.DRIVE)
-        self.assertAlmostEqual(msg.target_linear_m_s, 1.15)
+        self.assertAlmostEqual(msg.target_linear_m_s, 1.0)
         self.assertEqual(self.tick(-4.9).slope_ff_pwm, 0)
-        for angle in (0.0, 5.0, 10.0, 14.9):
+        for angle, scale in ((0.0, 1.0), (5.0, 0.84), (10.0, 0.6), (14.9, 0.6)):
             for _ in range(30):
                 msg = self.tick(angle)
             self.assertEqual(msg.mode, Message.DRIVE)
             self.assertEqual(msg.slope_ff_pwm, 0)
-            self.assertAlmostEqual(msg.target_linear_m_s, 1.0)
+            self.assertAlmostEqual(msg.target_linear_m_s, scale)
         self.assertEqual(self.tick(15.0).mode, Message.TERRAIN_STOP)
         for _ in range(20):
             self.assertEqual(self.tick(12.1).mode, Message.TERRAIN_STOP)

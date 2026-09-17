@@ -94,6 +94,24 @@ class TestSlopeSpeedPolicy(unittest.TestCase):
         self.assertAlmostEqual(scale, 0.92)
         self.assertEqual(state, SlopeSpeedPolicy.DOWNHILL)
 
+    def test_uphill_assist_tapers_before_level_confirmation(self) -> None:
+        for now in (1.0, 1.5):
+            self.policy.update(pitch_rad=math.radians(7),
+                               sample_valid=True, now_s=now)
+        for now, degrees, expected in (
+            (1.6, 5, 1.25), (1.7, 4, 1.125), (1.8, 3, 1.0),
+            (1.9, 0, 1.0), (2.0, -2, 1.0),
+        ):
+            with self.subTest(degrees=degrees):
+                scale, state, _ = self.policy.update(
+                    pitch_rad=math.radians(degrees), sample_valid=True,
+                    now_s=now)
+                self.assertAlmostEqual(scale, expected)
+                self.assertEqual(state, SlopeSpeedPolicy.UPHILL)
+        scale, state, _ = self.policy.update(
+            pitch_rad=0.0, sample_valid=True, now_s=2.4)
+        self.assertEqual((scale, state), (1.0, SlopeSpeedPolicy.LEVEL))
+
     def test_invalid_sample_returns_zero_scale(self) -> None:
         self.policy.update(
             pitch_rad=math.radians(8.0),

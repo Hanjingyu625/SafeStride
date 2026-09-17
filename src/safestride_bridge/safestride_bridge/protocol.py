@@ -433,7 +433,7 @@ class CommandPayload:
     enable: int
     reserved: int = 0
     slope_ff_pwm: int = 0
-    drive_pwm_cap: int = 100
+    drive_pwm_cap: int = 140
     mode: int = 0
     TYPE: ClassVar[PacketType] = PacketType.COMMAND
 
@@ -444,7 +444,7 @@ class CommandPayload:
             raise ValueError('COMMAND reserved field must be zero')
         if not -60 <= self.slope_ff_pwm <= 30:
             raise ValueError('slope_ff_pwm must be in [-60, 30]')
-        if not 0 <= self.drive_pwm_cap <= 100 or self.mode not in (0, 1, 2):
+        if not 0 <= self.drive_pwm_cap <= 140 or self.mode not in (0, 1, 2):
             raise ValueError('invalid drive cap or mode')
         if self.mode != 0 and (self.target_mrad_s != 0 or self.slope_ff_pwm != 0):
             raise ValueError('BRAKE requires zero target and slope FF')

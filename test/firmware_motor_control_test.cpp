@@ -106,6 +106,15 @@ int main() {
   run(walking,1,0,52360UL,0,100,true);
   assert(walking.appliedPwm() == 0);
 
+  // Loaded uphill demand can exceed the old 100 cap, but never 140.
+  DriveController loaded; loaded.begin(); primeFeedback(loaded);
+  run(loaded,2400,8696,120428UL,30,140);
+  assert(loaded.appliedPwm() == 140);
+  run(loaded,1,8696,120428UL,30,100);
+  assert(loaded.appliedPwm() <= 100);
+  run(loaded,1,0,120428UL,0,140,true);
+  assert(loaded.appliedPwm() == 0);
+
   // Twelve magnets: one second per pulse is pi/6 rad/s, not pi/3.
   DriveController calibrated; calibrated.begin(); primeFeedback(calibrated);
   run(calibrated,100,696,1000000UL);
