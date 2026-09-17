@@ -129,6 +129,8 @@ class TerrainBridgeNode(Node):
             ('transport.poll_rate_hz', 100.0),
             ('telemetry.timeout_s', 0.30),
             ('diagnostics.publish_rate_hz', 1.0),
+            ('attitude.pitch_offset_rad', 0.0),
+            ('attitude.roll_offset_rad', 0.0),
             ('range.min_m', 0.10),
             ('range.max_m', 2.00),
             ('range.field_of_view_rad', 0.052),
@@ -199,6 +201,14 @@ class TerrainBridgeNode(Node):
                 'serial poll period must be shorter than telemetry timeout'
             )
         self._frame_tof = str(self._value('frames.tof'))
+        self._pitch_offset = finite_float(
+            'attitude.pitch_offset_rad', self._value('attitude.pitch_offset_rad'),
+            minimum=-math.pi, maximum=math.pi,
+        )
+        self._roll_offset = finite_float(
+            'attitude.roll_offset_rad', self._value('attitude.roll_offset_rad'),
+            minimum=-math.pi, maximum=math.pi,
+        )
         self._frame_imu = str(self._value('frames.imu'))
         self._topic_tof = str(self._value('topics.tof'))
         self._topic_imu = str(self._value('topics.imu'))
@@ -552,12 +562,14 @@ class TerrainBridgeNode(Node):
                 max(0.0, now - self._last_telemetry_time)
             )
             message.mpu_valid = bool(telemetry.mpu_valid)
+            # Calibrate status once for control, Foxglove and HMI consumers.
+            # The Imu topic retains sensor-frame attitude for gravity removal.
             message.pitch_rad = (
-                telemetry.mpu_pitch_mrad / 1000.0
+                telemetry.mpu_pitch_mrad / 1000.0 - self._pitch_offset
                 if telemetry.mpu_valid else float('nan')
             )
             message.roll_rad = (
-                telemetry.mpu_roll_mrad / 1000.0
+                telemetry.mpu_roll_mrad / 1000.0 - self._roll_offset
                 if telemetry.mpu_valid else float('nan')
             )
         self._status_pub.publish(message)

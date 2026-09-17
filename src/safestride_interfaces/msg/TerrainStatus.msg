@@ -15,6 +15,7 @@ float32 tof_change_m
 bool tof_valid
 uint8 tof_alert
 bool terrain_hazard
+# Level-referenced angles after terrain_bridge attitude offsets (radians).
 float32 pitch_rad
 float32 roll_rad
 bool mpu_valid

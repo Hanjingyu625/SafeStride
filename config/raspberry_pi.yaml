@@ -53,6 +53,11 @@ serial_bridge:
 
 terrain_bridge:
   ros__parameters:
+    # Level reference: pitch -6.646310 deg, roll -3.380451 deg.
+    # Applied to /terrain/status only; /terrain/imu remains in the sensor frame.
+    attitude:
+      pitch_offset_rad: -0.116
+      roll_offset_rad: -0.059
     hmi:
       enabled: true
       pitch_sign: -1.0  # Match safety_supervisor.uphill_pitch_sign.
@@ -107,7 +112,7 @@ safety_supervisor:
     # If lifting the walker front makes pitch_rad negative, change only this
     # value to -1.0 after the first stationary orientation check.
     uphill_pitch_sign: -1.0
-    # Raw sensor pitch: positive downhill, negative uphill; no mounting offset.
+    # Terrain status is already zeroed by terrain_bridge; do not subtract twice.
     pitch_offset_rad: 0.0
     slope_enter_angle_rad: 0.08726646259971647  # 5 deg
     slope_exit_angle_rad: 0.05235987755982989  # 3 deg
