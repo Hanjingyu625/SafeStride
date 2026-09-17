@@ -99,11 +99,11 @@ int main() {
   assert(pressure.bothHandsPresent());
 
   // A light grip now activates both channels, while low readings release.
-  g_left_raw = g_right_raw = 45;
+  g_left_raw = g_right_raw = 38;
   PressureSensorPair light;
   light.begin(g_now_ms);
   assert(light.bothHandsPresent());
-  g_left_raw = g_right_raw = 35;
+  g_left_raw = g_right_raw = 30;
   g_now_ms += cfg::PRESSURE_SAMPLE_PERIOD_MS;
   light.update(g_now_ms);
   assert(light.bothHandsPresent());

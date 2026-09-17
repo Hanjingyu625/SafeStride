@@ -145,8 +145,8 @@ constexpr uint8_t PRESSURE_RELEASE_DEBOUNCE_SAMPLES = 2U;
 // polarity and threshold halfway between its released and held readings.
 constexpr bool PRESSURE_LEFT_ACTIVE_HIGH = true;
 constexpr bool PRESSURE_RIGHT_ACTIVE_HIGH = true;
-constexpr float PRESSURE_LEFT_PRESENT_THRESHOLD = 40.0F;
-constexpr float PRESSURE_RIGHT_PRESENT_THRESHOLD = 40.0F;
+constexpr float PRESSURE_LEFT_PRESENT_THRESHOLD = 35.0F;
+constexpr float PRESSURE_RIGHT_PRESENT_THRESHOLD = 35.0F;
 constexpr bool PRESSURE_THRESHOLDS_CALIBRATED = true;
 constexpr float PRESSURE_IMBALANCE_THRESHOLD = 300.0F;
 constexpr float PRESSURE_SUDDEN_CHANGE_THRESHOLD = 150.0F;
