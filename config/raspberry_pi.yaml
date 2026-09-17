@@ -84,8 +84,9 @@ safety_supervisor:
     range_timeout: 0.35
     # TOF is telemetry-only on the current hardware; MPU slope assistance stays
     # active, and an invalid MPU sample falls back to a neutral speed scale.
+    range_control_enabled: false  # No front-range motor slowdown/stop
     require_range_sensors: false
-    terrain_stop_enabled: true  # confirmed ToF hazard only; invalid is diagnostic
+    terrain_stop_enabled: false  # ToF telemetry only; no motor stop
     require_surface_condition: false
     surface_control_enabled: false
     drive_command_topic: /drive/command
@@ -135,6 +136,7 @@ cruise_command:
 surface_perception:
   ros__parameters:
     camera:
+      device: ''  # Optional /dev/v4l/by-id/... path; overrides index.
       index: 0
       backend: v4l2
       width: 640
@@ -192,6 +194,7 @@ gps_node:
     speed_filter_exit_confirmations: 3
     speed_filter_smoothing_alpha: 0.35
     speed_filter_maximum_speed_mps: 3.0
+
 
 crosswalk_controller:
   ros__parameters:

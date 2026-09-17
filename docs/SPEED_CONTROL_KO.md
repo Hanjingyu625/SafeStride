@@ -240,3 +240,11 @@ Deployment note: nominal walking speed is 1.0 m/s; uphill target stays at 1.0 m/
 ROS forward limit is 1.15 m/s and bridge/MCU wheel limits are 10 rad/s.
 FF 60 at 1.0 m/s is an initial model requiring loaded hardware calibration.
 Deploy both ROS configuration and Drive Uno firmware together.
+
+### ToF·노면 모니터링 설정
+
+현재 기본 설정은 `terrain_stop_enabled=false`, `range_control_enabled=false`,
+`require_range_sensors=false`, `surface_control_enabled=false`,
+`require_surface_condition=false`이다. ToF 위험·오류, 전방 거리, 노면 분류와
+권장 배율은 모터 명령을 변경하지 않는다. 영상과 센서·판정 토픽은 계속 발행한다.
+MPU의 5도 내리막 감속과 15도 정지, 손잡이·통신 보호는 유지한다.

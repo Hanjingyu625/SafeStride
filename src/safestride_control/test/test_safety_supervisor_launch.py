@@ -28,6 +28,7 @@ def generate_test_description():
             'max_telemetry_age': 1.0,
             'range_timeout': 1.0,
             'require_range_sensors': True,
+            'terrain_stop_enabled': True,
             'require_deadman': True,
             'max_linear_acceleration': 10.0,
             'max_linear_deceleration': 10.0,

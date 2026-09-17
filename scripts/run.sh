@@ -10,8 +10,18 @@ if [[ "${config}" != "${workspace}/config/raspberry_pi.yaml" ]]; then
 fi
 enable_terrain="${SAFESTRIDE_ENABLE_TERRAIN:-true}"
 require_terrain_tof="${SAFESTRIDE_REQUIRE_TERRAIN_TOF:-false}"
-enable_perception="${SAFESTRIDE_ENABLE_PERCEPTION:-false}"
+enable_perception="${SAFESTRIDE_ENABLE_PERCEPTION:-true}"
 require_surface_condition="${SAFESTRIDE_REQUIRE_SURFACE_CONDITION:-false}"
+# Prefer a stable USB capture node. An explicit index/device takes precedence.
+perception_camera_device="${SAFESTRIDE_PERCEPTION_CAMERA_DEVICE:-}"
+if [[ -z "${perception_camera_device}" && -z "${SAFESTRIDE_PERCEPTION_CAMERA_INDEX:-}" ]]; then
+  for candidate in /dev/v4l/by-id/*-video-index0; do
+    if [[ -e "${candidate}" ]]; then
+      perception_camera_device="${candidate}"
+      break
+    fi
+  done
+fi
 enable_cruise="${SAFESTRIDE_ENABLE_CRUISE:-true}"
 enable_crosswalk="${SAFESTRIDE_ENABLE_CROSSWALK:-true}"
 enable_gps="${SAFESTRIDE_ENABLE_GPS:-true}"
@@ -169,6 +179,7 @@ launch_args=(
   "perception_model_path:=${SAFESTRIDE_PERCEPTION_MODEL:-${workspace}/raspberry_pi/road_surface_inference/road_surface_public_mix_torchscript.pt}"
   "perception_classes_path:=${SAFESTRIDE_PERCEPTION_CLASSES:-${workspace}/raspberry_pi/road_surface_inference/target_classes.json}"
   "perception_camera_index:=${SAFESTRIDE_PERCEPTION_CAMERA_INDEX:-0}"
+  "perception_camera_device:=${perception_camera_device}"
   "perception_camera_backend:=${SAFESTRIDE_PERCEPTION_CAMERA_BACKEND:-v4l2}"
   "enable_gps:=${enable_gps}"
   "gps_port:=${gps_port}"

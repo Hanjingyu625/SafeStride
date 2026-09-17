@@ -59,6 +59,7 @@ class SurfacePerceptionNode(Node):
         super().__init__('surface_perception')
 
         self.declare_parameter('camera.index', 0)
+        self.declare_parameter('camera.device', '')
         self.declare_parameter('camera.backend', 'v4l2')
         self.declare_parameter('camera.width', 640)
         self.declare_parameter('camera.height', 480)
@@ -85,6 +86,10 @@ class SurfacePerceptionNode(Node):
         self._camera_index = int(self.get_parameter('camera.index').value)
         if self._camera_index < 0:
             raise ValueError('camera.index must be non-negative')
+        self._camera_device = str(
+            self.get_parameter('camera.device').value
+        ).strip()
+        self._camera_source = self._camera_device or self._camera_index
         self._camera_backend = str(
             self.get_parameter('camera.backend').value
         ).strip().lower()
@@ -252,7 +257,7 @@ class SurfacePerceptionNode(Node):
             if self._camera_backend == 'v4l2'
             else self._cv2.CAP_ANY
         )
-        camera = self._cv2.VideoCapture(self._camera_index, backend)
+        camera = self._cv2.VideoCapture(self._camera_source, backend)
         camera.set(self._cv2.CAP_PROP_FRAME_WIDTH, self._camera_width)
         camera.set(self._cv2.CAP_PROP_FRAME_HEIGHT, self._camera_height)
         camera.set(self._cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -260,8 +265,8 @@ class SurfacePerceptionNode(Node):
             camera.release()
             self._last_error = 'camera_open_failed'
             self.get_logger().warning(
-                'Cannot open camera index %d with backend %s'
-                % (self._camera_index, self._camera_backend),
+                'Cannot open camera %s with backend %s'
+                % (self._camera_source, self._camera_backend),
                 throttle_duration_sec=5.0,
             )
             return False
@@ -269,8 +274,8 @@ class SurfacePerceptionNode(Node):
         self._consecutive_read_failures = 0
         self._ema_probabilities = None
         self.get_logger().info(
-            'Opened camera index %d with backend %s'
-            % (self._camera_index, self._camera_backend)
+            'Opened camera %s with backend %s'
+            % (self._camera_source, self._camera_backend)
         )
         return True
 
@@ -443,7 +448,7 @@ class SurfacePerceptionNode(Node):
             return
         status = DiagnosticStatus()
         status.name = 'SafeStride/Surface Perception'
-        status.hardware_id = f'camera-{self._camera_index}'
+        status.hardware_id = f'camera-{self._camera_source}'
         if self._last_valid:
             status.level = DiagnosticStatus.OK
             status.message = 'surface classification valid'

@@ -44,6 +44,7 @@ def generate_launch_description() -> LaunchDescription:
     perception_model_path = LaunchConfiguration('perception_model_path')
     perception_classes_path = LaunchConfiguration('perception_classes_path')
     perception_camera_index = LaunchConfiguration('perception_camera_index')
+    perception_camera_device = LaunchConfiguration('perception_camera_device')
     perception_camera_backend = LaunchConfiguration(
         'perception_camera_backend'
     )
@@ -125,6 +126,11 @@ def generate_launch_description() -> LaunchDescription:
                 'perception_camera_index',
                 default_value='0',
                 description='Linux video-device index used by OpenCV.',
+            ),
+            DeclareLaunchArgument(
+                'perception_camera_device',
+                default_value='',
+                description='Optional stable USB video path; overrides camera index.',
             ),
             DeclareLaunchArgument(
                 'perception_camera_backend',
@@ -252,6 +258,9 @@ def generate_launch_description() -> LaunchDescription:
                         'camera.index': ParameterValue(
                             perception_camera_index,
                             value_type=int,
+                        ),
+                        'camera.device': ParameterValue(
+                            perception_camera_device, value_type=str,
                         ),
                         'camera.backend': perception_camera_backend,
                     },

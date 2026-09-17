@@ -265,8 +265,36 @@ class TestSupervisedDrive(unittest.TestCase):
         n._status_reasons = lambda now: ['deadman_released']
         self.assertEqual(self.tick(15.0).mode, Message.BRAKE)
 
+    def test_monitoring_inputs_cannot_change_motor_command(self):
+        n = self.node
+        n._terrain_reasons = lambda now: Supervisor._terrain_reasons(n, now)
+        n._range_state = lambda now: Supervisor._range_state(n, now)
+        n._terrain_stopping = True  # Disabled control also clears a prior stop.
+        for alert, valid in ((Message.TOF_RAISED, True),
+                             (Message.TOF_DROP, True),
+                             (Message.TOF_INVALID, False)):
+            for _ in range(30):
+                n.now += 0.05
+                n._last_terrain_time = n._now_seconds()
+                n._last_terrain = NS(pitch_rad=0.0, telemetry_age=0.0,
+                    mpu_valid=True, fault_bits=Message.FAULT_TOF_INVALID,
+                    tof_valid=valid, tof_alert=alert)
+                n._last_surface_time = n._now_seconds()
+                n._last_surface = NS(classification=6, confidence=0.99,
+                    recommended_speed_scale=0.0, valid=valid)
+                for side in ('left', 'right'):
+                    n._ranges[side] = {'time': n._now_seconds(), 'valid': True,
+                                      'distance': 0.01}
+                n._timer_callback()
+            msg = n._drive_publisher.messages[-1]
+            self.assertEqual(msg.mode, Message.DRIVE)
+            self.assertAlmostEqual(msg.target_linear_m_s, 0.08)
+            self.assertEqual(msg.slope_ff_pwm, 0)
+        self.assertEqual(self.tick(15.0).mode, Message.TERRAIN_STOP)
+
     def test_terrain_invalid_does_not_stop_and_confirmed_hazard_ramps(self):
         n = self.node
+        n.params['terrain_stop_enabled'] = True
         n._terrain_reasons = lambda now: Supervisor._terrain_reasons(n, now)
         def step(alert, valid=True, dt=0.05):
             n.now += dt

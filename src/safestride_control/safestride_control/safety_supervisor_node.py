@@ -53,7 +53,8 @@ class SafetySupervisor(Node):
         self.declare_parameter('range_timeout', 0.35)
         self.declare_parameter('surface_timeout', 2.5)
         self.declare_parameter('require_range_sensors', False)
-        self.declare_parameter('terrain_stop_enabled', True)
+        self.declare_parameter('terrain_stop_enabled', False)
+        self.declare_parameter('range_control_enabled', False)
         self._terrain_stopping = False
         self._terrain_stop_started = 0.0
         self._terrain_clear_since = None
@@ -607,6 +608,8 @@ class SafetySupervisor(Node):
         reasons: List[str] = []
         distances = {'left': math.nan, 'right': math.nan}
         scales = {'left': 1.0, 'right': 1.0}
+        if not self.get_parameter('range_control_enabled').value:
+            return reasons, distances, scales
 
         for side in ('left', 'right'):
             sample = self._ranges[side]
