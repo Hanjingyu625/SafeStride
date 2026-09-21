@@ -43,6 +43,78 @@ def update(machine, latitude, signal_s, signal_valid=True, speed=0.5):
 
 
 class TestCrossingPolicy(unittest.TestCase):
+    def test_entry_time_uses_three_seconds_and_actual_profile_speed(self):
+        for speed, seconds, expected in (
+            (1.0, 26.0, 'ENTRY_ALLOWED'),
+            (1.0, 18.0, 'ENTRY_ALLOWED'),
+            (0.35, 18.0, 'WAIT_AT_CURB'),
+            (1.0, 0.0, 'WAIT_AT_CURB'),
+        ):
+            with self.subTest(speed=speed, seconds=seconds):
+                machine = CrossingStateMachine(clock=FakeClock())
+                latitude = -8 / 111320.0
+                _, required, _ = machine.update(
+                    candidate=candidate(latitude), intersection_id='42',
+                    latitude=latitude, longitude=0.0,
+                    signal_remaining_s=seconds, signal_valid=True,
+                    safe_speed_mps=speed, measured_speed_mps=0.0,
+                    wheel_distance_m=0.0)
+                self.assertAlmostEqual(required, 10.0 / speed + 3.0)
+                self.assertEqual(machine.state, expected)
+
+    def wheel_update(self, machine, north_m, wheel_m, signal=40.0, east_m=0.0):
+        latitude = north_m / 111_320.0
+        return machine.update(
+            candidate=candidate(latitude), intersection_id='42',
+            latitude=latitude, longitude=east_m / 111_320.0,
+            signal_remaining_s=signal, signal_valid=signal is not None,
+            safe_speed_mps=0.5, measured_speed_mps=0.5,
+            wheel_distance_m=wheel_m)
+
+    def test_wheel_movement_before_curb_does_not_start_crossing(self):
+        machine = CrossingStateMachine(clock=FakeClock())
+        self.wheel_update(machine, -8, 0, None)
+        self.wheel_update(machine, -8, 0, None)
+        self.wheel_update(machine, -8, 2, None)
+        self.assertEqual(machine.state, 'WAIT_AT_CURB')
+
+    def test_sidewalk_motion_outside_corridor_does_not_start_crossing(self):
+        machine = CrossingStateMachine(clock=FakeClock())
+        self.wheel_update(machine, -5, 0, None)
+        self.wheel_update(machine, -5, 0, None)
+        self.wheel_update(machine, 0, 6, None, east_m=6)
+        self.assertEqual(machine.state, 'WAIT_AT_CURB')
+
+    def test_gps_jump_cannot_complete_with_short_wheel_distance(self):
+        clock = FakeClock()
+        machine = CrossingStateMachine(clock=clock)
+        self.wheel_update(machine, -5, 0)
+        self.wheel_update(machine, -5, 0)
+        self.wheel_update(machine, -3.5, 1.5)
+        self.assertEqual(machine.state, 'CROSSING')
+        self.wheel_update(machine, 7, 1.5)
+        clock.advance(3)
+        self.wheel_update(machine, 7, 1.5)
+        self.assertEqual(machine.state, 'CROSSING')
+        self.wheel_update(machine, 7, 12)
+        clock.advance(2.1)
+        self.wheel_update(machine, 7, 12)
+        self.assertEqual(machine.state, 'EXITING')
+
+    def test_signal_loss_and_short_time_have_distinct_reasons(self):
+        machine = CrossingStateMachine(clock=FakeClock())
+        update(machine, -5 / 111_320, 40)
+        update(machine, -5 / 111_320, 40)
+        update(machine, -3.5 / 111_320, 40)
+        update(machine, -3.5 / 111_320, None, signal_valid=False)
+        self.assertIn('signal data unavailable', machine.reason)
+        update(machine, -3.5 / 111_320, 5)
+        self.assertIn('remaining signal is tight', machine.reason)
+        update(machine, -3.5 / 111_320, 26)
+        self.assertEqual(machine.state, 'CROSSING')
+        update(machine, -3.5 / 111_320, 18)
+        self.assertEqual(machine.state, 'CROSSING_URGENT')
+
     def test_sufficient_signal_allows_entry_and_starts_crossing(self):
         clock = FakeClock()
         machine = CrossingStateMachine(clock=clock)

@@ -21,7 +21,7 @@ from .crosswalk_data import (
     CrosswalkSpatialIndex,
     load_crosswalks,
 )
-from .gps_motion import GpsMotionTracker, select_motion_measurement
+from .gps_motion import GpsFixGate, GpsMotionTracker, StationaryPosition, select_motion_measurement
 from .intersection_map import (
     DEFAULT_INTERSECTION_MAP_URL,
     load_intersection_map,
@@ -31,9 +31,11 @@ from .intersection_map import (
     select_intersection_id,
 )
 from .signal_logic import (
+    DEFAULT_PHASE_URL,
     DEFAULT_TIMING_URL,
-    request_signal_data,
-    signal_remaining_for_crosswalk,
+    evaluate_pedestrian_signal,
+    newer_signal_record,
+    request_signal_bundle,
 )
 from .speed_profile import UserSpeedProfile
 
@@ -60,11 +62,14 @@ def _finite_or_nan(value: Any) -> float:
 class CrosswalkController(Node):
     def __init__(self) -> None:
         super().__init__('crosswalk_controller')
+        self._fix_gate = GpsFixGate()
+        self._stationary_position = StationaryPosition()
         defaults = {
             'crosswalk_file': '',
             'api_key_file': '',
             'intersection_id': '',
             'signal_url': DEFAULT_TIMING_URL,
+            'signal_phase_url': DEFAULT_PHASE_URL,
             'intersection_map_url': DEFAULT_INTERSECTION_MAP_URL,
             'intersection_map_page_size': 100,
             'intersection_map_max_pages': 30,
@@ -74,6 +79,7 @@ class CrosswalkController(Node):
                 '~/.cache/safestride/v2x_intersections.json'
             ),
             'maximum_intersection_distance_m': 120.0,
+            'intersection_ambiguity_margin_m': 10.0,
             'update_rate_hz': 5.0,
             'gps_timeout_s': 2.0,
             'speed_timeout_s': 1.0,
@@ -91,7 +97,9 @@ class CrosswalkController(Node):
             'signal_cache_max_age_s': 12.0,
             'signal_request_timeout_s': 3.0,
             'maximum_crosswalk_distance_m': 80.0,
-            'default_safe_speed_mps': 0.50,
+            'default_safe_speed_mps': 1.00,
+            'reaction_time_s': 1.0,
+            'entry_safety_margin_s': 2.0,
             'profile_file': '',
             'motion_output_enabled': False,
             'fix_topic': '/gps/fix',
@@ -128,6 +136,7 @@ class CrosswalkController(Node):
             self.get_parameter('intersection_id').value
         ).strip()
         self._signal_url = str(self.get_parameter('signal_url').value)
+        self._phase_url = str(self.get_parameter('signal_phase_url').value)
         self._intersection_map_url = str(
             self.get_parameter('intersection_map_url').value
         )
@@ -211,7 +220,10 @@ class CrosswalkController(Node):
             self.get_parameter('output_frame_id').value
         )
 
-        self._controller = CrossingStateMachine(CrossingParameters())
+        self._controller = CrossingStateMachine(CrossingParameters(
+            reaction_time_s=self._nonnegative('reaction_time_s'),
+            entry_safety_margin_s=self._nonnegative('entry_safety_margin_s'),
+        ))
         self._profile = UserSpeedProfile(
             str(self.get_parameter('profile_file').value),
             default_speed_mps=default_safe_speed,
@@ -239,6 +251,7 @@ class CrosswalkController(Node):
         self._signal_future_id = ''
         self._signal_cache: Optional[Mapping[str, Any]] = None
         self._signal_cache_id = ''
+        self._phase_cache = None
         self._signal_cache_time: Optional[float] = None
         self._last_signal_request = -math.inf
         self._signal_error = ''
@@ -395,7 +408,16 @@ class CrosswalkController(Node):
         )
         if valid:
             now = self._now()
-            current = (latitude, longitude)
+            if not self._fix_gate.accept(latitude, longitude, now):
+                return
+            stationary = (
+                self._fresh(now, self._odom_time, self._speed_timeout)
+                and self._odom_speed is not None
+                and self._odom_speed < self._wheel_motion_min_speed
+                and not self._wheel_motion_active(now)
+            )
+            current = self._stationary_position.update(
+                latitude, longitude, now, stationary, self._gps_timeout)
             self._gps_motion.update(
                 latitude,
                 longitude,
@@ -404,6 +426,10 @@ class CrosswalkController(Node):
             )
             self._fix = current
             self._fix_time = now
+        else:
+            self._fix = None
+            self._fix_time = None
+            self._stationary_position = StationaryPosition()
 
     def _gps_speed_callback(self, message: Float32) -> None:
         speed = float(message.data)
@@ -481,8 +507,6 @@ class CrosswalkController(Node):
         )
 
     def _heading(self, now: float) -> Optional[float]:
-        if not self._motion_confirmed(now):
-            return None
         return self._gps_motion.heading(now, self._heading_timeout)
 
     def _consume_signal_future(self, now: float) -> None:
@@ -493,10 +517,20 @@ class CrosswalkController(Node):
         self._signal_future = None
         self._signal_future_id = ''
         try:
-            self._signal_cache = future.result()
+            result = future.result()
+            # Repeated API records must not restart the freshness timer.
+            if requested_id != self._signal_cache_id:
+                self._signal_cache = None
+                self._phase_cache = None
+            for name, attribute in (('timing', '_signal_cache'), ('phase', '_phase_cache')):
+                record = result.get(name)
+                if record is not None and newer_signal_record(record, getattr(self, attribute)):
+                    setattr(self, attribute, record)
             self._signal_cache_id = requested_id
-            self._signal_cache_time = now
-            self._signal_error = ''
+            self._signal_cache_time = self._last_signal_request
+            self._signal_error = '; '.join(
+                name + ': ' + result[name + '_error']
+                for name in ('timing', 'phase') if result.get(name + '_error'))
         except Exception as error:
             self._signal_error = str(error)
 
@@ -559,10 +593,11 @@ class CrosswalkController(Node):
         self._last_signal_request = now
         self._signal_future_id = intersection_id
         self._signal_future = self._executor.submit(
-            request_signal_data,
+            request_signal_bundle,
             self._api_key,
             intersection_id,
             url=self._signal_url,
+            phase_url=self._phase_url,
             timeout_s=self._signal_request_timeout,
         )
 
@@ -574,7 +609,7 @@ class CrosswalkController(Node):
     ) -> Tuple[Optional[float], bool, str]:
         self._request_signal_if_due(intersection_id, now)
         if (
-            self._signal_cache is None
+            self._phase_cache is None
             or self._signal_cache_id != intersection_id
             or not self._fresh(
                 now,
@@ -584,14 +619,10 @@ class CrosswalkController(Node):
         ):
             reason = self._signal_error or 'signal data unavailable or stale'
             return None, False, reason
-        try:
-            (remaining, _field), _raw = signal_remaining_for_crosswalk(
-                self._signal_cache,
-                direction,
-            )
-            return remaining, True, ''
-        except ValueError as error:
-            return None, False, str(error)
+        remaining, valid, reason = evaluate_pedestrian_signal(
+            self._signal_cache, self._phase_cache, direction, now,
+            self._signal_cache_max_age)
+        return remaining, valid, reason if valid else self._signal_error or reason
 
     def _publish_command(self, speed_mps: float) -> None:
         message = TwistStamped()
@@ -812,6 +843,17 @@ class CrosswalkController(Node):
                 key='crosswalk_count', value=str(len(self._crosswalks))
             ),
             KeyValue(key='signal_valid', value=str(signal_valid).lower()),
+            KeyValue(key='signal_reason', value=signal_reason),
+            KeyValue(key='gps_fix_gate', value=self._fix_gate.reason),
+            KeyValue(key='gps_position_held', value=str(self._stationary_position.held).lower()),
+            KeyValue(key='profile_speed_mps', value=str(self._profile.safe_speed())),
+            KeyValue(key='profile_sample_count', value=str(len(self._profile.samples))),
+            KeyValue(key='signal_record_timestamp', value=str(
+                (self._signal_cache or {}).get('trsmUtcTime', ''))),
+            KeyValue(key='signal_cache_age_s', value=str(
+                now - self._signal_cache_time if self._signal_cache_time is not None else math.inf)),
+            KeyValue(key='crosswalk_length_m', value=str((active or {}).get('length_m', math.nan))),
+            KeyValue(key='crosswalk_lateral_error_m', value=str((active or {}).get('lateral_error_m', math.nan))),
             KeyValue(
                 key='motion_output_enabled',
                 value=str(self._motion_output_enabled).lower(),
@@ -915,6 +957,7 @@ class CrosswalkController(Node):
                             maximum_distance_m=(
                                 self._maximum_intersection_distance
                             ),
+                            ambiguity_margin_m=self._nonnegative('intersection_ambiguity_margin_m'),
                         )
                     )
                 self._nearest_intersection = (
@@ -955,11 +998,17 @@ class CrosswalkController(Node):
                 allow_update=(
                     motion_confirmed
                     and self._controller.state
-                    not in ('WAIT_AT_CURB', 'CROSSING_URGENT')
+                    not in ('WAIT_AT_CURB', 'ENTRY_ALLOWED', 'CROSSING_URGENT')
                 ),
             )
+            if self._controller.state == 'WAIT_AT_CURB' and signal_reason == 'red pedestrian signal':
+                self._controller.reason = 'wait; pedestrian signal is red'
         else:
-            self._controller.reset('GPS unavailable or stale')
+            if self._controller.state in ('CROSSING', 'CROSSING_URGENT'):
+                self._controller.set_state(
+                    'CROSSING_URGENT', 'continue crossing; GPS unavailable or stale')
+            else:
+                self._controller.reset('GPS unavailable or stale')
             safe_speed = self._profile.safe_speed()
 
         selection_key = (

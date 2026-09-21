@@ -6,6 +6,46 @@ from typing import Optional, Tuple
 from .crosswalk_data import bearing_deg, haversine_m
 
 
+class GpsFixGate:
+    """Reject isolated jumps; reacquire a distant cluster after three fixes."""
+
+    def __init__(self) -> None:
+        self._accepted = None
+        self._candidate = None
+        self._candidate_count = 0
+        self.reason = 'no GPS fix'
+
+    def accept(self, latitude: float, longitude: float, now: float) -> bool:
+        if not all(math.isfinite(v) for v in (latitude, longitude, now)):
+            self.reason = 'non-finite GPS fix'
+            return False
+        current = (latitude, longitude, now)
+        if self._accepted is not None:
+            lat, lon, previous_time = self._accepted
+            elapsed = now - previous_time
+            if elapsed <= 0.0:
+                self.reason = 'non-increasing GPS time'
+                return False
+            distance = haversine_m(lat, lon, latitude, longitude)
+            # Allow 5 m of GNSS noise and up to 3 m/s, capped across outages.
+            if distance > 5.0 + 3.0 * min(elapsed, 5.0):
+                nearby = (
+                    self._candidate is not None
+                    and 0.0 < now - self._candidate[2] <= 2.0
+                    and haversine_m(*self._candidate[:2], latitude, longitude) <= 5.0
+                )
+                self._candidate_count = self._candidate_count + 1 if nearby else 1
+                self._candidate = current
+                if self._candidate_count < 3:
+                    self.reason = 'GPS jump awaiting confirmation'
+                    return False
+        self._accepted = current
+        self._candidate = None
+        self._candidate_count = 0
+        self.reason = 'accepted'
+        return True
+
+
 def select_motion_measurement(
     *,
     odom_fresh: bool,
@@ -137,4 +177,21 @@ class GpsMotionTracker:
         )
 
 
-__all__ = ['GpsMotionTracker', 'select_motion_measurement']
+class StationaryPosition:
+    """Hold control position only with fresh wheel-confirmed standstill."""
+
+    def __init__(self):
+        self.position = None
+        self.time = None
+        self.held = False
+
+    def update(self, latitude, longitude, now, stationary, timeout_s=2.0):
+        continuous = self.time is not None and 0 <= now - self.time <= timeout_s
+        self.held = stationary and continuous and self.position is not None
+        if not self.held:
+            self.position = (latitude, longitude)
+        self.time = now
+        return self.position
+
+
+__all__ = ['GpsMotionTracker', 'select_motion_measurement', 'StationaryPosition']

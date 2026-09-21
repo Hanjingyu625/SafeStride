@@ -30,7 +30,7 @@ local function unknown(reason)
     text(7, "Slope N/A")
     text(8, "--")
     text(9, BUILD_TAG .. " | " .. reason, AMBER)
-    text(10, "Location: N/A")
+    text(10, "GPS: UNAVAILABLE")
 end
 
 local function render(w)
@@ -61,14 +61,16 @@ local function render(w)
 
     if not bit(valid, 4) or w.crosswalk == 0 then
         text(5, "Crosswalk N/A"); text(6, "No signal data")
-    elseif bit(flags, 16) and bit(flags, 64) and w.crosswalk == 3 then
-        text(5, "ENTRY ALLOWED", MINT)
-    elseif w.crosswalk == 4 or w.crosswalk == 5 then
-        text(5, bit(flags, 32) and "CROSSING: CAUTION" or "CROSSING", AMBER)
     elseif w.crosswalk == 6 then
         text(5, "CROSSING COMPLETE", MINT)
+    elseif not bit(flags, 64) then
+        text(5, "NO SIGNAL DATA", AMBER)
+    elseif bit(flags, 16) and w.crosswalk == 3 then
+        text(5, "CAN CROSS", MINT)
+    elseif w.crosswalk == 4 or w.crosswalk == 5 then
+        text(5, bit(flags, 32) and "CAUTION" or "CROSSING", bit(flags, 32) and AMBER or MINT)
     else
-        text(5, "WAIT AT CROSSWALK", AMBER)
+        text(5, "WAIT", AMBER)
     end
     if bit(valid, 4) and w.crosswalk ~= 0 then
         local distance = w.distance == 65535 and "--" or string.format("%.1f", w.distance / 10)
@@ -88,7 +90,7 @@ local function render(w)
         text(7, "Slope N/A"); text(8, "--")
     end
     text(9, w.hazard == 1 and "Front hazard detected" or "Receiving data", w.hazard == 1 and CORAL or MINT)
-    text(10, "Location: N/A") -- No geocoded location exists in the system topics.
+    text(10, bit(valid, 4) and "GPS: FIX OK" or "GPS: NO FIX")
 end
 
 local function update_display()

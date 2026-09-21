@@ -232,7 +232,9 @@ crosswalk_controller:
     signal_cache_max_age_s: 12.0
     signal_request_timeout_s: 3.0
     maximum_crosswalk_distance_m: 80.0
-    default_safe_speed_mps: 0.50
+    default_safe_speed_mps: 1.00
+    reaction_time_s: 1.0
+    entry_safety_margin_s: 2.0
     profile_file: ''
     # Enable only after logged Pi-only tests and lifted-wheel validation.
     motion_output_enabled: false
