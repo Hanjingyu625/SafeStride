@@ -1,6 +1,8 @@
 import unittest
 
-from safestride_navigation.crossing_policy import CrossingStateMachine
+from safestride_navigation.crossing_policy import (
+    CrossingParameters, CrossingStateMachine,
+)
 from safestride_navigation.crosswalk_data import nearest_crosswalk
 
 
@@ -43,6 +45,44 @@ def update(machine, latitude, signal_s, signal_valid=True, speed=0.5):
 
 
 class TestCrossingPolicy(unittest.TestCase):
+    def test_nominal_drive_speed_is_not_reduced_by_crosswalk_cap(self):
+        machine = CrossingStateMachine(clock=FakeClock())
+        for state in ('IDLE', 'ENTRY_ALLOWED', 'CROSSING'):
+            with self.subTest(state=state):
+                machine.set_state(state, 'test')
+                self.assertAlmostEqual(
+                    machine.command(1.0, 1.0)['target_speed_mps'], 1.0)
+        machine.set_state('CROSSING_URGENT', 'remaining signal is tight')
+        self.assertAlmostEqual(
+            machine.command(1.0, 1.0)['target_speed_mps'], 1.1)
+
+    def test_fast_feedback_remains_bounded_by_drive_ceiling(self):
+        machine = CrossingStateMachine(clock=FakeClock())
+        for state in ('CROSSING', 'CROSSING_URGENT'):
+            with self.subTest(state=state):
+                machine.set_state(state, 'test')
+                self.assertAlmostEqual(
+                    machine.command(1.0, 1.5)['target_speed_mps'], 1.15)
+
+    def test_custom_cap_and_curb_stop_still_apply(self):
+        machine = CrossingStateMachine(
+            CrossingParameters(maximum_assist_speed_mps=0.7),
+            clock=FakeClock())
+        machine.set_state('CROSSING_URGENT', 'test')
+        self.assertAlmostEqual(
+            machine.command(1.0, 1.0)['target_speed_mps'], 0.7)
+        machine.set_state('WAIT_AT_CURB', 'red signal')
+        self.assertEqual(machine.command(1.0, 1.0)['target_speed_mps'], 0.0)
+
+    def test_slow_profile_is_not_replaced_with_nominal_speed(self):
+        machine = CrossingStateMachine(clock=FakeClock())
+        machine.set_state('CROSSING', 'test')
+        self.assertAlmostEqual(
+            machine.command(0.35, 0.35)['target_speed_mps'], 0.35)
+        machine.set_state('CROSSING_URGENT', 'test')
+        self.assertAlmostEqual(
+            machine.command(0.35, 0.35)['target_speed_mps'], 0.45)
+
     def test_entry_time_uses_three_seconds_and_actual_profile_speed(self):
         for speed, seconds, expected in (
             (1.0, 26.0, 'ENTRY_ALLOWED'),

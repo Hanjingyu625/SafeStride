@@ -233,6 +233,8 @@ crosswalk_controller:
     signal_request_timeout_s: 3.0
     maximum_crosswalk_distance_m: 80.0
     default_safe_speed_mps: 1.00
+    # Match safety_supervisor.max_forward_velocity and the MCU wheel limit.
+    maximum_assist_speed_mps: 1.15
     reaction_time_s: 1.0
     entry_safety_margin_s: 2.0
     profile_file: ''

@@ -98,6 +98,7 @@ class CrosswalkController(Node):
             'signal_request_timeout_s': 3.0,
             'maximum_crosswalk_distance_m': 80.0,
             'default_safe_speed_mps': 1.00,
+            'maximum_assist_speed_mps': 1.15,
             'reaction_time_s': 1.0,
             'entry_safety_margin_s': 2.0,
             'profile_file': '',
@@ -221,6 +222,7 @@ class CrosswalkController(Node):
         )
 
         self._controller = CrossingStateMachine(CrossingParameters(
+            maximum_assist_speed_mps=self._positive('maximum_assist_speed_mps'),
             reaction_time_s=self._nonnegative('reaction_time_s'),
             entry_safety_margin_s=self._nonnegative('entry_safety_margin_s'),
         ))

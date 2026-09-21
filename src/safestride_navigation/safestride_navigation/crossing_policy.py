@@ -27,7 +27,8 @@ class CrossingParameters:
     entry_safety_margin_s: float = 2.0
     crossing_time_margin_s: float = 2.0
     minimum_estimate_speed_mps: float = 0.15
-    maximum_assist_speed_mps: float = 0.85
+    # Matches the drive ceiling: 10000 mrad/s at a 0.115 m wheel radius.
+    maximum_assist_speed_mps: float = 1.15
     maximum_lateral_error_m: float = 3.0
     gps_progress_tolerance_m: float = 3.0
 
