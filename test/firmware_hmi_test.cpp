@@ -16,7 +16,40 @@ static void ack(bool corrupt=false) {
   if(corrupt) bytes[6]^=1;
   hmi_uart_test::rx().assign(bytes,bytes+8);
 }
+
+static void verifyScenario(const uint16_t* expected) {
+  uint8_t payload[32];
+  pack(expected,payload);
+
+  hmi::State state;
+  assert(state.accept(payload,sizeof(payload),1,100));
+  for (size_t i=0; i<hmi::WORDS; ++i) assert(state.words[i]==expected[i]);
+
+  uint8_t frame[41];
+  assert(hmi::buildWrite(frame,1,0,state.words)==sizeof(frame));
+  assert(frame[0]==1 && frame[1]==0x10);
+  assert(frame[2]==0 && frame[3]==0 && frame[4]==0 && frame[5]==16);
+  assert(frame[6]==32);
+  for (size_t i=0; i<hmi::WORDS; ++i) {
+    assert(frame[7+i*2]==(expected[i]>>8));
+    assert(frame[8+i*2]==(expected[i]&255));
+  }
+  assert(hmi::modbusCrc(frame,sizeof(frame))==0);
+}
+
 int main() {
+  // Same six PC-only operating states covered by test_hmi_scenarios.py.
+  const uint16_t scenarios[][hmi::WORDS] = {
+    {2,1,63,125,3,3,15,42,0,0,0,2,0,0,1,83},
+    {2,1,63,85,3,2,65535,35,85,0,0,2,0,0,1,3},
+    {2,1,63,70,3,4,9,21,65466,0,0,2,0,0,1,67},
+    {2,1,63,20,3,2,5,15,0,0,0,2,1,0,1,67},
+    {2,1,63,0,3,2,65535,15,0,3,1,2,0,0,1,3},
+    {2,1,0,65535,0,0,65535,65535,0,5,0,0,0,0,1,0},
+  };
+  for (size_t i=0; i<sizeof(scenarios)/sizeof(scenarios[0]); ++i)
+    verifyScenario(scenarios[i]);
+
   hmi::State state;
   uint16_t words[16]={2,1,63,125,3,3,6,42,65526,3,1,2,0,0,1,19};
   uint8_t payload[32]; pack(words,payload);

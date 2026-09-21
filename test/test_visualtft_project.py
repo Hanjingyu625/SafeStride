@@ -23,6 +23,8 @@ class VisualTftProjectTests(unittest.TestCase):
         self.assertEqual(project.attrib["Name"], "SafeStride")
         self.assertEqual(project.attrib["StartupPage"], "Screen0")
         self.assertEqual(project.attrib["DeviceType"], "19005")
+        # VisualTFT baud index 4 is 19200, matching terrain_mcu/ezhmi_transport.h.
+        self.assertEqual(project.attrib["DeviceBaudRate"], "4")
         self.assertEqual(
             [page.attrib["RelativePath"] for page in project.findall("./Pages/Page")],
             ["Screen0.tft", "Screen1.tft"],

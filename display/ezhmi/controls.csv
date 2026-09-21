@@ -1,15 +1,15 @@
 screen,id,type,x,y,width,height,font_px,initial_text
 0,1,text,80,98,320,64,40,SafeStride
-1,1,text,20,68,204,38,32,-- km/h
-1,2,text,20,112,204,20,16,Grip: unavailable
-1,3,text,20,174,204,28,24,? UNAVAILABLE
-1,4,text,20,206,204,20,14,Waiting for link
-1,5,text,256,68,204,28,22,Crosswalk N/A
-1,6,text,256,101,204,20,14,No signal data
-1,7,text,256,174,204,28,24,Slope N/A
-1,8,text,256,206,204,20,18,--
-1,9,text,16,242,448,20,14,Waiting for link
-1,10,text,256,122,204,18,14,Location: N/A
+1,1,text_display,20,68,204,38,32,-- km/h
+1,2,text_display,20,112,204,20,16,Grip: unavailable
+1,3,text_display,20,174,204,28,24,? UNAVAILABLE
+1,4,text_display,20,206,204,20,14,Waiting for link
+1,5,text_display,256,68,204,28,22,Crosswalk N/A
+1,6,text_display,256,101,204,20,14,No signal data
+1,7,text_display,256,174,204,28,24,Slope N/A
+1,8,text_display,256,206,204,20,18,--
+1,9,text_display,16,242,448,20,14,Waiting for link
+1,10,text_display,256,122,204,18,14,Location: N/A
 1,11,button,380,7,84,27,14,DEV
 1,12,text,16,7,200,27,22,SafeStride
 1,13,text,20,46,204,18,14,CURRENT SPEED

@@ -2,9 +2,11 @@
 -- ASCII-only display strings avoid missing glyphs in the bundled LCD fonts.
 -- LCD is a Modbus SLAVE. This script never sends motor/control commands.
 local PAGE = 1
+local BUILD_TAG = "BUILD 2"
 local MINT, AMBER, CORAL, MUTED = 0x6FF9, 0xFDEE, 0xFB6E, 0x94B3
 local ticks, last_change, last_heartbeat = 0, 0, nil
 local received = false
+local page_entered = false
 local names = {"version", "heartbeat", "valid", "speed", "hands", "crosswalk",
     "seconds", "distance", "pitch", "tof", "hazard", "walker", "braking",
     "faults", "host_link", "flags"}
@@ -27,7 +29,7 @@ local function unknown(reason)
     text(6, "No signal data")
     text(7, "Slope N/A")
     text(8, "--")
-    text(9, reason, AMBER)
+    text(9, BUILD_TAG .. " | " .. reason, AMBER)
     text(10, "Location: N/A")
 end
 
@@ -89,18 +91,12 @@ local function render(w)
     text(10, "Location: N/A") -- No geocoded location exists in the system topics.
 end
 
-function on_init()
-    ticks, last_change, last_heartbeat, received = 0, 0, nil, false
-    change_screen(0) -- SafeStride logo screen
-    set_enable(PAGE, 11, 0) -- DEV button stays disabled
-    unknown("Waiting for link")
-    start_timer(0, 100, 1, 0)
-end
-
-function on_timer(timer_id)
-    if timer_id ~= 0 then return end
-    ticks = ticks + 1
-    if ticks == 22 then change_screen(PAGE) end -- 2.2 second intro
+local function update_display()
+    if not page_entered then
+        if ticks < 2 then return end
+        change_screen(PAGE) -- Two-second SafeStride intro.
+        page_entered = true
+    end
     local w = {}
     for _, name in ipairs(names) do
         local value = get_variant("ss_" .. name)
@@ -112,14 +108,32 @@ function on_timer(timer_id)
     end
     if w.version ~= 2 then unknown("Display / firmware mismatch"); return end
     if last_heartbeat == nil then
-        last_heartbeat = w.heartbeat -- Initial register defaults are not live data.
+        last_heartbeat = w.heartbeat
+        -- Non-zero heartbeat plus a live host link cannot be an untouched default.
+        if w.heartbeat ~= 0 and w.host_link == 1 then
+            last_change, received = ticks, true
+        end
     elseif last_heartbeat ~= w.heartbeat then
         last_heartbeat, last_change, received = w.heartbeat, ticks, true
     end
     -- Runs on the LCD, so Terrain power loss cannot leave a green frozen screen.
-    if not received or ticks - last_change >= 10 or w.host_link ~= 1 then
+    if not received or ticks - last_change >= 1 or w.host_link ~= 1 then
         unknown("Link lost / waiting")
         return
     end
     render(w)
+end
+
+function on_init()
+    ticks, last_change, last_heartbeat, received = 0, 0, nil, false
+    page_entered = false
+    change_screen(0) -- SafeStride logo screen
+    set_enable(PAGE, 11, 0) -- DEV button stays disabled
+    unknown("Waiting for link")
+end
+
+function on_systick()
+    -- VisualTFT calls this callback automatically once per second.
+    ticks = ticks + 1
+    update_display()
 end
