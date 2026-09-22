@@ -189,11 +189,13 @@ def nearest_intersection(
     longitude: float,
     *,
     maximum_distance_m: float,
+    ambiguity_margin_m: float = 0.0,
 ) -> Optional[Intersection]:
     if not math.isfinite(maximum_distance_m) or maximum_distance_m <= 0.0:
         raise ValueError('maximum_distance_m must be finite and positive')
     selected: Optional[Mapping[str, Any]] = None
     selected_distance = math.inf
+    second_distance = math.inf
     for item in intersections:
         distance = haversine_m(
             latitude,
@@ -202,9 +204,14 @@ def nearest_intersection(
             float(item['longitude']),
         )
         if distance <= maximum_distance_m and distance < selected_distance:
+            second_distance = selected_distance
             selected = item
             selected_distance = distance
+        elif distance <= maximum_distance_m:
+            second_distance = min(second_distance, distance)
     if selected is None:
+        return None
+    if ambiguity_margin_m > 0.0 and second_distance - selected_distance < ambiguity_margin_m:
         return None
     result = dict(selected)
     result['distance_m'] = selected_distance

@@ -1,56 +1,71 @@
+# scripts/run.sh의 기본 실행 설정. SAFESTRIDE_CONFIG를 지정하면 다른 YAML을 사용한다.
+# ros__parameters 아래의 값은 해당 ROS 노드가 시작할 때 읽는다. 수정 후 노드를 재시작한다.
+# 단위: m=미터, m/s=선속도, rad=라디안, rad/s=각속도, s=초, ms=밀리초, Hz=초당 횟수.
+# PWM은 Arduino 0~255 척도의 count다. 100은 약 39.2% 듀티이며 속도 100%를 뜻하지 않는다.
+# MCU의 P 게인, PWM 변화율, 3초/600ms 감속, 8/7km/h 과속 역치는 firmware의 config.h/코드에서 설정한다.
+# 속도 변화 경우와 역치 설명: docs/SPEED_CHANGE_THRESHOLDS_KO.md
+
+# 구동용 Arduino(Drive Uno)와 통신하고 모터 명령·Hall·압력·주행 상태를 전달한다.
 serial_bridge:
   ros__parameters:
     serial:
-      port: /dev/safestride-drive
-      baudrate: 115200
-      read_chunk_size: 256
-      max_frame_size: 160
-      reconnect_period_s: 1.0
-    # Drive telemetry is 50 Hz; polling at 100 Hz leaves serial and CPU margin.
-    transport: {poll_rate_hz: 100.0}
+      port: /dev/safestride-drive  # Drive Uno의 USB 직렬 장치 경로
+      baudrate: 115200  # 통신 속도(bps). MCU의 SERIAL_BAUD와 일치해야 한다.
+      read_chunk_size: 256  # 한 번에 읽을 최대 바이트 수
+      max_frame_size: 160  # 수신 프레임 최대 크기(바이트)
+      reconnect_period_s: 1.0  # 연결 실패 시 재시도 간격(초)
+    transport:
+      poll_rate_hz: 100.0  # 직렬 수신 확인 주기. MCU 상태 송신은 50Hz다.
     command:
-      publish_rate_hz: 50.0
-      # Allow short Pi scheduling stalls without dropping the 20 Hz cruise
-      # stream. The MCU still enforces its independent 200 ms frame TTL.
-      timeout_s: 0.50
-      ttl_ms: 200
-      # Use /cmd_vel_safe and the Hall-speed PID instead of fixed PWM drive.
-      deadman_direct_drive: false
-      deadman_forward_velocity_m_s: 0.10
-      # Calibration state remains diagnostic; pulse feedback and stall checks
-      # are still active in the closed-loop firmware.
-      require_hall_calibration: false
-      max_abs_angular_z_rad_s: 0.0
-      allow_magnet_bench_mode: false
-      auto_arm_magnet_bench_mode: false
-    telemetry: {timeout_s: 0.30}
-    diagnostics: {publish_rate_hz: 1.0}
+      publish_rate_hz: 50.0  # MCU에 모터 명령을 보내는 주기(Hz)
+      timeout_s: 0.50  # 새 감독 명령이 이 시간 동안 없으면 disable 정지(초)
+      ttl_ms: 200  # 각 명령의 유효기간(ms). MCU는 새 수락 명령이 기한 내 없으면 정지한다.
+      deadman_direct_drive: false  # false: /drive/command 목표 사용. true: 아래 고정 선속도 요청 사용
+      deadman_forward_velocity_m_s: 0.10  # direct_drive=true일 때 요청할 전진속도(m/s)
+      require_hall_calibration: false  # true이면 Hall 보정 플래그가 있어야 enable 허용. false여도 Hall 피드백·고장 감시는 유지
+      max_abs_angular_z_rad_s: 0.0  # 회전속도 설정(rad/s). 현재 공통 구동/DriveCommand 경로에는 독립 회전 목표가 없다.
+      allow_magnet_bench_mode: false  # 자석을 손으로 움직이는 별도 MCU 시험 모드를 Pi에서 허용할지
+      auto_arm_magnet_bench_mode: false  # 허용된 자석 시험 모드의 자동 enable 여부
+    telemetry:
+      timeout_s: 0.30  # MCU 상태가 이 시간보다 오래되면 link 불량으로 판단(초)
+    diagnostics:
+      publish_rate_hz: 1.0  # 통신·제어 진단 발행 주기(Hz)
     base:
-      hall_pulses_per_revolution: 12
-      max_wheel_speed_rad_s: 10.0
-    range: {min_m: 0.02, max_m: 4.0, field_of_view_rad: 0.35}
-    # Nominal pack voltage is known, but no battery-to-ADC divider is fitted.
-    battery: {nominal_voltage: 12.0, empty_voltage: 0.0, full_voltage: 0.0}
+      hall_pulses_per_revolution: 12  # 바퀴 1회전당 자석 펄스 수. MCU 설정 및 실제 자석 수와 일치시킨다.
+      max_wheel_speed_rad_s: 10.0  # 바퀴 목표 각속도 상한. 반지름 0.115m에서 1.15m/s
+      # 반지름/바퀴 간격은 run.sh의 SAFESTRIDE_WHEEL_RADIUS_M / SAFESTRIDE_WHEEL_SEPARATION_M으로 전달한다.
+    range:
+      min_m: 0.02  # 전방 거리 메시지의 최소 유효거리(m). 현재 Drive 전방 센서는 미구현
+      max_m: 4.0  # 전방 거리 메시지의 최대거리(m)
+      field_of_view_rad: 0.35  # 전방 거리 센서 시야각(rad)
+    battery:
+      nominal_voltage: 12.0  # 배터리 명목 전압(V). 현재 배터리 ADC 센싱은 꺼져 있다.
+      empty_voltage: 0.0  # 잔량 환산용 방전 전압(V). 0/0이면 환산 미설정
+      full_voltage: 0.0  # 잔량 환산용 완충 전압(V). 설정 시 empty_voltage보다 커야 한다.
     frames:
-      odom: odom
-      base: base_footprint
-      range_left: front_left_range_link
-      range_right: front_right_range_link
-    joints: {left: left_wheel_joint, right: right_wheel_joint}
+      odom: odom  # 바퀴 이동을 적분한 위치의 기준 좌표계
+      base: base_footprint  # 보행기 본체 기준 좌표계
+      range_left: front_left_range_link  # 왼쪽 전방 거리 센서 좌표계
+      range_right: front_right_range_link  # 오른쪽 전방 거리 센서 좌표계
+    joints:
+      left: left_wheel_joint  # 왼쪽 바퀴 조인트 이름(URDF와 일치)
+      right: right_wheel_joint  # 오른쪽 바퀴 조인트 이름. 현재 Hall 값은 왼쪽 측정의 복제
     topics:
-      cmd_vel: /cmd_vel_safe
-      joint_states: /joint_states
-      odom: /odom
-      range_left: /range/front_left
-      range_right: /range/front_right
-      battery: /battery_state
-      pressure: /handle/pressure
-      hall: /wheel/hall
-      status: /walker/status
-      diagnostics: /diagnostics
-    services: {set_enabled: /walker/set_enabled}
-    publish_tf: true
+      cmd_vel: /cmd_vel_safe  # 안전 목표 관측 토픽 이름. 실제 브리지 구독은 /drive/command의 DriveCommand다.
+      joint_states: /joint_states  # 바퀴 회전 위치·속도 발행
+      odom: /odom  # 바퀴 기반 위치·속도 추정 발행
+      range_left: /range/front_left  # 왼쪽 전방 거리 발행
+      range_right: /range/front_right  # 오른쪽 전방 거리 발행
+      battery: /battery_state  # 배터리 상태 발행
+      pressure: /handle/pressure  # 양손 압력·접촉 상태 발행
+      hall: /wheel/hall  # Hall 펄스·바퀴 속도 발행
+      status: /walker/status  # ARM·손 접촉·고장·PWM·측정속도 등 주행 상태 발행
+      diagnostics: /diagnostics  # 진단 상태 발행
+    services:
+      set_enabled: /walker/set_enabled  # false: 주행 enable 차단. true: 물리조건·새 명령에 따른 enable 허용
+    publish_tf: true  # odom에서 본체까지의 좌표 변환(TF)을 발행할지
 
+# 지형용 Arduino(Terrain Uno)의 하향 ToF·MPU6050 측정과 LCD 표시를 전달한다.
 terrain_bridge:
   ros__parameters:
     # Level reference: pitch -6.646310 deg, roll -3.380451 deg.
@@ -59,206 +74,209 @@ terrain_bridge:
       pitch_offset_rad: -0.116
       roll_offset_rad: -0.059
     hmi:
-      enabled: true
-      pitch_sign: -1.0  # Match safety_supervisor.uphill_pitch_sign.
-      pitch_offset_rad: 0.0  # Match safety_supervisor.pitch_offset_rad.
+      enabled: true  # LCD/HMI 표시 데이터 중계 활성화
+      pitch_sign: -1.0  # 화면 경사 부호. safety_supervisor.uphill_pitch_sign과 맞춘다.
+      pitch_offset_rad: 0.0  # 화면 경사 영점 보정(rad). 감독의 pitch_offset_rad와 맞춘다.
       topics:
         surface: /perception/surface_condition
     serial:
-      port: /dev/safestride-terrain
-      baudrate: 115200
-      read_chunk_size: 256
-      max_frame_size: 160
-      reconnect_period_s: 1.0
-    transport: {poll_rate_hz: 100.0}
-    telemetry: {timeout_s: 0.30}
-    diagnostics: {publish_rate_hz: 1.0}
-    range: {min_m: 0.10, max_m: 2.0, field_of_view_rad: 0.052}
-    frames: {tof: terrain_tof_link, imu: imu_link}
+      port: /dev/safestride-terrain  # Terrain Uno USB 직렬 장치 경로
+      baudrate: 115200  # Terrain MCU와 같은 통신 속도(bps)
+      read_chunk_size: 256  # 한 번에 읽을 최대 바이트 수
+      max_frame_size: 160  # 수신 프레임 최대 크기(바이트)
+      reconnect_period_s: 1.0  # 연결 재시도 간격(초)
+    transport:
+      poll_rate_hz: 100.0  # 직렬 수신 확인 주기(Hz)
+    telemetry:
+      timeout_s: 0.30  # 지형 보드 상태의 link 최근성 기준(초)
+    diagnostics:
+      publish_rate_hz: 1.0  # 지형 보드 진단 발행 주기(Hz)
+    range:
+      min_m: 0.10  # 하향 ToF 거리 메시지의 최소거리(m)
+      max_m: 2.0  # 하향 ToF 거리 메시지의 최대거리(m)
+      field_of_view_rad: 0.052  # ToF 시야각(rad, 약 3도)
+    frames:
+      tof: terrain_tof_link  # 하향 ToF 좌표계
+      imu: imu_link  # MPU6050 좌표계
     topics:
-      tof: /terrain/tof
-      imu: /terrain/imu
-      status: /terrain/status
-      diagnostics: /diagnostics
+      tof: /terrain/tof  # 하향 거리 Range 메시지 발행
+      imu: /terrain/imu  # 자세·가속도·자이로 IMU 메시지 발행
+      status: /terrain/status  # 감독이 소비하는 pitch·ToF 위험·유효성·측정 나이 발행
+      diagnostics: /diagnostics  # 지형 센서·통신 진단 발행
 
+# 원래 목표에 안전 조건과 경사 보조를 적용하여 실제 구동 명령을 만든다.
 safety_supervisor:
   ros__parameters:
-    publish_rate: 20.0
-    diagnostic_rate: 2.0
-    command_timeout: 0.50
-    status_timeout: 0.50
-    max_telemetry_age: 0.50
-    range_timeout: 0.35
-    # TOF is telemetry-only on the current hardware; MPU slope assistance stays
-    # active, and an invalid MPU sample falls back to a neutral speed scale.
-    range_control_enabled: false  # No front-range motor slowdown/stop
-    require_range_sensors: false
-    terrain_stop_enabled: false  # ToF telemetry only; no motor stop
-    require_surface_condition: false
-    surface_control_enabled: false
-    drive_command_topic: /drive/command
-    brake_enter_deg: 15.0
-    brake_release_deg: 12.0
-    brake_recovery_s: 0.5
-    drive_pwm_cap: 140
-    require_deadman: true
-    slope_control_enabled: true
-    max_forward_velocity: 1.15
-    max_reverse_velocity: 0.08
-    max_angular_velocity: 0.0
-    max_linear_acceleration: 0.20
-    max_linear_deceleration: 0.50
-    max_angular_acceleration: 0.50
-    max_angular_deceleration: 1.00
-    # pitch_rad is used because accel Z alone has no uphill/downhill sign.
-    # If lifting the walker front makes pitch_rad negative, change only this
-    # value to -1.0 after the first stationary orientation check.
-    uphill_pitch_sign: -1.0
-    # Terrain status is already zeroed by terrain_bridge; do not subtract twice.
-    pitch_offset_rad: 0.0
-    slope_enter_angle_rad: 0.08726646259971647  # 5 deg
-    slope_exit_angle_rad: 0.05235987755982989  # 3 deg
-    slope_confirmation_time_s: 0.50
-    downhill_speed_scale: 0.6
-    uphill_speed_scale: 1.0
-    max_combined_speed_scale: 1.25
-    stop_distance: 0.35
-    slow_distance: 0.80
-    command_topic: /cmd_vel
-    safe_command_topic: /cmd_vel_safe
-    left_range_topic: /range/front_left
-    right_range_topic: /range/front_right
-    status_topic: /walker/status
-    terrain_status_topic: /terrain/status
-    diagnostics_topic: /diagnostics
-    output_frame_id: base_link
+    publish_rate: 20.0  # 안전 판정·목표 명령 발행 주기(Hz)
+    diagnostic_rate: 2.0  # 안전 판정 이유의 진단 발행 주기(Hz)
+    command_timeout: 0.50  # 원래 목표가 오래되면 정지(초)
+    status_timeout: 0.50  # /walker/status가 오래되면 정지(초)
+    max_telemetry_age: 0.50  # Drive 상태와 ToF 판정의 허용 측정 나이(초)
+    range_timeout: 0.35  # 거리 입력 및 MPU 측정 최근성 검사 기준(초)
+    range_control_enabled: false  # 전방 거리 모터 제어는 꺼짐
+    require_range_sensors: false  # 현재 코드에서 이 값만으로 ToF 누락 정지를 요구하지 않는다.
+    terrain_stop_enabled: false  # 하향 ToF는 모니터링 전용
+    require_surface_condition: false  # 노면 제어가 켜졌을 때 유효 노면 입력을 필수로 요구할지
+    surface_control_enabled: false  # 카메라 노면 분류의 속도 배율을 목표에 반영할지. 현재 꺼짐
+    drive_command_topic: /drive/command  # 목표·경사 FF·PWM cap·모드를 묶은 실제 구동 명령 토픽
+    brake_enter_deg: 7.0  # 내리막 확정 전에도 7도 이상이면 3초 PWM 감속을 먼저 시작
+    brake_release_deg: 4.0  # 내리막이 4도 이하로 완화되어야 경사 정지 해제 가능(진입값보다 작아야 함)
+    brake_recovery_s: 0.5  # 해제 가능한 유효 경사를 유지해야 하는 시간(초)
+    drive_pwm_cap: 140  # 최종 PWM cap(count). MCU MAX_PWM 상한도 함께 적용
+    require_deadman: true  # 양손 접촉을 정상 주행 조건으로 요구
+    slope_control_enabled: true  # MPU 경사 보조·정지 활성화. 현재 IMU 무효/오래됨은 BRAKE 요청
+    max_forward_velocity: 1.15  # 전진 목표 상한(m/s, 4.14km/h)
+    max_reverse_velocity: 0.08  # 후진 목표 크기 상한(m/s)
+    max_angular_velocity: 0.0  # 회전 목표 상한(rad/s). 현재 회전 요청은 지원하지 않음
+    max_linear_acceleration: 0.20  # Pi 목표 선속도 상승률(m/s²). MCU에 별도 각속도 ramp도 있음
+    max_linear_deceleration: 0.50  # 정상 목표 선속도 하강률(m/s²). BRAKE·손 해제·지형 감속은 별도 경로
+    max_angular_acceleration: 0.50  # 목표 회전속도 상승률(rad/s²). 현재 회전 상한은 0
+    max_angular_deceleration: 1.00  # 목표 회전속도 하강률(rad/s²)
+    uphill_pitch_sign: -1.0  # 보정 후 음수 pitch=오르막, 양수=내리막
+    pitch_offset_rad: 0.0  # terrain_bridge가 보정한 pitch를 다시 보정하지 않음
+    slope_enter_angle_rad: 0.08726646259971647  # 경사 분류 진입 5도(rad). 오르막 보조 진입 기준
+    slope_exit_angle_rad: 0.05235987755982989  # 경사 분류 이탈 3도(rad). 진입값보다 작아야 함
+    slope_confirmation_time_s: 0.50  # 경사 후보가 지속돼야 상태를 확정하는 시간(초). 7도 정지 진입은 별도
+    downhill_speed_scale: 1.0  # 내리막 목표 배율은 유지; 확정 시 별도 BRAKE로 PWM 0
+    uphill_speed_scale: 1.0  # 오르막 목표속도 유지; 경사 FF만 추가
+    max_combined_speed_scale: 1.25  # 노면·경사 증속 배율의 곱 상한. 감속 배율이 있으면 작은 배율 우선
+    stop_distance: 0.35  # 전방 거리 <=0.35m BRAKE, range_control_enabled=true일 때만
+    slow_distance: 0.80  # 전방 거리 0.35~0.80m 감속, range_control_enabled=true일 때만
+    command_topic: /cmd_vel  # Cruise 또는 상위 정책이 요청하는 원래 목표 입력
+    safe_command_topic: /cmd_vel_safe  # 감독 후 안전 목표를 관측용으로 발행
+    left_range_topic: /range/front_left  # 선택 왼쪽 전방 거리 입력
+    right_range_topic: /range/front_right  # 선택 오른쪽 전방 거리 입력
+    status_topic: /walker/status  # 양손·ARM·fault·통신 상태 입력
+    terrain_status_topic: /terrain/status  # 경사·하향 ToF 위험 입력
+    diagnostics_topic: /diagnostics  # 정지·제한 이유 발행
+    output_frame_id: base_link  # 목표 메시지의 기준 좌표계
 
+# 안전 제한을 적용하기 전의 기본 직진 목표를 계속 발행한다.
 cruise_command:
   ros__parameters:
-    speed_mps: 1.0
-    publish_rate_hz: 20.0
-    command_topic: /cmd_vel
-    frame_id: base_link
+    speed_mps: 1.0  # 기본 요청 선속도(m/s, 3.6km/h). 노드에서 허용하는 설정 범위는 0~1.0
+    publish_rate_hz: 20.0  # 기본 목표 발행 주기(Hz)
+    command_topic: /cmd_vel  # 안전 감독에 전달할 원래 목표 토픽
+    frame_id: base_link  # 목표 기준 좌표계
 
+# 카메라 영상으로 노면을 분류한다. 노드 실행 여부와 감독의 속도 반영 여부는 별도다.
 surface_perception:
   ros__parameters:
     camera:
-      device: ''  # Optional /dev/v4l/by-id/... path; overrides index.
-      index: 0
-      backend: v4l2
-      width: 640
-      height: 480
-      reconnect_period_s: 2.0
-      compressed_topic: /camera/image/compressed
-      jpeg_quality: 70
+      device: ''  # 지정하면 카메라 index 대신 이 장치 경로 사용
+      index: 0  # 카메라 장치 번호(예: /dev/video0)
+      backend: v4l2  # Linux 카메라 입력 방식
+      width: 640  # 요청 영상 가로 해상도(px)
+      height: 480  # 요청 영상 세로 해상도(px)
+      reconnect_period_s: 2.0  # 카메라 연결 재시도 간격(초)
+      compressed_topic: /camera/image/compressed  # JPEG 미리보기 토픽
+      jpeg_quality: 70  # 미리보기 JPEG 품질(0~100)
     model:
-      path: ''
-      classes_path: ''
-      confidence_threshold: 0.65
-      min_top1_margin: 0.15
-      ema_alpha: 0.75
-      cpu_threads: 1
-      version: ''
-    inference_rate_hz: 1.0
-    diagnostic_rate_hz: 1.0
-    surface_topic: /perception/surface_condition
-    diagnostics_topic: /diagnostics
-    frame_id: camera_link
+      path: ''  # TorchScript 모델 파일 경로. run.sh가 환경변수/기본 경로로 덮어쓸 수 있음
+      classes_path: ''  # 모델 출력 클래스 목록 경로. run.sh에서 덮어쓸 수 있음
+      confidence_threshold: 0.65  # top1 분류 신뢰도 최소값(0~1)
+      min_top1_margin: 0.15  # top1과 top2 신뢰도 차이 최소값. 애매한 예측을 제외
+      ema_alpha: 0.75  # 이전 분류 확률의 유지 비율. 클수록 예측 변화가 느림(새 확률 비율은 1-alpha)
+      cpu_threads: 1  # 모델 추론에 사용할 CPU 스레드 수
+      version: ''  # 진단 메시지에 기록할 모델 버전
+    inference_rate_hz: 1.0  # 노면 추론 주기(Hz)
+    diagnostic_rate_hz: 1.0  # 카메라·모델 진단 주기(Hz)
+    surface_topic: /perception/surface_condition  # 분류·신뢰도·권장 속도 배율 발행
+    diagnostics_topic: /diagnostics  # 인식 진단 발행
+    frame_id: camera_link  # 카메라 기준 좌표계
 
+# BE-220 GPS는 Terrain Uno가 아니라 Raspberry Pi 직렬 포트에 직접 연결한다.
+# GPS 속도는 MCU Hall P 제어에 들어가지 않는다. 위치·방향 및 횡단보도 정책의 보조 입력이다.
 gps_node:
   ros__parameters:
-    # BE-220 is connected directly to the Raspberry Pi, not the Terrain Uno.
-    port: /dev/serial0
-    baudrate: 115200
-    poll_rate_hz: 50.0
-    reconnect_period_s: 1.0
-    frame_id: gps_link
-    fix_topic: /gps/fix
-    speed_topic: /gps/speed
-    raw_speed_topic: /gps/speed_raw
-    course_topic: /gps/course
-    diagnostics_topic: /diagnostics
-    nmea_timeout_s: 2.0
-    fix_timeout_s: 2.0
-    diagnostic_rate_hz: 1.0
-    course_min_speed_mps: 0.20
-    # GPS is a fallback. Hall odometry remains authoritative for walking speed.
-    speed_filter_window_s: 8.0
-    # Ignore receiver-acquisition transients after startup or reconnect.
-    speed_filter_settling_time_s: 15.0
-    speed_filter_minimum_span_s: 4.0
-    speed_filter_minimum_samples: 5
-    speed_filter_minimum_displacement_m: 1.0
-    speed_filter_hdop_displacement_scale_m: 0.50
-    speed_filter_minimum_path_efficiency: 0.55
-    speed_filter_minimum_course_coherence: 0.55
-    # Reject coherent GNSS position drift when RMC Doppler speed disagrees.
-    speed_filter_minimum_speed_agreement: 0.60
-    speed_filter_maximum_hdop: 5.0
-    speed_filter_minimum_satellites: 5
-    speed_filter_require_quality: true
-    speed_filter_enter_confirmations: 2
-    speed_filter_exit_confirmations: 3
-    speed_filter_smoothing_alpha: 0.35
-    speed_filter_maximum_speed_mps: 3.0
+    port: /dev/serial0  # GPS UART 장치. run.sh에서 GPS 포트 설정으로 덮어쓸 수 있음
+    baudrate: 115200  # GPS 수신기와 맞출 통신 속도(bps)
+    poll_rate_hz: 50.0  # GPS 직렬 입력 확인 주기(Hz)
+    reconnect_period_s: 1.0  # 연결 재시도 간격(초)
+    frame_id: gps_link  # GPS 좌표계
+    fix_topic: /gps/fix  # 위도·경도 및 위치 품질 발행
+    speed_topic: /gps/speed  # 이동 신뢰성 필터를 거친 속도(m/s)
+    raw_speed_topic: /gps/speed_raw  # 수신기의 원래 속도(m/s)
+    course_topic: /gps/course  # GPS 진행방향 발행
+    diagnostics_topic: /diagnostics  # GPS 수신·품질·필터 진단 발행
+    nmea_timeout_s: 2.0  # NMEA 문장 수신 최근성 기준(초)
+    fix_timeout_s: 2.0  # 위치 fix 최근성 기준(초)
+    diagnostic_rate_hz: 1.0  # GPS 진단 주기(Hz)
+    course_min_speed_mps: 0.20  # 이 속도 이상일 때 진행방향을 발행(m/s)
+    speed_filter_window_s: 8.0  # 이동 검증에 사용하는 최근 GPS 표본 시간창(초)
+    speed_filter_settling_time_s: 15.0  # 시작/재연결 후 GPS 안정화 대기(초)
+    speed_filter_minimum_span_s: 4.0  # 속도 검증에 필요한 최소 표본 시간 범위(초)
+    speed_filter_minimum_samples: 5  # 검증에 필요한 최소 GPS 표본 수
+    speed_filter_minimum_displacement_m: 1.0  # 실제 이동으로 인정할 최소 시작-끝 거리(m)
+    speed_filter_hdop_displacement_scale_m: 0.50  # HDOP가 나쁠수록 필요한 이동거리를 키우는 계수(m)
+    speed_filter_minimum_path_efficiency: 0.55  # 직선 이동거리/누적 경로길이 최소비율. 제자리 흔들림 제외
+    speed_filter_minimum_course_coherence: 0.55  # 진행방향 일관성 최소값(0~1)
+    speed_filter_minimum_speed_agreement: 0.60  # 위치 이동 속도와 수신기 속도의 일치도 최소값(0~1)
+    speed_filter_maximum_hdop: 5.0  # 허용 HDOP 상한. 작을수록 엄격한 위치 품질 요구
+    speed_filter_minimum_satellites: 5  # 품질 검증에 필요한 최소 위성 수
+    speed_filter_require_quality: true  # GPS 품질 조건을 이동 인정에 요구할지
+    speed_filter_enter_confirmations: 2  # 이동 상태 진입에 필요한 연속 확인 횟수
+    speed_filter_exit_confirmations: 3  # 이동 상태 이탈에 필요한 연속 확인 횟수
+    speed_filter_smoothing_alpha: 0.35  # 최종 속도 EMA의 새 값 비율. 클수록 응답이 빠름
+    speed_filter_maximum_speed_mps: 3.0  # GPS 필터에서 허용할 속도 상한(m/s). 모터 목표 상한과는 별개
 
-
+# 위치·바퀴 이동·신호시간으로 횡단보도 상태를 판단한다. 현재 모터 목표 출력은 꺼져 있다.
 crosswalk_controller:
   ros__parameters:
-    # Empty files keep the node in readiness-monitor mode without crashing.
-    crosswalk_file: ''
-    api_key_file: ''
-    # Optional bench fallback. Live GPS/V2X matching takes priority.
-    intersection_id: ''
-    intersection_map_page_size: 100
-    intersection_map_max_pages: 30
-    intersection_map_retry_s: 60.0
-    intersection_map_file: ''
-    intersection_map_cache_file: ~/.cache/safestride/v2x_intersections.json
-    maximum_intersection_distance_m: 120.0
-    update_rate_hz: 5.0
-    gps_timeout_s: 2.0
-    speed_timeout_s: 1.0
-    heading_timeout_s: 5.0
-    heading_min_move_m: 2.0
-    heading_max_step_m: 30.0
-    candidate_heading_tolerance_deg: 60.0
-    gps_change_threshold_m: 0.5
-    gps_stuck_timeout_s: 5.0
-    gps_stuck_speed_mps: 0.15
-    wheel_motion_min_speed_mps: 0.02
-    wheel_motion_hold_s: 3.5
-    # Hall odometry is required; GNSS alone cannot verify very slow motion.
-    allow_gps_speed_fallback: false
-    signal_refresh_interval_s: 3.0
-    signal_cache_max_age_s: 12.0
-    signal_request_timeout_s: 3.0
-    maximum_crosswalk_distance_m: 80.0
-    default_safe_speed_mps: 0.50
-    profile_file: ''
-    # Enable only after logged Pi-only tests and lifted-wheel validation.
-    motion_output_enabled: false
-    fix_topic: /gps/fix
-    gps_speed_topic: /gps/speed
-    gps_course_topic: /gps/course
-    odom_topic: /odom
-    command_topic: /cmd_vel
-    status_topic: /crosswalk/status
-    diagnostics_topic: /diagnostics
-    output_frame_id: base_link
+    crosswalk_file: ''  # 횡단보도 지도 JSON 경로. 빈 값은 준비 감시; run.sh에서 파일 경로 전달 가능
+    api_key_file: ''  # 신호 API 키 파일 경로. run.sh에서 전달 가능
+    intersection_id: ''  # 시험용 고정 교차로 ID. 실제 GPS/지도 매칭이 우선
+    intersection_map_page_size: 100  # 교차로 지도 API 한 페이지의 요청 건수
+    intersection_map_max_pages: 30  # 교차로 지도 조회 최대 페이지 수
+    intersection_map_retry_s: 60.0  # 교차로 지도 재조회 간격(초)
+    intersection_map_file: ''  # 로컬 교차로 지도 파일 경로
+    intersection_map_cache_file: ~/.cache/safestride/v2x_intersections.json  # 조회 지도 캐시 경로
+    maximum_intersection_distance_m: 120.0  # 교차로 매칭 최대 허용거리(m)
+    update_rate_hz: 5.0  # 횡단보도 상태 계산 주기(Hz)
+    gps_timeout_s: 2.0  # 위치 입력 허용 나이(초)
+    speed_timeout_s: 1.0  # 속도 입력 허용 나이(초)
+    heading_timeout_s: 5.0  # 진행방향 입력 허용 나이(초)
+    heading_min_move_m: 2.0  # 위치 변화로 방향을 계산하는 최소 이동거리(m)
+    heading_max_step_m: 30.0  # 방향 추정에서 허용할 최대 위치 변화(m). 큰 GPS 점프 제외
+    candidate_heading_tolerance_deg: 60.0  # 횡단보도 후보와 진행방향의 허용 각도 차이(도)
+    gps_change_threshold_m: 0.5  # GPS 위치가 갱신됐다고 인정하는 거리 변화(m)
+    gps_stuck_timeout_s: 5.0  # 움직임이 있는데 좌표가 변하지 않으면 GPS 정체로 판단하는 시간(초)
+    gps_stuck_speed_mps: 0.15  # GPS 좌표 정체 검사에 사용하는 이동속도 기준(m/s)
+    wheel_motion_min_speed_mps: 0.02  # 바퀴 이동으로 인정할 최소 속도(m/s)
+    wheel_motion_hold_s: 3.5  # 최근 바퀴 이동 확인을 유지할 최대 시간(초). 저속 펄스 간격 고려
+    allow_gps_speed_fallback: false  # false: Hall odometry 우선/필수. GPS 속도만으로 이동을 대신 확인하지 않음
+    signal_refresh_interval_s: 3.0  # 신호정보 재조회 간격(초)
+    signal_cache_max_age_s: 12.0  # 신호 캐시 최대 허용 나이(초)
+    signal_request_timeout_s: 3.0  # 신호 API 요청 제한시간(초)
+    maximum_crosswalk_distance_m: 80.0  # 횡단보도 후보 탐색 최대거리(m)
+    default_safe_speed_mps: 1.00  # 보행속도 프로필 표본이 없을 때 안전속도(m/s). Cruise 기본속도와 별개
+    maximum_assist_speed_mps: 1.15  # 횡단 보조 목표 상한(m/s). safety_supervisor.max_forward_velocity와 동일
+    reaction_time_s: 1.0  # 신호 종료 전 감속 판단에 포함할 반응 시간(초)
+    entry_safety_margin_s: 2.0  # 횡단 진입 허용에 추가할 안전 여유 시간(초)
+    profile_file: ''  # 사용자 보행속도 표본 저장 파일. 빈 값이면 파일 영속 저장 안 함
+    motion_output_enabled: false  # true이면 /cmd_vel로 횡단 정책 목표 발행. 현재는 상태 감시만 수행
+    fix_topic: /gps/fix  # GPS 위치 입력
+    gps_speed_topic: /gps/speed  # 필터 GPS 속도 입력
+    gps_course_topic: /gps/course  # GPS 진행방향 입력
+    odom_topic: /odom  # Hall 기반 위치·속도 입력
+    command_topic: /cmd_vel  # 선택 횡단보도 목표 출력. Cruise와 동시 발행 시 전용 mux는 없음
+    status_topic: /crosswalk/status  # 횡단 상태·목표·진입 허용 등 발행
+    diagnostics_topic: /diagnostics  # 지도·신호·GPS·바퀴 준비 상태 진단
+    output_frame_id: base_link  # 횡단 목표 메시지의 기준 좌표계
 
+# Foxglove에서 센서·속도·진단을 관측하기 위한 WebSocket 연결 설정이다.
 foxglove_bridge:
   ros__parameters:
-    port: 8765
-    address: 0.0.0.0
-    topic_whitelist:
-      - ^/(diagnostics|walker/status|wheel/hall|handle/pressure|battery_state)$
-      - ^/terrain/(tof|imu|status)$
-      - ^/(gps/fix|gps/speed|gps/speed_kmh|gps/speed_raw|gps/speed_raw_kmh|gps/course|crosswalk/status|odom|odom_kmh|cmd_vel_kmh|cmd_vel_safe_kmh|tf|tf_static|robot_description)$
-      - ^/perception/surface_condition$
-      - ^/camera/image/compressed$
-    service_whitelist: ['(?!)']
-    param_whitelist: ['(?!)']
-    client_topic_whitelist: ['(?!)']
-    capabilities: [connectionGraph, assets]
-    sysinfo: true
+    port: 8765  # WebSocket 접속 포트
+    address: 0.0.0.0  # 모든 네트워크 인터페이스에서 접속 대기
+    topic_whitelist:  # 아래 정규식과 일치하는 토픽을 화면에 제공
+      - ^/(diagnostics|walker/status|wheel/hall|handle/pressure|battery_state)$  # 구동 상태·센서
+      - ^/terrain/(tof|imu|status)$  # 지형 센서
+      - ^/(gps/fix|gps/speed|gps/speed_kmh|gps/speed_raw|gps/speed_raw_kmh|gps/course|crosswalk/status|odom|odom_kmh|cmd_vel_kmh|cmd_vel_safe_kmh|tf|tf_static|robot_description)$  # 위치·속도·좌표계
+      - ^/perception/surface_condition$  # 노면 분류
+      - ^/camera/image/compressed$  # 카메라 미리보기
+    service_whitelist: ['(?!)']  # 모든 서비스 호출 차단(아무것도 일치하지 않는 정규식)
+    param_whitelist: ['(?!)']  # 파라미터 접근 차단
+    client_topic_whitelist: ['(?!)']  # 화면 클라이언트의 ROS 토픽 발행 차단
+    capabilities: [connectionGraph, assets]  # 노드 연결 그래프와 시각화 자산 제공
+    sysinfo: true  # 시스템 정보 제공

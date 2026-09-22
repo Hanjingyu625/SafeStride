@@ -75,14 +75,16 @@ local function render(w)
 
     if not bit(valid, 4) or w.crosswalk == 0 then
         text(5, "Crosswalk N/A"); text(6, "No signal data")
-    elseif bit(flags, 16) and bit(flags, 64) and w.crosswalk == 3 then
-        text(5, "ENTRY ALLOWED", MINT)
-    elseif w.crosswalk == 4 or w.crosswalk == 5 then
-        text(5, bit(flags, 32) and "CROSSING: CAUTION" or "CROSSING", AMBER)
     elseif w.crosswalk == 6 then
         text(5, "CROSSING COMPLETE", MINT)
+    elseif not bit(flags, 64) then
+        text(5, "NO SIGNAL DATA", AMBER)
+    elseif bit(flags, 16) and w.crosswalk == 3 then
+        text(5, "CAN CROSS", MINT)
+    elseif w.crosswalk == 4 or w.crosswalk == 5 then
+        text(5, bit(flags, 32) and "CAUTION" or "CROSSING", bit(flags, 32) and AMBER or MINT)
     else
-        text(5, "WAIT AT CROSSWALK", AMBER)
+        text(5, "WAIT", AMBER)
     end
     if bit(valid, 4) and w.crosswalk ~= 0 then
         local distance = w.distance == 65535 and "--" or string.format("%.1f", w.distance / 10)

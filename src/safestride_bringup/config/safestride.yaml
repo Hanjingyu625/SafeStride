@@ -110,8 +110,8 @@ safety_supervisor:
     require_surface_condition: false
     surface_control_enabled: false
     drive_command_topic: /drive/command
-    brake_enter_deg: 15.0
-    brake_release_deg: 12.0
+    brake_enter_deg: 7.0  # Before confirmation, 7 deg starts the 3 s PWM ramp.
+    brake_release_deg: 4.0
     brake_recovery_s: 0.5
     drive_pwm_cap: 140
     require_deadman: true
@@ -132,7 +132,7 @@ safety_supervisor:
     slope_enter_angle_rad: 0.08726646259971647  # 5 deg
     slope_exit_angle_rad: 0.05235987755982989  # 3 deg
     slope_confirmation_time_s: 0.50
-    downhill_speed_scale: 0.6
+    downhill_speed_scale: 1.0  # Confirmed downhill is handled by BRAKE/PWM 0.
     uphill_speed_scale: 1.0
     max_combined_speed_scale: 1.25
 
@@ -248,7 +248,11 @@ crosswalk_controller:
     signal_cache_max_age_s: 12.0
     signal_request_timeout_s: 3.0
     maximum_crosswalk_distance_m: 80.0
-    default_safe_speed_mps: 0.50
+    default_safe_speed_mps: 1.00
+    # Match safety_supervisor.max_forward_velocity and the MCU wheel limit.
+    maximum_assist_speed_mps: 1.15
+    reaction_time_s: 1.0
+    entry_safety_margin_s: 2.0
     profile_file: ''
     # Enable only after logged Pi-only tests and lifted-wheel validation.
     motion_output_enabled: false
