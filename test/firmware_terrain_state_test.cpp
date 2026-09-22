@@ -125,6 +125,7 @@ int TwoWire::read() {
 int main() {
   namespace proto = safestride_protocol;
   setup();
+  assert(!g_light.outputReady() && !g_light.hasSample());
   sendHello();
   g_serial_tx_length = 0U;
 
@@ -171,7 +172,7 @@ int main() {
   }
 
   // Route real COBS/CRC HMI packets only within the negotiated session.
-  uint8_t hmi_payload[32]={2,0,1,0,1,0,125,0};
+  uint8_t hmi_payload[safestride_hmi::WORDS * 2]={3,0,1,0,1,0,125,0};
   BufferStream wrong_session;
   assert(proto::sendFrame(wrong_session, safestride_hmi::PACKET_TYPE,
       10, 0xBADUL, 0, hmi_payload, sizeof(hmi_payload)));
@@ -195,7 +196,16 @@ int main() {
   for (size_t i=0; i<g_serial_tx_length; ++i) result=receiver.push(g_serial_tx[i],frame);
   assert(result==proto::ReceiveResult::FRAME_READY);
   assert(frame.type==safestride_hmi::STATUS_PACKET_TYPE && frame.payload_length==12);
-  assert(frame.payload[0]==2 && frame.payload[1]==0);
+  assert(frame.payload[0]==3 && frame.payload[1]==0);
+
+  // Local lighting continues through host session loss; no relay is configured.
+  g_session_active = false;
+  loop();
+  assert(g_light.hasSample() && g_light.rawAdc() == 0U);
+  assert(!g_light.requestedOn());
+  g_now_ms += cfg::LIGHT_CONFIRM_MS;
+  loop();
+  assert(g_light.requestedOn() && !g_light.outputReady());
 
   printf("firmware terrain session/telemetry/HMI tests: OK\n");
   return 0;

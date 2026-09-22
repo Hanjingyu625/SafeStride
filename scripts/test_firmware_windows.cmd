@@ -36,6 +36,10 @@ if errorlevel 1 goto :fail
 
 cl /nologo /utf-8 /std:c++14 /EHsc /W4 /I"%ROOT%\test\arduino_stub" "%ROOT%\test\firmware_hmi_test.cpp" /Fe:"%OUT%\hmi_test.exe"
 if errorlevel 1 goto :fail
+cl /nologo /utf-8 /std:c++14 /EHsc /W4 /I"%ROOT%\test\arduino_stub" "%ROOT%\test\firmware_light_test.cpp" /Fe:"%OUT%\light_test.exe"
+if errorlevel 1 goto :fail
+"%OUT%\light_test.exe"
+if errorlevel 1 goto :fail
 "%OUT%\hmi_test.exe"
 if errorlevel 1 goto :fail
 
