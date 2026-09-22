@@ -66,6 +66,15 @@ class TestDriveCommand(unittest.TestCase):
         self.b._command_tick()
         self.assertEqual(self.packets[-1].drive_pwm_cap, 140)
 
+    def test_nominal_and_caution_targets_fit_deployed_wheel_limit(self):
+        self.b._max_wheel_speed = 10.0
+        for target, expected in ((1.0, 8696), (1.1, 9565), (1.15, 10000)):
+            with self.subTest(target=target):
+                self.b._on_cmd_vel(self.message(target=target, cap=140))
+                self.b._command_tick()
+                self.assertEqual(self.packets[-1].target_mrad_s, expected)
+                self.assertEqual(self.packets[-1].enable, 1)
+
     def test_stale_future_invalid_messages_cannot_refresh_command(self):
         for msg in (self.message(stamp=9), self.message(stamp=11),
                     self.message(target=math.nan), self.message(ff=31),

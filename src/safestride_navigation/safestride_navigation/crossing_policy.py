@@ -23,11 +23,14 @@ class CrossingParameters:
     exit_hold_s: float = 2.0
     complete_hold_s: float = 4.0
     crossing_timeout_s: float = 180.0
-    reaction_time_s: float = 2.0
-    entry_safety_margin_s: float = 5.0
+    reaction_time_s: float = 1.0
+    entry_safety_margin_s: float = 2.0
     crossing_time_margin_s: float = 2.0
     minimum_estimate_speed_mps: float = 0.15
-    maximum_assist_speed_mps: float = 0.85
+    # Matches the drive ceiling: 10000 mrad/s at a 0.115 m wheel radius.
+    maximum_assist_speed_mps: float = 1.15
+    maximum_lateral_error_m: float = 3.0
+    gps_progress_tolerance_m: float = 3.0
 
 
 def clamp(value: float, low: float, high: float) -> float:
@@ -62,6 +65,7 @@ class CrossingStateMachine:
         self.crossing_started_at: Optional[float] = None
         self.arm_wheel_origin: Optional[float] = None
         self.crossing_wheel_origin: Optional[float] = None
+        self.crossing_start_progress: Optional[float] = None
         self.reason = 'waiting for a crosswalk'
 
     def set_state(self, new_state: str, reason: str) -> None:
@@ -95,6 +99,7 @@ class CrossingStateMachine:
         self.crossing_started_at = None
         self.arm_wheel_origin = None
         self.crossing_wheel_origin = None
+        self.crossing_start_progress = None
         self.reason = reason
 
     def current_crosswalk(
@@ -151,7 +156,21 @@ class CrossingStateMachine:
                 wheel_distance_m - self.arm_wheel_origin
                 >= self.parameters.entry_start_min_gain_m
             )
-        return gps_started or wheel_motion_started
+        # Walking along the curb must not count as entering the roadway.
+        return (
+            progress_m >= self.parameters.entry_start_progress_m
+            and (gps_started if wheel_distance_m is None else wheel_motion_started)
+        )
+
+    def _start_crossing(self, progress: float, wheel_distance: Optional[float]) -> None:
+        self.crossing_start_progress = progress
+        self.crossing_wheel_origin = wheel_distance
+
+    @staticmethod
+    def _waiting_reason(signal_valid: bool, remaining: Optional[float]) -> str:
+        if not signal_valid or remaining is None or not math.isfinite(remaining):
+            return 'waiting for valid signal data'
+        return 'wait for a safer signal window'
 
     def update(
         self,
@@ -169,10 +188,19 @@ class CrossingStateMachine:
         """Advance the policy and return active crossing, entry time and ETA."""
 
         now = self._clock()
+        signal_valid = bool(
+            signal_valid and signal_remaining_s is not None
+            and math.isfinite(signal_remaining_s) and signal_remaining_s >= 0.0
+        )
         active = self.current_crosswalk(candidate, latitude, longitude)
         if active is None:
             self.reset('no crosswalk candidate')
             return None, None, None
+
+        in_corridor = (
+            active.get('lateral_error_m', 0.0)
+            <= self.parameters.maximum_lateral_error_m
+        )
 
         safe_speed_mps = max(
             float(safe_speed_mps),
@@ -207,7 +235,7 @@ class CrossingStateMachine:
                 self.lock(active, selected_id)
                 active = self.current_crosswalk(candidate, latitude, longitude)
                 assert active is not None
-            if active['edge_distance_m'] <= self.parameters.curb_zone_m:
+            if active['edge_distance_m'] <= self.parameters.curb_zone_m and in_corridor:
                 if (
                     signal_valid
                     and signal_remaining_s is not None
@@ -220,7 +248,7 @@ class CrossingStateMachine:
                 else:
                     self.set_state(
                         'WAIT_AT_CURB',
-                        'wait for a safer signal window',
+                        self._waiting_reason(signal_valid, signal_remaining_s),
                     )
 
         elif self.state == 'WAIT_AT_CURB':
@@ -228,20 +256,20 @@ class CrossingStateMachine:
             if active['edge_distance_m'] > self.parameters.curb_release_distance_m:
                 self.set_state('APPROACHING', 'user moved away from curb')
             elif (
-                progress is not None
+                in_corridor and progress is not None
                 and self._automatic_start_detected(
                     float(progress),
                     measured_speed_mps,
                     wheel_distance_m,
                 )
             ):
-                self.crossing_wheel_origin = self.arm_wheel_origin
+                self._start_crossing(float(progress), wheel_distance_m)
                 self.set_state(
                     'CROSSING_URGENT',
                     'entry detected while waiting; continue across',
                 )
             elif (
-                signal_valid
+                in_corridor and signal_valid
                 and signal_remaining_s is not None
                 and signal_remaining_s >= required_entry_time
             ):
@@ -250,13 +278,15 @@ class CrossingStateMachine:
                     'ENTRY_ALLOWED',
                     'signal time became sufficient',
                 )
+            else:
+                self.reason = self._waiting_reason(signal_valid, signal_remaining_s)
 
         elif self.state == 'ENTRY_ALLOWED':
             progress = active.get('progress_m')
             if active['edge_distance_m'] > self.parameters.curb_release_distance_m:
                 self.set_state('APPROACHING', 'user moved away before entry')
             elif (
-                not signal_valid
+                not in_corridor or not signal_valid
                 or signal_remaining_s is None
                 or signal_remaining_s < required_entry_time
             ):
@@ -264,12 +294,12 @@ class CrossingStateMachine:
                     'WAIT_AT_CURB',
                     'signal window closed before entry',
                 )
-            elif progress is not None and self._automatic_start_detected(
+            elif in_corridor and progress is not None and self._automatic_start_detected(
                 float(progress),
                 measured_speed_mps,
                 wheel_distance_m,
             ):
-                self.crossing_wheel_origin = self.arm_wheel_origin
+                self._start_crossing(float(progress), wheel_distance_m)
                 self.set_state(
                     'CROSSING',
                     'automatic entry detected from position and motion',
@@ -277,18 +307,20 @@ class CrossingStateMachine:
 
         elif self.state in ('CROSSING', 'CROSSING_URGENT'):
             progress = active.get('progress_m')
+            gps_progress = progress
+            wheel_progress = None
             if (
                 wheel_distance_m is not None
                 and self.crossing_wheel_origin is not None
             ):
-                wheel_progress = max(
+                wheel_progress = (self.crossing_start_progress or 0.0) + max(
                     wheel_distance_m - self.crossing_wheel_origin,
                     0.0,
                 )
                 progress = (
                     wheel_progress
                     if progress is None
-                    else max(float(progress), wheel_progress)
+                    else min(float(progress), wheel_progress + self.parameters.gps_progress_tolerance_m)
                 )
                 active['progress_m'] = progress
                 active['remaining_m'] = max(
@@ -317,6 +349,12 @@ class CrossingStateMachine:
 
             if (
                 progress is not None
+                and in_corridor
+                and gps_progress is not None
+                and float(gps_progress)
+                >= float(active['length_m']) + self.parameters.exit_clearance_m
+                and (wheel_progress is None or wheel_progress
+                     >= float(active['length_m']) + self.parameters.exit_clearance_m)
                 and float(progress)
                 >= float(active['length_m']) + self.parameters.exit_clearance_m
             ):
@@ -328,17 +366,19 @@ class CrossingStateMachine:
                 self.exit_seen_since = None
 
             if self.state in ('CROSSING', 'CROSSING_URGENT'):
-                urgent = (
-                    not signal_valid
-                    or signal_remaining_s is None
-                    or eta_s is None
-                    or signal_remaining_s
-                    < eta_s + self.parameters.crossing_time_margin_s
-                )
+                if not signal_valid:
+                    urgent_reason = 'continue crossing; signal data unavailable'
+                elif eta_s is None:
+                    urgent_reason = 'continue crossing; ETA unavailable'
+                elif signal_remaining_s < eta_s + self.parameters.crossing_time_margin_s:
+                    urgent_reason = 'continue crossing; remaining signal is tight'
+                else:
+                    urgent_reason = ''
+                urgent = bool(urgent_reason)
                 self.set_state(
                     'CROSSING_URGENT' if urgent else 'CROSSING',
                     (
-                        'continue crossing; remaining signal is tight'
+                        urgent_reason
                         if urgent
                         else 'crossing progress is within the signal window'
                     ),

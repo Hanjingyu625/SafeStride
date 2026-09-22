@@ -99,6 +99,13 @@ Supervisor = production_class(
 
 
 class TestSupervisedDrive(unittest.TestCase):
+    def test_caution_target_reaches_one_point_one_on_level_ground(self):
+        self.node._last_command.twist.linear.x = 1.1
+        for _ in range(140):
+            self.tick(0.0)
+        self.assertAlmostEqual(
+            self.node._drive_publisher.messages[-1].target_linear_m_s, 1.1)
+
     def setUp(self):
         self.node = Supervisor()
         n = self.node

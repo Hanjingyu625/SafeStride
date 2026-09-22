@@ -86,6 +86,20 @@ ros2 topic echo /diagnostics --field status
 ```
 
 Monitor-only mode publishes status without becoming a `/cmd_vel` publisher.
+The configured cruise target is 1.0 m/s. With a 1.0 m/s walking profile and
+feedback, the crosswalk target is 1.0 m/s during normal crossing and 1.1 m/s
+during caution (the existing +0.10 m/s assistance). Its configurable
+`maximum_assist_speed_mps` is 1.15 m/s, matching the supervisor forward limit
+and MCU target limit of 10000 mrad/s at the configured 0.115 m wheel radius.
+Keep these limits aligned when changing the drive configuration. The walking
+profile still learns actual moving speed for crossing-time estimates; raising
+the command ceiling does not assume a slow user can walk faster. Approach and
+exit targets remain capped at 0.50 m/s, and waiting requests zero speed.
+In monitor-only mode these are status targets, not motor commands. When motion
+output is enabled, supervisor slope scaling, acceleration limits, grip checks,
+and MCU Hall-feedback/PWM limits still apply; a requested speed is not a
+guarantee of measured speed. The old standalone v6 script is not this ROS path.
+
 Diagnostics include coordinates, heading source, candidate bearing, crossing
 direction, matched `itstId`, and distance to the intersection. Verify every
 state transition from recorded logs before enabling motion. If crosswalk motion

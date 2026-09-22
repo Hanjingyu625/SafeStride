@@ -1,12 +1,26 @@
 import unittest
 
 from safestride_navigation.gps_motion import (
+    GpsFixGate,
     GpsMotionTracker,
     select_motion_measurement,
 )
 
 
 class TestGpsMotionTracker(unittest.TestCase):
+    def test_isolated_jump_is_rejected_without_delaying_normal_fixes(self):
+        gate = GpsFixGate()
+        self.assertTrue(gate.accept(0, 0, 0))
+        self.assertFalse(gate.accept(100 / 111_320, 0, 1))
+        self.assertTrue(gate.accept(1 / 111_320, 0, 2))
+
+    def test_distant_cluster_reacquires_without_permanent_lockout(self):
+        gate = GpsFixGate()
+        gate.accept(0, 0, 0)
+        self.assertFalse(gate.accept(100 / 111_320, 0, 1))
+        self.assertFalse(gate.accept(101 / 111_320, 0, 2))
+        self.assertTrue(gate.accept(100 / 111_320, 0, 3))
+
     def setUp(self):
         self.tracker = GpsMotionTracker(
             change_threshold_m=0.5,

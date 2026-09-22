@@ -615,19 +615,19 @@ pitch_filtered += 0.15 × (pitch_new-pitch_filtered)
 소스: `src/safestride_navigation/safestride_navigation/crosswalk_controller_node.py`, `crossing_policy.py`, `speed_profile.py`, `gps_motion.py`, `src/safestride_sensors/safestride_sensors/gps_speed_filter.py`.
 
 - 현재 `motion_output_enabled=false`로 `/cmd_vel` 발행은 꺼져 있다. 기본 모터 목표는 CruiseCommandNode가 만든다.
-- `CrosswalkController._fix_callback()/_gps_speed_callback()/_gps_course_callback()/_odom_callback()`는 GPS/바퀴 상태 저장, `_measured_motion()`과 `select_motion_measurement()`는 사용할 측정속도 선택이다.
+- `CrosswalkController._fix_callback()/_gps_speed_callback()/_gps_course_callback()/_odom_callback()`는 GPS/바퀴 상태 저장, `_measured_motion()`과 `select_motion_measurement()`는 사용할 측정속도 선택이다. `GpsFixGate`는 비현실적인 위치 점프를 거르고 `StationaryPosition`은 바퀴가 정지한 동안 GPS 위치 흔들림을 억제한다.
 - `_wheel_motion_active()/_motion_confirmed()/_fresh()/_heading()`는 바퀴 움직임/최근성/방향 확인, `_tick()`은 지도/신호/보행 프로필/상태기계를 종합한다.
 - `_signal_state()/_request_signal_if_due()/_consume_signal_future()`와 교차로 지도 요청·수신 함수가 남은 신호시간/교차로를 제공한다. 지도·신호 파싱/거리·방향 helper는 상위 정책 입력 생성이지 MCU 속도 피드백 함수가 아니다.
 - `_publish_command()`는 선택 정책을 켰을 때 최종 요청 속도를 `/cmd_vel`로 전달한다. `_publish_status()/_publish_diagnostic()`는 판단 결과 표시다.
-- `UserSpeedProfile.add()/load()/save()`는 0.12~1.8m/s의 최대 300개 표본을 유지/영속화. `safe_speed()`는 `percentile(samples, 0.20)`을 0.30~1.00m/s로 제한; 표본 없으면 기본 0.50m/s.
+- `UserSpeedProfile.add()/load()/save()`는 0.12~1.8m/s의 최대 300개 표본을 유지/영속화한다. `safe_speed()`는 표본 중앙값(`percentile 0.50`)을 최대 1.00m/s로 제한하며, 표본이 없으면 기본 1.00m/s다.
 - 프로필 변수 `path`, `default_speed_mps`, `samples`; 횡단보도 변수 `_profile`, `_controller`, `_motion_output_enabled`, 측정속도/나이, 위치/방향/바퀴 거리, active crossing, 신호시간, `desired_speed/effective_speed`가 상위 요청에 관여한다.
 - `GpsMotionTracker.update()/set_course()/heading()/coordinates_stuck()`는 위치/방향/좌표 정지 판단; `allow_gps_speed_fallback=false`이면 GPS만으로 바퀴 움직임을 대신 확인하지 않는다.
 - `GpsSpeedFilter.update()/reset()`는 GPS 위치 변화/수신기 속도/품질/방향 일관성/확정 횟수/EMA를 사용해 GNSS drift를 제외한다. `_distance_m()/_course_coherence()/_optional_float()`는 거리/방향/수치 보조 함수다.
 - GPS 노드 `__init__()/_connect()/_close()/_poll()/_publish_sentence()`는 연결/문장 수신/위치·속도 발행과 필터 갱신, `_fresh_quality()/_age()/_now()`는 품질 최근성/시각, `_publish_diagnostic()/_format_float()`는 상태 표시다.
 - GPS 필터 파라미터 전체는 실행 YAML의 `gps_node.speed_filter_*`에 있다: window/settling/minimum span/sample/displacement/HDOP scale/path efficiency/course coherence/speed agreement/max HDOP/min satellites/quality/enter-exit confirmations/smoothing/max speed. 이들은 GPS 속도 추정에 관여하며 현재 MCU P 입력에는 들어가지 않는다.
 
-`CrossingStateMachine`의 함수: `__init__()/set_state()/lock()/reset()/current_crosswalk()/_record_progress()/_automatic_start_detected()/update()/command()`.
-상태 변수: `parameters`, `_clock`, `state`, `state_since`, `locked_crosswalk`, `locked_intersection_id`, `progress_history`, `exit_seen_since`, `crossing_started_at`, `arm_wheel_origin`, `crossing_wheel_origin`, `reason`.
+`CrossingStateMachine`의 함수: `__init__()/set_state()/lock()/reset()/current_crosswalk()/_record_progress()/_automatic_start_detected()/_start_crossing()/_waiting_reason()/update()/command()`.
+상태 변수: `parameters`, `_clock`, `state`, `state_since`, `locked_crosswalk`, `locked_intersection_id`, `progress_history`, `exit_seen_since`, `crossing_started_at`, `arm_wheel_origin`, `crossing_wheel_origin`, `crossing_start_progress`, `reason`.
 
 | 횡단 상태 | 생성 가능한 요청 |
 |---|---|
@@ -639,7 +639,7 @@ pitch_filtered += 0.15 × (pitch_new-pitch_filtered)
 | CROSSING_URGENT | 안전속도+0.10/측정속도 중 큰 값을 최대 보조속도로 제한 |
 | EXITING | 안전속도와 0.50m/s 중 작은 값 |
 
-모든 요청은 `maximum_assist_speed_mps=0.85`로 최종 제한된다.
+모든 요청은 `maximum_assist_speed_mps=1.15`로 최종 제한된다. 프로필 기본·학습 속도 상한은 1.00m/s이며 긴급 횡단에서 여기에 0.10m/s를 더할 수 있다. 진입 가능시간 계산의 `reaction_time_s=1.0`, `entry_safety_margin_s=2.0`이다.
 `CrossingParameters`에는 접근/잠금/연석 구역 거리, 이탈 거리, 진입 진행량·증가량·시간창·최저속도,
 출구 clearance/hold, 완료 hold, 횡단 timeout, reaction/entry margin/crossing margin,
 minimum estimate speed/maximum assist speed가 있어 상태 및 요청속도 결정을 바꾼다.

@@ -13,6 +13,19 @@ from safestride_navigation.crosswalk_data import (
 
 
 class TestCrosswalkData(unittest.TestCase):
+    def test_perpendicular_crosswalk_is_not_selected_just_because_it_is_ahead(self):
+        crosswalk = dict(index=0, latitude=10 / 111_320, longitude=0.0,
+                         length_m=10.0, width_m=3.0, axis_bearing_deg=90.0)
+        self.assertIsNone(nearest_crosswalk(
+            [crosswalk], 0.0, 0.0, heading_deg=0.0))
+
+    def test_verified_signal_direction_is_preserved(self):
+        crosswalk = dict(index=0, latitude=0.0, longitude=0.0,
+                         length_m=10.0, width_m=3.0, axis_bearing_deg=0.0,
+                         signal_direction='nt')
+        selected = nearest_crosswalk([crosswalk], -10 / 111_320, 0.0)
+        self.assertEqual(selected['signal_direction'], 'nt')
+
     def test_loads_v2_converter_fields_and_rejects_bad_records(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / 'crosswalks.json'

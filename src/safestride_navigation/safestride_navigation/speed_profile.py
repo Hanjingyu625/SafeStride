@@ -1,4 +1,4 @@
-"""Conservative rolling walking-speed profile from the v6 prototype."""
+"""Rolling median of confirmed walking samples, excluding curbside waiting."""
 
 import json
 import math
@@ -26,7 +26,7 @@ class UserSpeedProfile:
         self,
         path: str = '',
         *,
-        default_speed_mps: float = 0.50,
+        default_speed_mps: float = 1.00,
     ) -> None:
         self.path = Path(path).expanduser() if path else None
         self.default_speed_mps = default_speed_mps
@@ -53,10 +53,10 @@ class UserSpeedProfile:
             self.samples.append(speed)
 
     def safe_speed(self) -> float:
-        value = percentile(self.samples, 0.20)
+        value = percentile(self.samples, 0.50)
         if value is None:
             return self.default_speed_mps
-        return max(0.30, min(1.00, value))
+        return min(1.00, value)
 
     def save(self) -> None:
         if self.path is None:

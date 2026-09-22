@@ -247,7 +247,10 @@ crosswalk_controller:
     signal_cache_max_age_s: 12.0  # 신호 캐시 최대 허용 나이(초)
     signal_request_timeout_s: 3.0  # 신호 API 요청 제한시간(초)
     maximum_crosswalk_distance_m: 80.0  # 횡단보도 후보 탐색 최대거리(m)
-    default_safe_speed_mps: 0.50  # 보행속도 프로필 표본이 없을 때 안전속도(m/s). Cruise 기본속도와 별개
+    default_safe_speed_mps: 1.00  # 보행속도 프로필 표본이 없을 때 기본 횡단 보조속도(m/s)
+    maximum_assist_speed_mps: 1.15  # 횡단 보조 목표 상한(m/s). 감독의 전진속도 상한과 일치
+    reaction_time_s: 1.0  # 진입 가능시간 계산에서 사용자 반응에 확보할 시간(초)
+    entry_safety_margin_s: 2.0  # 횡단 시작 판단에서 신호 종료 전에 추가로 남길 여유시간(초)
     profile_file: ''  # 사용자 보행속도 표본 저장 파일. 빈 값이면 파일 영속 저장 안 함
     motion_output_enabled: false  # true이면 /cmd_vel로 횡단 정책 목표 발행. 현재는 상태 감시만 수행
     fix_topic: /gps/fix  # GPS 위치 입력

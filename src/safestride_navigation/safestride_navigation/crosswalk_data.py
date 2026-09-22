@@ -101,6 +101,7 @@ def load_crosswalks(path: str) -> List[Crosswalk]:
                 'length_m': length,
                 'width_m': max(width or 0.0, 0.0),
                 'axis_bearing_deg': axis_bearing % 180.0,
+                'signal_direction': str(row.get('signal_direction', '')).lower(),
                 'intersection_id': (
                     '' if intersection_id in (None, '')
                     else str(intersection_id).strip()
@@ -249,6 +250,12 @@ def nearest_crosswalk(
             and heading_error > maximum_heading_error_deg
         ):
             continue
+        if (
+            heading is not None
+            and undirected_axis_difference_deg(heading, float(item['axis_bearing_deg']))
+            > maximum_heading_error_deg
+        ):
+            continue
         if edge_distance < best_edge_distance:
             best = item
             best_edge_distance = edge_distance
@@ -285,7 +292,9 @@ def nearest_crosswalk(
             'crossing_bearing_deg': crossing_bearing,
             'crossing_direction': bearing_to_direction(crossing_bearing),
             'signal_bearing_deg': signal_bearing,
-            'signal_direction': bearing_to_direction(signal_bearing),
+            'signal_direction': (
+                best.get('signal_direction') or bearing_to_direction(signal_bearing)
+            ),
             'axis_alignment_error_deg': undirected_axis_difference_deg(
                 orientation_reference,
                 axis_a,

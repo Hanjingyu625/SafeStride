@@ -37,33 +37,43 @@ function set_text(page,id,value) texts[id]=value end
 function set_fore_color(...) end
 function set_enable(page,id,value) assert(id==11 and value==0) end
 function change_screen(id) screen=id end
-function start_timer(id,ms,direction,count)
-  assert(id==0 and ms==100 and count==0)
-end
 function get_variant(name) return values[string.sub(name,4)] end
 '''
         checks = '''
 on_init(); assert(screen==0)
-on_timer(0); assert(texts[3]=='? UNAVAILABLE')
-for i=1,21 do values.heartbeat=i; on_timer(0) end
+on_systick(); assert(screen==0 and texts[3]=='? UNAVAILABLE')
+values.heartbeat=1; on_systick()
 assert(screen==1 and texts[1]=='1.25 km/h')
-assert(texts[3]=='O READY' and texts[5]=='ENTRY ALLOWED')
-assert(texts[8]=='-1.0 deg' and texts[10]=='Location: N/A')
-values.flags=67; values.heartbeat=22; on_timer(0)
-assert(texts[5]=='WAIT AT CROSSWALK') -- no explicit entry permission
-values.braking=1; on_timer(0); assert(texts[3]=='X BRAKING')
-values.braking=0; values.flags=65; on_timer(0); assert(texts[3]=='X STANDBY')
-values.flags=83; values.hazard=1; on_timer(0); assert(texts[3]=='X HAZARD')
-values.hazard=0; values.valid=31; on_timer(0); assert(texts[3]=='? UNAVAILABLE')
-values.valid=63
-for i=1,10 do on_timer(0) end
+assert(texts[3]=='O READY' and texts[5]=='CAN CROSS')
+assert(texts[8]=='-1.0 deg' and texts[10]=='GPS: FIX OK')
+function pulse() values.heartbeat=values.heartbeat+1; on_systick() end
+values.flags=67; pulse()
+assert(texts[5]=='WAIT') -- no explicit entry permission
+values.crosswalk=2; values.seconds=0; pulse(); assert(texts[5]=='WAIT')
+values.flags=3; pulse(); assert(texts[5]=='NO SIGNAL DATA')
+values.crosswalk=5; values.flags=99; pulse(); assert(texts[5]=='CAUTION')
+values.flags=35; pulse(); assert(texts[5]=='NO SIGNAL DATA')
+values.crosswalk=4; values.flags=67; pulse(); assert(texts[5]=='CROSSING')
+values.crosswalk=6; pulse(); assert(texts[5]=='CROSSING COMPLETE')
+values.crosswalk=3
+values.braking=1; pulse(); assert(texts[3]=='X BRAKING')
+values.braking=0; values.flags=65; pulse(); assert(texts[3]=='X STANDBY')
+values.flags=83; values.hazard=1; pulse(); assert(texts[3]=='X HAZARD')
+values.hazard=0; values.valid=31; pulse(); assert(texts[3]=='? UNAVAILABLE')
+values.valid=63; pulse(); assert(texts[3]=='O READY')
+on_systick()
 assert(texts[3]=='? UNAVAILABLE' and texts[1]=='-- km/h')
-values.heartbeat=23; on_timer(0); assert(texts[3]=='O READY')
-values.host_link=0; on_timer(0); assert(texts[3]=='? UNAVAILABLE')
-values.host_link=1; values.version=1; on_timer(0)
+values.heartbeat=8; on_systick(); assert(texts[3]=='O READY')
+values.host_link=0; values.heartbeat=9; on_systick(); assert(texts[3]=='? UNAVAILABLE')
+values.host_link=1; values.version=1; values.heartbeat=10; on_systick()
 assert(texts[4]=='Display / firmware mismatch')
-values.version=2; values.pitch=nil; on_timer(0)
+values.version=2; values.pitch=nil; values.heartbeat=11; on_systick()
 assert(texts[4]=='Check LCD variables')
+values.pitch=0; values.heartbeat=100; values.host_link=1; values.flags=83
+on_init(); on_systick(); on_systick()
+assert(screen==1 and texts[1]=='1.25 km/h' and texts[3]=='O READY')
+on_systick()
+assert(texts[3]=='? UNAVAILABLE' and texts[4]=='Link lost / waiting')
 '''
         try:
             code = (setup + source + checks).encode('utf-8')
