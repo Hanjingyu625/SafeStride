@@ -2,7 +2,6 @@
 -- ASCII-only display strings avoid missing glyphs in the bundled LCD fonts.
 -- LCD is a Modbus SLAVE. This script never sends motor/control commands.
 local PAGE = 1
-local BUILD_TAG = "BUILD 2"
 local MINT, AMBER, CORAL, MUTED = 0x6FF9, 0xFDEE, 0xFB6E, 0x94B3
 local ticks, last_change, last_heartbeat = 0, 0, nil
 local received = false
@@ -10,6 +9,7 @@ local page_entered = false
 local names = {"version", "heartbeat", "valid", "speed", "hands", "crosswalk",
     "seconds", "distance", "pitch", "tof", "hazard", "walker", "braking",
     "faults", "host_link", "flags"}
+for index = 0, 9 do names[#names + 1] = "location_" .. index end
 
 local function bit(value, mask)
     return math.floor(value / mask) % 2 == 1
@@ -18,6 +18,19 @@ end
 local function text(id, value, color)
     set_text(PAGE, id, value)
     set_fore_color(PAGE, id, color or MUTED)
+end
+
+local function location_text(w)
+    local bytes = {}
+    for index = 0, 9 do
+        local value = w["location_" .. index]
+        local high, low = math.floor(value / 256), value % 256
+        if high == 0 then break end
+        bytes[#bytes + 1] = string.char(high)
+        if low == 0 then break end
+        bytes[#bytes + 1] = string.char(low)
+    end
+    return table.concat(bytes)
 end
 
 local function unknown(reason)
@@ -29,8 +42,9 @@ local function unknown(reason)
     text(6, "No signal data")
     text(7, "Slope N/A")
     text(8, "--")
-    text(9, BUILD_TAG .. " | " .. reason, AMBER)
+    text(9, reason, AMBER)
     text(10, "Location: N/A")
+    text(23, "Surface N/A")
 end
 
 local function render(w)
@@ -87,8 +101,28 @@ local function render(w)
     else
         text(7, "Slope N/A"); text(8, "--")
     end
+    local surfaces = {"SMOOTH", "ROUGH", "WET", "GRAVEL", "STEP", "HOLE"}
+    if bit(flags, 128) then
+        local class = math.floor(flags / 256) % 8
+        local confidence = math.floor(flags / 2048) % 32
+        local label = surfaces[class]
+        if label then
+            local color = class == 1 and MINT or ((class == 5 or class == 6) and CORAL or AMBER)
+            local percent = math.floor(confidence * 100 / 31 + 0.5)
+            text(23, label .. " " .. percent .. "%", color)
+        else
+            text(23, "Surface N/A")
+        end
+    else
+        text(23, "Surface N/A")
+    end
+    if bit(valid, 4) and w.crosswalk ~= 0 then
+        local location = location_text(w)
+        text(10, location ~= "" and ("Location: " .. location) or "CROSSWALK NEARBY")
+    else
+        text(10, "Location: N/A")
+    end
     text(9, w.hazard == 1 and "Front hazard detected" or "Receiving data", w.hazard == 1 and CORAL or MINT)
-    text(10, "Location: N/A") -- No geocoded location exists in the system topics.
 end
 
 local function update_display()
@@ -106,7 +140,7 @@ local function update_display()
         end
         w[name] = value
     end
-    if w.version ~= 2 then unknown("Display / firmware mismatch"); return end
+    if w.version ~= 3 then unknown("Display / firmware mismatch"); return end
     if last_heartbeat == nil then
         last_heartbeat = w.heartbeat
         -- Non-zero heartbeat plus a live host link cannot be an untouched default.

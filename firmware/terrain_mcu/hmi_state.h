@@ -2,27 +2,35 @@
 #include <stdint.h>
 #include <stddef.h>
 
-// SafeStride VisualTFT project holding registers 0..15 (not factory settings).
+// SafeStride VisualTFT project holding registers 0..25 (not factory settings).
 namespace safestride_hmi {
 constexpr uint8_t PACKET_TYPE = 0x30;
 constexpr uint8_t STATUS_PACKET_TYPE = 0x31;
-constexpr uint32_t CAPABILITY = 1UL << 11;
-constexpr size_t WORDS = 16;
+constexpr uint32_t CAPABILITY = 1UL << 12;
+constexpr size_t BASE_WORDS = 16;
+constexpr size_t LOCATION_WORDS = 10;
+constexpr size_t WORDS = BASE_WORDS + LOCATION_WORDS;
 constexpr uint32_t HOST_TIMEOUT_MS = 600;
 enum Index { VERSION, HEARTBEAT, VALID, SPEED, HANDS, CROSSWALK,
   SECONDS, DISTANCE, PITCH, TOF, HAZARD, WALKER, BRAKING, FAULTS,
   HOST_LINK, FLAGS };
 enum Valid { SPEED_VALID=1, HANDS_VALID=2, CROSS_VALID=4,
   PITCH_VALID=8, TOF_VALID=16, WALKER_VALID=32 };
+constexpr uint16_t SURFACE_VALID = 1U << 7;
+constexpr uint8_t SURFACE_SHIFT = 8;
 
 class State {
  public:
-  uint16_t words[WORDS] = {2,0,0,65535,0,0,65535,65535,0,5,0,0,0,0,0,0};
+  uint16_t words[WORDS] = {3,0,0,65535,0,0,65535,65535,0,5,0,0,0,0,0,0};
   bool accept(const uint8_t* p, size_t n, uint16_t seq, uint32_t now) {
-    if (n != WORDS*2 || read(p) != 2 || (read(p+4) & ~63U) ||
+    const uint16_t flags = n == WORDS*2 ? read(p+30) : 0;
+    const uint16_t surface = (flags >> SURFACE_SHIFT) & 7U;
+    if (n != WORDS*2 || read(p) != 3 || (read(p+4) & ~63U) ||
         read(p+8)>3 || read(p+10)>6 || read(p+18)>5 ||
         read(p+20)>1 || read(p+22)>5 || read(p+24)>1 ||
-        read(p+28)>1 || (read(p+30) & ~127U)) return false;
+        read(p+28)>1 ||
+        (!(flags & SURFACE_VALID) && (flags & 0xff00U)) ||
+        ((flags & SURFACE_VALID) && (surface < 1U || surface > 6U))) return false;
     const uint16_t delta = static_cast<uint16_t>(seq-last_seq_);
     if (seen_ && (delta==0 || delta>=0x8000)) return false;
     for (size_t i=0; i<WORDS; ++i) words[i]=read(p+2*i);
@@ -51,6 +59,7 @@ class State {
     words[PITCH]=0; words[TOF]=5; words[HOST_LINK]=0;
     words[WALKER]=0; words[BRAKING]=0; words[FAULTS]=0;
     words[FLAGS]=0;
+    for (size_t i=BASE_WORDS; i<WORDS; ++i) words[i]=0;
     words[HAZARD]=latched_hazard_ ? 1 : 0;
   }
 };

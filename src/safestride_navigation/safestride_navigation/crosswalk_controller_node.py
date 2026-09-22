@@ -612,6 +612,7 @@ class CrosswalkController(Node):
         command: Mapping[str, Any],
         target_speed_mps: float,
         intersection_id: str,
+        intersection_name: str,
     ) -> None:
         status = CrosswalkStatus()
         status.header.stamp = self.get_clock().now().to_msg()
@@ -638,6 +639,7 @@ class CrosswalkController(Node):
         status.command_mode = str(command['mode'])
         status.reason = self._controller.reason
         status.intersection_id = intersection_id
+        status.intersection_name = intersection_name
         status.crosswalk_index = int(active.get('index', 0) if active else 0)
         self._status_publisher.publish(status)
 
@@ -1005,6 +1007,7 @@ class CrosswalkController(Node):
             command=command,
             target_speed_mps=desired_speed,
             intersection_id=intersection_id,
+            intersection_name=intersection_name,
         )
         self._publish_diagnostic(
             now,

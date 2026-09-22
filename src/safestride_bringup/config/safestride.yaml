@@ -75,6 +75,8 @@ terrain_bridge:
       enabled: true
       pitch_sign: -1.0  # Match safety_supervisor.uphill_pitch_sign.
       pitch_offset_rad: 0.0  # Match safety_supervisor.pitch_offset_rad.
+      topics:
+        surface: /perception/surface_condition
     serial:
       port: /dev/serial/by-id/CHANGE_ME_TERRAIN_UNO
       baudrate: 115200

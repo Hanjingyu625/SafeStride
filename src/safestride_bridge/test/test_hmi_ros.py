@@ -50,12 +50,12 @@ class HmiRosTests(unittest.TestCase):
     def test_ack_session_validation_and_diagnostics(self):
         now = self.node._now()
         frame = Frame(packet_type=STATUS_PACKET_TYPE, sequence=1, session_id=999,
-                      timestamp_ms=0, payload=STATUS_FORMAT.pack(2,1,0,3,0))
+                      timestamp_ms=0, payload=STATUS_FORMAT.pack(3,1,0,3,0))
         self.node._handle_frame(frame, now)
         self.assertEqual(self.node._session_errors, 1)
         self.assertIsNone(self.node._hmi.last_status)
         frame = Frame(packet_type=STATUS_PACKET_TYPE, sequence=1, session_id=123,
-                      timestamp_ms=0, payload=STATUS_FORMAT.pack(2,1,0,3,0))
+                      timestamp_ms=0, payload=STATUS_FORMAT.pack(3,1,0,3,0))
         self.node._handle_frame(frame, now)
         self.assertEqual(self.node._hmi.last_status, (1,0,3,0))
         self.assertIsNone(self.node._last_telemetry_time)  # ACK cannot refresh sensors

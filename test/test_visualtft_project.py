@@ -67,7 +67,7 @@ class VisualTftProjectTests(unittest.TestCase):
     def test_control_ids_and_safe_dev_button(self):
         page = ET.parse(PROJECT / "Screen1.tft").getroot()
         controls = {int(item.attrib["id"]): item for item in page}
-        self.assertEqual(set(controls), set(range(1, 22)))
+        self.assertEqual(set(controls), set(range(1, 24)))
         self.assertEqual(len(controls), len(list(page)))
 
         button = controls[11]
@@ -76,7 +76,7 @@ class VisualTftProjectTests(unittest.TestCase):
         for key in ("action", "custom_data_up", "custom_data_down", "external_data_up", "external_data_down"):
             self.assertEqual(button.attrib[key], "")
 
-        for control_id in range(17, 22):
+        for control_id in range(17, 23):
             panel = controls[control_id]
             self.assertEqual(panel.attrib["type"], "text")
             self.assertEqual(panel.attrib["show_bk"], "1")
@@ -94,6 +94,12 @@ class VisualTftProjectTests(unittest.TestCase):
         canonical = (DISPLAY / "safestride.lua").read_text(encoding="ascii")
         visualtft = (PROJECT / "main.lua").read_text(encoding="ascii")
         self.assertEqual(visualtft.replace("\r\n", "\n"), canonical.replace("\r\n", "\n"))
+        self.assertNotIn("BUILD_TAG", canonical)
+        self.assertNotIn("BUILD 3", canonical)
+        self.assertIn(
+            'local surfaces = {"SMOOTH", "ROUGH", "WET", "GRAVEL", "STEP", "HOLE"}',
+            canonical,
+        )
 
         for item in ET.parse(PROJECT / "Screen1.tft").getroot():
             for key in ("text", "text_state_up", "text_state_down"):

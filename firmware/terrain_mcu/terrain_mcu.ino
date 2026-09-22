@@ -243,7 +243,7 @@ void loop() {
 
 void sendDisplayStatus(uint32_t now_ms) {
 #if EZHMI_ENABLED
-  uint8_t payload[12] = {2U, static_cast<uint8_t>(g_lcd.linkOk(now_ms)), 0U, 0U};
+  uint8_t payload[12] = {3U, static_cast<uint8_t>(g_lcd.linkOk(now_ms)), 0U, 0U};
   proto::writeU16(payload + 2U, g_lcd.exception_code);
   proto::writeU32(payload + 4U, g_lcd.ack_count);
   proto::writeU32(payload + 8U, g_lcd.error_count);

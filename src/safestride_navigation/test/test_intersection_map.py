@@ -96,6 +96,17 @@ class TestIntersectionMap(unittest.TestCase):
         self.assertEqual(source, 'configured_fallback')
         self.assertEqual(name, '')
 
+    def test_locked_id_keeps_matching_nearest_name(self):
+        identifier, source, name = select_intersection_id(
+            locked_id='1678',
+            crosswalk={'intersection_id': '1678'},
+            nearest={'intersection_id': '1678', 'name': '수서역'},
+            configured_id='',
+        )
+        self.assertEqual(identifier, '1678')
+        self.assertEqual(source, 'locked')
+        self.assertEqual(name, '수서역')
+
 
 if __name__ == '__main__':
     unittest.main()
