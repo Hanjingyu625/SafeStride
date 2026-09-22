@@ -4,11 +4,12 @@ set -euo pipefail
 # Run on the Raspberry Pi as pi: bash /home/pi/deploy_safestride_version.sh pdj1|main
 env_file=/etc/safestride/safestride.env
 service=safestride.service
+perception_venv=/home/pi/safestride-perception-venv
 
 case "${1:-}" in
   status)
     systemctl is-active "${service}" || true
-    sed -n '/^SAFESTRIDE_WORKSPACE=/p; /^SAFESTRIDE_CONFIG=/p; /^SAFESTRIDE_REQUIRE_TERRAIN_TOF=/p' "${env_file}"
+    sed -n '/^SAFESTRIDE_WORKSPACE=/p; /^SAFESTRIDE_CONFIG=/p; /^SAFESTRIDE_REQUIRE_TERRAIN_TOF=/p; /^SAFESTRIDE_PERCEPTION_VENV=/p' "${env_file}"
     for name in pdj1 main; do
       if [[ "${name}" == pdj1 ]]; then
         checkout=/home/pi/SafeStride_jingyu
@@ -63,6 +64,9 @@ for key in ('range_control_enabled', 'require_range_sensors', 'terrain_stop_enab
 print('ToF motor controls disabled:', sys.argv[1])
 PY
 grep -qx 'SAFESTRIDE_REQUIRE_TERRAIN_TOF=false' "${env_file}"
+if grep -qx 'SAFESTRIDE_ENABLE_PERCEPTION=true' "${env_file}"; then
+  "${perception_venv}/bin/python" -c 'import cv2, numpy, torch'
+fi
 
 git -C "${checkout}" fetch origin "${version}"
 git -C "${checkout}" merge --ff-only "origin/${version}"
@@ -77,12 +81,16 @@ MAKEFLAGS=-j2 colcon build --symlink-install --parallel-workers 2 --event-handle
 
 candidate=$(mktemp /tmp/safestride-env.XXXXXX)
 trap 'rm -f "${candidate}"' EXIT
-python3 - "${env_file}" "${checkout}" "${config}" >"${candidate}" <<'PY'
+python3 - "${env_file}" "${checkout}" "${config}" "${perception_venv}" >"${candidate}" <<'PY'
 from pathlib import Path
 import sys
 
 lines = Path(sys.argv[1]).read_text(encoding='utf-8').splitlines()
-updates = {'SAFESTRIDE_WORKSPACE': sys.argv[2], 'SAFESTRIDE_CONFIG': sys.argv[3]}
+updates = {
+    'SAFESTRIDE_WORKSPACE': sys.argv[2],
+    'SAFESTRIDE_CONFIG': sys.argv[3],
+    'SAFESTRIDE_PERCEPTION_VENV': sys.argv[4],
+}
 found = set()
 for index, line in enumerate(lines):
     key = line.partition('=')[0]
