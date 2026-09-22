@@ -120,7 +120,7 @@ local function render(w)
     end
     if bit(valid, 4) and w.crosswalk ~= 0 then
         local location = location_text(w)
-        text(10, location ~= "" and ("Location: " .. location) or "CROSSWALK NEARBY")
+        text(10, location ~= "" and location or "CROSSWALK NEARBY")
     else
         text(10, "Location: N/A")
     end

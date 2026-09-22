@@ -48,7 +48,7 @@ on_systick(); assert(screen==0 and texts[3]=='? UNAVAILABLE')
 values.heartbeat=1; on_systick()
 assert(screen==1 and texts[1]=='1.25 km/h')
 assert(texts[3]=='O READY' and texts[5]=='CAN CROSS')
-assert(texts[8]=='-1.0 deg' and texts[10]=='Location: SUSEO STN')
+assert(texts[8]=='-1.0 deg' and texts[10]=='SUSEO STN')
 assert(texts[23]=='WET 77%')
 function pulse() values.heartbeat=values.heartbeat+1; on_systick() end
 values.flags=67; pulse()
