@@ -9,7 +9,7 @@ screen,id,type,x,y,width,height,font_px,initial_text
 1,7,text_display,256,174,204,28,24,Slope N/A
 1,8,text_display,256,206,204,20,18,--
 1,9,text_display,16,242,448,20,14,Waiting for link
-1,10,text_display,256,122,204,18,14,Location: N/A
+1,10,text_display,256,122,204,18,14,GPS: UNAVAILABLE
 1,11,button,380,7,84,27,14,DEV
 1,12,text,16,7,200,27,22,SafeStride
 1,13,text,20,46,204,18,14,CURRENT SPEED

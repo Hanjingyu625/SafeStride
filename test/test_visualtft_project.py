@@ -69,6 +69,7 @@ class VisualTftProjectTests(unittest.TestCase):
         controls = {int(item.attrib["id"]): item for item in page}
         self.assertEqual(set(controls), set(range(1, 22)))
         self.assertEqual(len(controls), len(list(page)))
+        self.assertEqual(controls[10].attrib["text"], "GPS: UNAVAILABLE")
 
         button = controls[11]
         self.assertEqual(button.attrib["type"], "button")

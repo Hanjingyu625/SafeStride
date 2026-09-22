@@ -149,8 +149,11 @@ Reload `display/ezhmi/visualtft/main.lua` into the LCD project (the standalone
 does not change LCD text. Display states are CAN CROSS, WAIT, CROSSING, CAUTION,
 NO SIGNAL DATA and CROSSING COMPLETE. Already crossing with insufficient time
 shows CAUTION, not an instruction to stop in the road. Missing signal shows
-NO SIGNAL DATA even during crossing. `Location: N/A` was hard-coded: it is now
-GPS: FIX OK / GPS: NO FIX, not a street name. The current 16-word wire format
+NO SIGNAL DATA even during crossing. The LCD project's initial text is
+GPS: UNAVAILABLE; its Lua changes this to GPS: FIX OK / GPS: NO FIX when live
+data arrives. If the physical LCD still shows Location: N/A, it has an older
+screen package and must be recompiled and downloaded from the VisualTFT project.
+The current 16-word wire format
 does not transmit geocoded location or latitude/longitude to the LCD.
 
 ## Local verification
