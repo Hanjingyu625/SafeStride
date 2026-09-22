@@ -19,6 +19,10 @@ DEFAULT_PHASE_URL = (
     'https://t-data.seoul.go.kr/apig/apiman-gateway/'
     'tapi/v2xSignalPhaseInformation/1.0'
 )
+DEFAULT_COMBINED_URL = (
+    'https://t-data.seoul.go.kr/apig/apiman-gateway/'
+    'tapi/v2xSignalPhaseTimingFusionCurrentInfo/1.0'
+)
 OPPOSITE_DIRECTION = {
     'nt': 'st',
     'ne': 'sw',
@@ -131,7 +135,10 @@ def evaluate_pedestrian_signal(timing, phase, direction, now, max_age_s=12.0):
         state = phase.get(direction + 'PdsgStatNm')
         if state == 'stop-And-Remain':
             return 0.0, True, 'red pedestrian signal'
-        if state != 'protected-Movement-Allowed':
+        if state not in (
+            'protected-Movement-Allowed',
+            'permissive-Movement-Allowed',
+        ):
             raise ValueError('pedestrian phase unavailable or unsupported')
         timing_age = age(timing)
         if str(timing.get('itstId')) != str(phase.get('itstId')):
@@ -146,7 +153,26 @@ def evaluate_pedestrian_signal(timing, phase, direction, now, max_age_s=12.0):
         return None, False, str(error)
 
 
-def request_signal_bundle(api_key, intersection_id, *, url, phase_url, timeout_s):
+def request_signal_bundle(api_key, intersection_id, *, url, phase_url,
+                          timeout_s, combined_url=None):
+    if combined_url:
+        try:
+            combined = request_signal_data(
+                api_key, intersection_id, url=combined_url,
+                timeout_s=timeout_s, key_param='apikey')
+            pedestrian_states = [
+                (key[:-6], value)
+                for key, value in combined.items()
+                if key.endswith('PdsgStatNm') and value is not None
+            ]
+            if pedestrian_states and all(
+                state == 'stop-And-Remain'
+                or _valid_signal(combined.get(prefix + 'RmdrCs')) is not None
+                for prefix, state in pedestrian_states
+            ):
+                return {'timing': combined, 'phase': combined}
+        except (RuntimeError, ValueError):
+            pass
     # Independent results allow a confirmed red even when countdown retrieval fails.
     with ThreadPoolExecutor(max_workers=2) as pool:
         futures = {name: pool.submit(request_signal_data, api_key, intersection_id,
@@ -198,6 +224,7 @@ def request_signal_data(
     *,
     url: str = DEFAULT_TIMING_URL,
     timeout_s: float = 10.0,
+    key_param: str = 'apiKey',
 ) -> Mapping[str, Any]:
     """Fetch and select the latest record for one intersection."""
 
@@ -207,7 +234,7 @@ def request_signal_data(
         raise ValueError('intersection_id is empty')
     query = urllib.parse.urlencode(
         {
-            'apiKey': api_key,
+            key_param: api_key,
             'itstId': intersection_id,
             'type': 'json',
             'pageNo': 1,
@@ -234,6 +261,7 @@ def request_signal_data(
 
 
 __all__ = [
+    'DEFAULT_COMBINED_URL',
     'DEFAULT_TIMING_URL',
     'all_valid_signal_values',
     'collect_signal_records',

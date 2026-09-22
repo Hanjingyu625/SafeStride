@@ -156,10 +156,11 @@ class CrossingStateMachine:
                 wheel_distance_m - self.arm_wheel_origin
                 >= self.parameters.entry_start_min_gain_m
             )
-        # Walking along the curb must not count as entering the roadway.
+        # Wheel travel along the curb alone must not count as road entry.
         return (
             progress_m >= self.parameters.entry_start_progress_m
-            and (gps_started if wheel_distance_m is None else wheel_motion_started)
+            and gps_started
+            and (wheel_distance_m is None or wheel_motion_started)
         )
 
     def _start_crossing(self, progress: float, wheel_distance: Optional[float]) -> None:
@@ -426,7 +427,7 @@ class CrossingStateMachine:
             mode, speed, allowed, alert = 'ENTRY_ALLOWED', safe_speed, True, 3
         elif self.state == 'CROSSING':
             mode, speed, allowed, alert = (
-                'CROSSING_ASSIST', max(safe_speed, measured_speed), True, 4
+                'CROSSING_ASSIST', max(safe_speed, measured_speed), False, 4
             )
         elif self.state == 'CROSSING_URGENT':
             mode, speed, allowed, alert = (
@@ -435,12 +436,12 @@ class CrossingStateMachine:
                     max(safe_speed + 0.10, measured_speed),
                     self.parameters.maximum_assist_speed_mps,
                 ),
-                True,
+                False,
                 5,
             )
         else:
             mode, speed, allowed, alert = (
-                'EXITING', min(safe_speed, 0.50), True, 6
+                'EXITING', min(safe_speed, 0.50), False, 6
             )
         return {
             'mode': mode,
