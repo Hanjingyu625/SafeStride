@@ -119,7 +119,7 @@ safety_supervisor:
     require_surface_condition: false  # 노면 제어가 켜졌을 때 유효 노면 입력을 필수로 요구할지
     surface_control_enabled: false  # 카메라 노면 분류의 속도 배율을 목표에 반영할지. 현재 꺼짐
     drive_command_topic: /drive/command  # 목표·경사 FF·PWM cap·모드를 묶은 실제 구동 명령 토픽
-    brake_enter_deg: 5.0  # 5도 도달 즉시 현재 PWM에서 3초 감속 시작
+    brake_enter_deg: 7.0  # 7도 도달 즉시 현재 PWM에서 3초 감속 시작
     brake_release_deg: 3.0  # 3도 이하 0.5초 유지 시 복귀 허용; 시작된 감속은 완료
     brake_recovery_s: 0.5  # 해제 가능한 유효 경사를 유지해야 하는 시간(초)
     drive_pwm_cap: 140  # 최종 PWM cap(count). MCU MAX_PWM 상한도 함께 적용
@@ -174,8 +174,8 @@ surface_perception:
     model:
       path: ''  # TorchScript 모델 파일 경로. run.sh가 환경변수/기본 경로로 덮어쓸 수 있음
       classes_path: ''  # 모델 출력 클래스 목록 경로. run.sh에서 덮어쓸 수 있음
-      confidence_threshold: 0.65  # top1 분류 신뢰도 최소값(0~1)
-      min_top1_margin: 0.15  # top1과 top2 신뢰도 차이 최소값. 애매한 예측을 제외
+      confidence_threshold: 0.55  # top1 분류 신뢰도 최소값(0~1)
+      min_top1_margin: 0.08  # top1과 top2 신뢰도 차이 최소값. 애매한 예측을 제외
       ema_alpha: 0.75  # 이전 분류 확률의 유지 비율. 클수록 예측 변화가 느림(새 확률 비율은 1-alpha)
       cpu_threads: 1  # 모델 추론에 사용할 CPU 스레드 수
       version: ''  # 진단 메시지에 기록할 모델 버전

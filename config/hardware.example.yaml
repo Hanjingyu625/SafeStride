@@ -40,5 +40,5 @@ terrain:
 perception:
   model_path: models/road_surface.onnx
   model_sha256: CHANGE_ME
-  confidence_threshold: 0.65
+  confidence_threshold: 0.55
   unknown_speed_scale: 0.0

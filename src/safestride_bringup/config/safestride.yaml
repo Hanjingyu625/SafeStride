@@ -110,7 +110,7 @@ safety_supervisor:
     require_surface_condition: false
     surface_control_enabled: false
     drive_command_topic: /drive/command
-    brake_enter_deg: 5.0  # Begin the 3 s actuator PWM fade at threshold entry.
+    brake_enter_deg: 7.0  # Begin the 3 s actuator PWM fade at threshold entry.
     brake_release_deg: 3.0
     brake_recovery_s: 0.5
     drive_pwm_cap: 140
@@ -169,8 +169,8 @@ surface_perception:
     model:
       path: ''
       classes_path: ''
-      confidence_threshold: 0.65
-      min_top1_margin: 0.15
+      confidence_threshold: 0.55
+      min_top1_margin: 0.08
       ema_alpha: 0.75
       cpu_threads: 1
       version: ''

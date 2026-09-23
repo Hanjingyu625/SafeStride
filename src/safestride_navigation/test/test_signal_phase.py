@@ -83,6 +83,32 @@ class SignalPhaseTests(unittest.TestCase):
         self.assertEqual(result['timing'], self.timing)
         self.assertEqual(result['phase'], self.phase)
 
+    def test_unrelated_missing_head_does_not_discard_requested_green(self):
+        combined = {**self.timing, **self.phase,
+                    'etPdsgStatNm': 'unknown', 'etPdsgRmdrCs': None}
+        with patch('safestride_navigation.signal_logic.request_signal_data',
+                   return_value=combined) as fetch:
+            result = request_signal_bundle(
+                'test', '42', url='timing', phase_url='phase',
+                combined_url='combined', timeout_s=1, direction='nt')
+        self.assertEqual(result['phase'], combined)
+        self.assertEqual(fetch.call_count, 1)
+
+    def test_requested_missing_head_falls_back_not_other_green(self):
+        combined = {**self.timing, **self.phase}
+        def fetch(_key, _intersection, *, url, **kwargs):
+            if url == 'combined':
+                return combined
+            return self.timing if url == 'timing' else self.phase
+        with patch('safestride_navigation.signal_logic.request_signal_data',
+                   side_effect=fetch) as mocked:
+            result = request_signal_bundle(
+                'test', '42', url='timing', phase_url='phase',
+                combined_url='combined', timeout_s=1, direction='et')
+        self.assertEqual(mocked.call_count, 3)
+        self.assertFalse(evaluate_pedestrian_signal(
+            result['timing'], result['phase'], 'et', 1001)[1])
+
     def test_combined_green_without_countdown_falls_back(self):
         incomplete = {**self.phase, 'ntPdsgRmdrCs': None}
 

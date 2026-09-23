@@ -237,15 +237,15 @@ class TestSupervisedDrive(unittest.TestCase):
             msg = self.tick(0)
         self.assertEqual(msg.mode, 0)
 
-    def test_five_degree_downhill_ramps_immediately_and_through_confirmation(self):
+    def test_seven_degree_downhill_ramps_immediately_and_through_confirmation(self):
         for _ in range(30):
-            msg = self.tick(4.9)
+            msg = self.tick(6.9)
         self.assertEqual(msg.mode, Message.DRIVE)
         self.assertAlmostEqual(msg.target_linear_m_s, 0.08)
         for _ in range(10):
-            msg = self.tick(5.0)
+            msg = self.tick(7.0)
             self.assertEqual(msg.mode, Message.TERRAIN_STOP)
-        msg = self.tick(5.0)
+        msg = self.tick(7.0)
         self.assertEqual((msg.mode, msg.target_linear_m_s, msg.slope_ff_pwm),
                          (Message.TERRAIN_STOP, 0.0, 0))
         self.assertEqual(msg.drive_pwm_cap, 140)
@@ -290,7 +290,7 @@ class TestSupervisedDrive(unittest.TestCase):
     def test_reverse_has_no_forward_slope_assist(self):
         self.node._last_command.twist.linear.x = -0.05
         for _ in range(20):
-            msg = self.tick(6)
+            msg = self.tick(7)
         self.assertEqual(msg.slope_ff_pwm, 0)
         self.assertEqual((msg.mode, msg.target_linear_m_s), (Message.TERRAIN_STOP, 0.0))
 
@@ -336,9 +336,9 @@ class TestSupervisedDrive(unittest.TestCase):
         for angle in (5.0, 6.9):
             for _ in range(30):
                 msg = self.tick(angle)
-            self.assertEqual(msg.mode, Message.TERRAIN_STOP)
+            self.assertEqual(msg.mode, Message.DRIVE)
             self.assertEqual(msg.slope_ff_pwm, 0)
-            self.assertEqual(msg.target_linear_m_s, 0.0)
+            self.assertEqual(msg.target_linear_m_s, 1.0)
         self.assertEqual(self.tick(7.0).mode, Message.TERRAIN_STOP)
         for _ in range(20):
             self.assertEqual(self.tick(4.1).mode, Message.TERRAIN_STOP)

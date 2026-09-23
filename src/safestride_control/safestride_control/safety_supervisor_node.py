@@ -78,7 +78,7 @@ class SafetySupervisor(Node):
         self.declare_parameter('slope_control_enabled', True)
         self.declare_parameter('surface_control_enabled', False)
         self.declare_parameter('drive_command_topic', '/drive/command')
-        self.declare_parameter('brake_enter_deg', 5.0)
+        self.declare_parameter('brake_enter_deg', 7.0)
         self.declare_parameter('brake_release_deg', 3.0)
         self.declare_parameter('brake_recovery_s', 0.5)
         self.declare_parameter('drive_pwm_cap', 140)
@@ -887,12 +887,10 @@ class SafetySupervisor(Node):
         ) = self._surface_state(now)
         hard_stop_reasons.extend(surface_reasons)
         slope_scale, slope_state, normalized_pitch = self._slope_state(now)
-        downhill_pwm_off = (
-            self._slope_control_enabled
-            and slope_state == SlopeSpeedPolicy.DOWNHILL
-        )
         self._slope_braking = self._brake_policy.update(
             normalized_pitch, now, self._slope_control_enabled)
+        # The 5-degree display classification must not bypass the stop threshold.
+        downhill_pwm_off = self._slope_braking and math.isfinite(normalized_pitch)
         self._slope_ff_pwm = slope_feedforward_pwm(normalized_pitch, slope_state)
         if (self._slope_ff_pwm > 0 and normalized_pitch <
                 float(self.get_parameter('slope_enter_angle_rad').value)):
