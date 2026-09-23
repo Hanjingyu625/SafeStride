@@ -40,10 +40,10 @@ def _bool_text(value: bool) -> str:
 
 
 # Keep these internal: the user does not select a drive mode or enter a speed.
-# PWM 20 is the measured hands-on launch aid, while 60 at 1.0 m/s mirrors the
+# PWM 35 is the hands-on launch cap, while 60 at 1.0 m/s mirrors the
 # existing MCU feed-forward model. One Hall pulse represents this much travel
 # with the installed 0.115 m wheel radius and twelve magnets.
-_HANDS_ON_PWM = 20
+_HANDS_ON_PWM = 35
 _NOMINAL_ASSIST_PWM = 60
 _NOMINAL_ASSIST_SPEED_M_S = 1.0
 _HALL_METERS_PER_PULSE = 2.0 * math.pi * 0.115 / 12.0
@@ -78,8 +78,8 @@ class SafetySupervisor(Node):
         self.declare_parameter('slope_control_enabled', True)
         self.declare_parameter('surface_control_enabled', False)
         self.declare_parameter('drive_command_topic', '/drive/command')
-        self.declare_parameter('brake_enter_deg', 7.0)
-        self.declare_parameter('brake_release_deg', 4.0)
+        self.declare_parameter('brake_enter_deg', 5.0)
+        self.declare_parameter('brake_release_deg', 3.0)
         self.declare_parameter('brake_recovery_s', 0.5)
         self.declare_parameter('drive_pwm_cap', 140)
         self._surface_control_enabled = bool(self.get_parameter('surface_control_enabled').value)
@@ -470,7 +470,7 @@ class SafetySupervisor(Node):
             ):
                 self._assist_idle_expired = True
                 return 0
-            return launch_cap
+            return min(self._drive_pwm_cap, launch_cap + max(0, self._slope_ff_pwm))
 
         speed = float(status.measured_speed_m_s)
         speed_age = float(status.speed_age)
@@ -488,7 +488,7 @@ class SafetySupervisor(Node):
 
         # Firmware retains the last Hall speed for five seconds. Once a new
         # magnet is overdue, distance/age is a decreasing upper bound on the
-        # current speed and brings the assist back toward PWM 20 promptly.
+        # current speed and brings the assist back toward PWM 35 promptly.
         effective_speed = speed
         if speed_age > 0.0:
             effective_speed = min(
@@ -984,13 +984,12 @@ class SafetySupervisor(Node):
             )
             drive.drive_pwm_cap = self._active_drive_pwm_cap
             drive.mode = DriveCommand.BRAKE if (
-                downhill_pwm_off or
                 (self._slope_braking and not math.isfinite(normalized_pitch)) or motion_stop_reasons or
                 'obstacle_stop' in operating_notes or 'surface_stop' in operating_notes
             ) else DriveCommand.DRIVE
-            # Before 5-degree confirmation, a valid 7-degree downhill still
-            # uses the existing three-second actuator-output ramp.
-            if (self._terrain_stopping or self._slope_braking) and drive.mode == DriveCommand.DRIVE:
+            # All valid downhill stops use the same actuator fade; confirmed
+            # slope classification must not interrupt it with an immediate brake.
+            if (downhill_pwm_off or self._terrain_stopping or self._slope_braking) and drive.mode == DriveCommand.DRIVE:
                 drive.mode = DriveCommand.TERRAIN_STOP
             drive.slope_ff_pwm = self._slope_ff_pwm if (
                 drive.mode == DriveCommand.DRIVE and self._output_linear > 0.0

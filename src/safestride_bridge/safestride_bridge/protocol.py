@@ -442,8 +442,8 @@ class CommandPayload:
             raise ValueError('enable must be 0 or 1')
         if self.reserved != 0:
             raise ValueError('COMMAND reserved field must be zero')
-        if not -60 <= self.slope_ff_pwm <= 30:
-            raise ValueError('slope_ff_pwm must be in [-60, 30]')
+        if not -60 <= self.slope_ff_pwm <= 45:
+            raise ValueError('slope_ff_pwm must be in [-60, 45]')
         if not 0 <= self.drive_pwm_cap <= 140 or self.mode not in (0, 1, 2):
             raise ValueError('invalid drive cap or mode')
         if self.mode != 0 and (self.target_mrad_s != 0 or self.slope_ff_pwm != 0):

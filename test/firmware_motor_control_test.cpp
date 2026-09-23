@@ -72,11 +72,11 @@ void run(DriveController& d, int ticks, int32_t target, uint32_t period,
 }
 
 int main() {
-  // A forward launch jumps to 20 once, with stop and cap priority intact.
+  // A forward launch jumps to 30 once, with stop and cap priority intact.
   DriveController launch; launch.begin(); primeFeedback(launch);
   HallSample no_speed = {0, 0, 0xFFFFFFFFUL};
   for (int i = 0; i < 4; ++i) launch.update(5000,no_speed,no_speed,8696,true);
-  assert(launch.appliedPwm() == 20);
+  assert(launch.appliedPwm() == 30);
   launch.update(5000,no_speed,no_speed,0,true);
   assert(launch.appliedPwm() == 0);
   for (int i = 0; i < 4; ++i)
@@ -87,7 +87,7 @@ int main() {
 
   DriveController once; once.begin(); primeFeedback(once);
   for (int i = 0; i < 4; ++i) once.update(5000,no_speed,no_speed,8696,true);
-  assert(once.appliedPwm() == 20);
+  assert(once.appliedPwm() == 30);
   once.update(5000,no_speed,no_speed,8696,true,true,0,false,0,0);
   assert(once.appliedPwm() == 0);
   once.update(5000,no_speed,no_speed,8696,true);
@@ -100,9 +100,11 @@ int main() {
   assert(walking.feedforwardPwm() >= 59 && walking.feedforwardPwm() <= 61);
   assert(abs(walking.feedbackPwm()) <= 1);
   assert(walking.appliedPwm() >= 59 && walking.appliedPwm() <= 61);
+  run(walking,2400,8696,60214UL,45,140);
+  assert(walking.appliedPwm() >= 104 && walking.appliedPwm() <= 106);
   run(walking,1600,10000,52360UL,30);
   assert(walking.appliedTargetMradS() == 10000);
-  assert(walking.appliedPwm() >= 93 && walking.appliedPwm() <= 95);
+  assert(walking.appliedPwm() >= 92 && walking.appliedPwm() <= 94);
   run(walking,1,0,52360UL,0,100,true);
   assert(walking.appliedPwm() == 0);
 
@@ -160,9 +162,9 @@ int main() {
     // Recovery uses 10 count/s only until it catches the normal controller
     // output. A later demand change returns to the ordinary 20 count/s slew.
     run(terrain,1020,696,752297UL);
-    assert(g_motor_pwm == 32);
+    assert(g_motor_pwm >= 40 && g_motor_pwm <= 42);
     run(terrain,20,696,752297UL,30);
-    assert(g_motor_pwm >= 34);
+    assert(g_motor_pwm >= 43);
     terrain.update(5000,absent,absent,0,true,true,0,false,0,100,false,true);
     terrain.update(5000,absent,absent,0,false);
     terrain.update(5000,absent,absent,0,true,true,0,false,0,100,false,true);
@@ -171,9 +173,9 @@ int main() {
   // Feed-forward replaces the old FF10 plus hard minimum 80.
   DriveController d; d.begin(); primeFeedback(d);
   run(d,800,696,752297UL);
-  assert(g_motor_pwm >= 31 && g_motor_pwm <= 33);
+  assert(g_motor_pwm >= 40 && g_motor_pwm <= 42);
   run(d,400,696,752297UL,8);
-  assert(g_motor_pwm >= 39 && g_motor_pwm <= 41);
+  assert(g_motor_pwm >= 48 && g_motor_pwm <= 50);
   run(d,400,696,752297UL,-45);
   assert(g_motor_pwm == 0);
   run(d,400,696,752297UL,-60);
@@ -189,7 +191,7 @@ int main() {
   // Output slew, zero target, fault/explicit brake bypass normal ramp.
   DriveController slew; slew.begin(); primeFeedback(slew);
   run(slew,100,696,752297UL);
-  assert(g_motor_pwm >= 20 && g_motor_pwm <= 30);
+  assert(g_motor_pwm >= 30 && g_motor_pwm <= 40);
   int before=g_motor_pwm;
   HallSample h={2000,752297UL,0};
   slew.update(5000,h,h,0,true,true,1160,true);

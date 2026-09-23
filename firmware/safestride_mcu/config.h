@@ -102,11 +102,11 @@ constexpr uint8_t MOTOR_IN2_PIN = 8U;
 constexpr int8_t MOTOR_SIGN = 1;
 constexpr uint16_t MAX_PWM = 140U;  // shared drive output ceiling
 // Initial feed-forward model; PWM counts are on Arduino's 0..255 scale.
-// 30 is a bias, NOT a minimum output. Calibrate 60 at 1.0 m/s under load.
+// 40 is a bias, NOT a minimum output. Calibrate 60 at 1.0 m/s under load.
 // Nominal FF=60 is an initial model, not a measured speed calibration.
-constexpr uint8_t MOTOR_FF_BIAS_PWM = 30U;
+constexpr uint8_t MOTOR_FF_BIAS_PWM = 40U;
 constexpr uint8_t MOTOR_FF_NOMINAL_PWM = 60U;
-constexpr uint8_t MOTOR_START_PWM = 20U;
+constexpr uint8_t MOTOR_START_PWM = 30U;
 constexpr float MOTOR_NOMINAL_MRAD_S = 1.0F / 0.115F * 1000.0F;
 constexpr float MOTOR_PWM_RISE_PER_S = 20.0F;
 constexpr float TERRAIN_RECOVERY_PWM_RISE_PER_S = 10.0F;

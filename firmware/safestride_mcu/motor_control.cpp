@@ -496,7 +496,7 @@ void DriveController::update(
     return;
   }
 
-  // 정상 제어식: u = sign(ω) × [30 + (60-30)|ω|/ω_nom] + 경사 FF + Kp(ω-측정).
+  // 정상 제어식: u = sign(ω) × [40 + (60-40)|ω|/ω_nom] + 경사 FF + Kp(ω-측정).
   // Nominal speed is 1.0 m/s. The bias is not a minimum output.
   const float target = applied_target_mrad_s_;
   const float direction = target >= 0.0F ? 1.0F : -1.0F;
@@ -506,7 +506,7 @@ void DriveController::update(
        fabsf(target) / cfg::MOTOR_NOMINAL_MRAD_S);
   // Slope assistance is forward only. No positive correction from invalid
   // Hall data: bounded FF starts the wheel while the pulse monitor runs.
-  if (target > 20.0F) ff_pwm_ += clampFloat(slope_ff_pwm, -60.0F, 30.0F);
+  if (target > 20.0F) ff_pwm_ += clampFloat(slope_ff_pwm, -60.0F, 45.0F);
   feedback_pwm_ = speed_valid_ ? calculatePid(
       target, filtered_left_mrad_s_, dt_seconds, motor_pid_) : 0.0F;
   float output = compensateMotorDeadzone(ff_pwm_ + feedback_pwm_, target);
@@ -515,7 +515,7 @@ void DriveController::update(
   if (!speed_valid_) output = clampFloat(output,
       -cfg::MOTOR_FF_NOMINAL_PWM, cfg::MOTOR_FF_NOMINAL_PWM);
   // 출력 크기를 늘릴 때 20count/s, 줄일 때 60count/s로 제한한다.
-  // After the one-time launch step, 20->60 takes at least two seconds.
+  // After the one-time launch step, 30->60 takes at least 1.5 seconds.
   // After a terrain stop, retain the slower rise limit. The speed controller
   // determines the PWM needed at target speed; there is no blind PWM sweep.
   const float desired_output = output;

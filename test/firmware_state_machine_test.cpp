@@ -309,9 +309,12 @@ int main() {
   assert(g_state==ControllerState::ARMED && g_brake_requested);
   assert(!handleCommand(brake_frame)); // duplicate cannot refresh/alter state
   brake_frame.sequence=101U;
-  command[11]=0U; proto::writeI32(command,696L); proto::writeI16(command+8,8);
+  command[11]=0U; proto::writeI32(command,696L); proto::writeI16(command+8,45);
   assert(handleCommand(brake_frame));
-  assert(!g_brake_requested && g_slope_ff_pwm==8 && g_requested_mrad_s==696L);
+  assert(!g_brake_requested && g_slope_ff_pwm==45 && g_requested_mrad_s==696L);
+  brake_frame.sequence=102U; proto::writeI16(command+8,46);
+  assert(!handleCommand(brake_frame));
+  proto::writeI16(command+8,45);
   brake_frame.sequence=102U; command[10]=141U;
   assert(!handleCommand(brake_frame));
   assert(g_last_command_sequence==101U && g_drive_pwm_cap==140U);
