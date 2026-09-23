@@ -1,6 +1,9 @@
 """Attach to the EXISTING TerrainBridgeNode; never open a second serial owner."""
 from rclpy.qos import qos_profile_sensor_data
-from safestride_interfaces.msg import WalkerStatus, HandlePressure, CrosswalkStatus, TerrainStatus
+from safestride_interfaces.msg import (
+    WalkerStatus, HandlePressure, CrosswalkStatus, TerrainStatus,
+    SurfaceCondition,
+)
 from .protocol import Frame
 from .hmi_model import Snapshot, PACKET_TYPE, CAPABILITY
 from .hmi_model import STATUS_FORMAT
@@ -24,6 +27,7 @@ class HmiRelay:
             ('pressure', HandlePressure, '/handle/pressure'),
             ('crosswalk', CrosswalkStatus, '/crosswalk/status'),
             ('terrain', TerrainStatus, node._topic_status),
+            ('surface', SurfaceCondition, '/perception/surface_condition'),
         ):
             node.declare_parameter('hmi.topics.'+key, default)
             topic = node.get_parameter('hmi.topics.'+key).value
@@ -42,7 +46,7 @@ class HmiRelay:
         if len(frame.payload) != STATUS_FORMAT.size:
             return False
         version, linked, exception, acks, errors = STATUS_FORMAT.unpack(frame.payload)
-        if version != 2 or linked > 1 or exception > 255:
+        if version != 3 or linked > 1 or exception > 255:
             return False
         if (self.last_status_sequence is not None and
                 not sequence_is_newer(frame.sequence, self.last_status_sequence)):
@@ -64,7 +68,7 @@ class HmiRelay:
         elif not n._link_ok(now):
             status.message = 'Terrain link unavailable'
         elif not n._capabilities & CAPABILITY:
-            status.message = 'Terrain firmware lacks HMI v2; flash updated firmware'
+            status.message = 'Terrain firmware lacks HMI v3; flash updated firmware'
         elif self.last_status is None or now - self.last_status_time >= 1.5:
             status.message = 'waiting for LCD transport status'
         elif not self.last_status[0]:

@@ -12,6 +12,16 @@ from safestride_navigation.intersection_map import (
 
 
 class TestIntersectionMap(unittest.TestCase):
+    def test_ambiguous_nearby_intersections_are_not_guessed(self):
+        records = [dict(intersection_id=str(i), latitude=m / 111_320, longitude=0)
+                   for i, m in enumerate((20, 24))]
+        self.assertIsNone(nearest_intersection(
+            records, 0, 0, maximum_distance_m=120, ambiguity_margin_m=10))
+        records[1]['latitude'] = 50 / 111_320
+        self.assertEqual(nearest_intersection(
+            records, 0, 0, maximum_distance_m=120,
+            ambiguity_margin_m=10)['intersection_id'], '0')
+
     def test_normalizes_nested_records_and_rejects_bad_coordinates(self):
         records = normalize_intersections(
             {
@@ -95,6 +105,17 @@ class TestIntersectionMap(unittest.TestCase):
         self.assertEqual(identifier, '1678')
         self.assertEqual(source, 'configured_fallback')
         self.assertEqual(name, '')
+
+    def test_locked_id_keeps_matching_nearest_name(self):
+        identifier, source, name = select_intersection_id(
+            locked_id='1678',
+            crosswalk={'intersection_id': '1678'},
+            nearest={'intersection_id': '1678', 'name': '수서역'},
+            configured_id='',
+        )
+        self.assertEqual(identifier, '1678')
+        self.assertEqual(source, 'locked')
+        self.assertEqual(name, '수서역')
 
 
 if __name__ == '__main__':

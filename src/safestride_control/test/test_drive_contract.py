@@ -78,7 +78,7 @@ class FakeNode:
 def production_class(relative, name):
     tree = ast.parse((ROOT / relative).read_text(encoding='utf-8'))
     # Keep the actual class and helper function bodies; replace only imports.
-    tree.body = [n for n in tree.body if isinstance(n, (ast.ClassDef, ast.FunctionDef))
+    tree.body = [n for n in tree.body if isinstance(n, (ast.Assign, ast.ClassDef, ast.FunctionDef))
                  and not (isinstance(n, ast.FunctionDef) and n.name == 'main')]
     scope = dict(vars(typing), math=math, Node=FakeNode, threading=threading,
                  DriveCommand=Message, TwistStamped=Message, Range=Message,
@@ -99,6 +99,13 @@ Supervisor = production_class(
 
 
 class TestSupervisedDrive(unittest.TestCase):
+    def test_caution_target_reaches_one_point_one_on_level_ground(self):
+        self.node._last_command.twist.linear.x = 1.1
+        for _ in range(140):
+            self.tick(0.0)
+        self.assertAlmostEqual(
+            self.node._drive_publisher.messages[-1].target_linear_m_s, 1.1)
+
     def setUp(self):
         self.node = Supervisor()
         n = self.node
@@ -119,6 +126,56 @@ class TestSupervisedDrive(unittest.TestCase):
         n._timer_callback()
         return n._drive_publisher.messages[-1]
 
+    def walker_status(self, *, deadman=True, speed=0.0, speed_age=math.inf,
+                      speed_valid=False, new_pulse=False):
+        self.node._status_callback(Message(
+            deadman=deadman,
+            measured_speed_m_s=speed,
+            speed_age=speed_age,
+            speed_valid=speed_valid,
+            new_pulse=new_pulse,
+        ))
+
+    def test_hands_on_launch_uses_pwm_twenty_then_expires_before_hall_fault(self):
+        self.walker_status(deadman=True)
+        self.assertEqual(self.tick(0).drive_pwm_cap, 20)
+        self.assertEqual(self.tick(0, dt=3.8).drive_pwm_cap, 20)
+        self.assertEqual(self.tick(0, dt=0.2).drive_pwm_cap, 0)
+
+    def test_hall_speed_sets_assist_cap_and_overdue_pulse_reduces_it(self):
+        self.walker_status(
+            deadman=True,
+            speed=0.5,
+            speed_age=0.0,
+            speed_valid=True,
+            new_pulse=True,
+        )
+        self.assertEqual(self.tick(0).drive_pwm_cap, 40)
+        self.walker_status(
+            deadman=True,
+            speed=0.5,
+            speed_age=0.24,
+            speed_valid=True,
+            new_pulse=False,
+        )
+        self.assertEqual(self.tick(0).drive_pwm_cap, 30)
+        self.walker_status(
+            deadman=True,
+            speed=0.5,
+            speed_age=4.0,
+            speed_valid=True,
+            new_pulse=False,
+        )
+        self.assertEqual(self.tick(0).drive_pwm_cap, 0)
+        self.walker_status(
+            deadman=True,
+            speed=0.25,
+            speed_age=0.0,
+            speed_valid=True,
+            new_pulse=True,
+        )
+        self.assertEqual(self.tick(0).drive_pwm_cap, 30)
+
     def test_full_drive_brake_auto_resume_and_atomic_fields(self):
         for _ in range(20):
             msg = self.tick(0)
@@ -129,10 +186,10 @@ class TestSupervisedDrive(unittest.TestCase):
             msg = self.tick(-11)
         self.assertAlmostEqual(msg.target_linear_m_s, 0.08)
         self.assertEqual(msg.slope_ff_pwm, 30)
-        msg = self.tick(16)
+        msg = self.tick(7)
         self.assertEqual((msg.mode, msg.target_linear_m_s, msg.slope_ff_pwm), (2, 0.0, 0))
         for _ in range(20):
-            self.assertEqual(self.tick(13).mode, 2)
+            self.assertEqual(self.tick(4.1).mode, 2)
         for _ in range(30):
             msg = self.tick(0)
         self.assertEqual(msg.mode, 0)
@@ -172,16 +229,32 @@ class TestSupervisedDrive(unittest.TestCase):
             msg = self.tick(0)
         self.assertEqual(msg.mode, 0)
 
-    def test_downhill_slows_from_five_degrees_and_stops_at_fifteen(self):
-        for angle, scale in ((4.9, 1.0), (5.0, 0.84), (6.0, 0.76),
-                             (8.0, 0.6), (10.0, 0.6), (14.9, 0.6)):
-            for _ in range(30):
-                msg = self.tick(angle)
-            self.assertAlmostEqual(msg.target_linear_m_s, 0.08 * scale)
+    def test_confirmed_five_degree_downhill_immediately_requests_zero_pwm(self):
+        for _ in range(30):
+            msg = self.tick(4.9)
+        self.assertEqual(msg.mode, Message.DRIVE)
+        self.assertAlmostEqual(msg.target_linear_m_s, 0.08)
+        for _ in range(10):
+            msg = self.tick(5.0)
             self.assertEqual(msg.mode, Message.DRIVE)
-            self.assertEqual(msg.slope_ff_pwm, 0)
-            self.assertEqual(msg.drive_pwm_cap, 140)
-        self.assertEqual(self.tick(15.0).mode, Message.TERRAIN_STOP)
+        msg = self.tick(5.0)
+        self.assertEqual((msg.mode, msg.target_linear_m_s, msg.slope_ff_pwm),
+                         (Message.BRAKE, 0.0, 0))
+        self.assertEqual(msg.drive_pwm_cap, 140)
+        for _ in range(20):
+            self.assertEqual(self.tick(4.0).mode, Message.BRAKE)
+        for _ in range(10):
+            self.assertEqual(self.tick(3.0).mode, Message.BRAKE)
+        msg = self.tick(3.0)
+        self.assertEqual(msg.mode, Message.DRIVE)
+        self.assertGreater(msg.target_linear_m_s, 0.0)
+
+    def test_seven_degrees_ramps_before_five_degree_confirmation(self):
+        self.assertEqual(self.tick(7.0).mode, Message.TERRAIN_STOP)
+        for _ in range(10):
+            msg = self.tick(7.0)
+        self.assertEqual((msg.mode, msg.target_linear_m_s),
+                         (Message.BRAKE, 0.0))
 
     def test_uphill_pwm_gain_without_target_speed_gain(self):
         for angle, pwm in ((-5.0, 10), (-7.0, 20), (-9.0, 30), (-12.0, 30)):
@@ -209,9 +282,9 @@ class TestSupervisedDrive(unittest.TestCase):
     def test_reverse_has_no_forward_slope_assist(self):
         self.node._last_command.twist.linear.x = -0.05
         for _ in range(20):
-            msg = self.tick(8)
+            msg = self.tick(6)
         self.assertEqual(msg.slope_ff_pwm, 0)
-        self.assertAlmostEqual(msg.target_linear_m_s, -0.05)
+        self.assertEqual((msg.mode, msg.target_linear_m_s), (Message.BRAKE, 0.0))
 
     def test_invalid_brake_parameters(self):
         for args in ((math.nan, 7, 0.5), (7, 7, 0.5), (10, 7, -1)):
@@ -248,22 +321,29 @@ class TestSupervisedDrive(unittest.TestCase):
         self.assertEqual(msg.mode, Message.DRIVE)
         self.assertAlmostEqual(msg.target_linear_m_s, 1.0)
         self.assertEqual(self.tick(-4.9).slope_ff_pwm, 0)
-        for angle, scale in ((0.0, 1.0), (5.0, 0.84), (10.0, 0.6), (14.9, 0.6)):
+        for _ in range(30):
+            msg = self.tick(0.0)
+        self.assertEqual(msg.mode, Message.DRIVE)
+        self.assertAlmostEqual(msg.target_linear_m_s, 1.0)
+        for angle in (5.0, 6.9):
             for _ in range(30):
                 msg = self.tick(angle)
-            self.assertEqual(msg.mode, Message.DRIVE)
+            self.assertEqual(msg.mode, Message.BRAKE)
             self.assertEqual(msg.slope_ff_pwm, 0)
-            self.assertAlmostEqual(msg.target_linear_m_s, scale)
-        self.assertEqual(self.tick(15.0).mode, Message.TERRAIN_STOP)
+            self.assertEqual(msg.target_linear_m_s, 0.0)
+        self.assertEqual(self.tick(7.0).mode, Message.BRAKE)
         for _ in range(20):
-            self.assertEqual(self.tick(12.1).mode, Message.TERRAIN_STOP)
+            self.assertEqual(self.tick(4.1).mode, Message.BRAKE)
         for _ in range(20):
-            msg = self.tick(12.0)
+            msg = self.tick(4.0)
+        self.assertEqual(msg.mode, Message.BRAKE)
+        for _ in range(20):
+            msg = self.tick(3.0)
         self.assertEqual(msg.mode, Message.DRIVE)
-        self.assertEqual(self.tick(15.0).mode, Message.TERRAIN_STOP)
-        self.assertEqual(self.tick(15.0, valid=False).mode, Message.BRAKE)
+        self.assertEqual(self.tick(7.0).mode, Message.TERRAIN_STOP)
+        self.assertEqual(self.tick(7.0, valid=False).mode, Message.BRAKE)
         n._status_reasons = lambda now: ['deadman_released']
-        self.assertEqual(self.tick(15.0).mode, Message.BRAKE)
+        self.assertEqual(self.tick(7.0).mode, Message.BRAKE)
 
     def test_monitoring_inputs_cannot_change_motor_command(self):
         n = self.node
@@ -290,7 +370,7 @@ class TestSupervisedDrive(unittest.TestCase):
             self.assertEqual(msg.mode, Message.DRIVE)
             self.assertAlmostEqual(msg.target_linear_m_s, 0.08)
             self.assertEqual(msg.slope_ff_pwm, 0)
-        self.assertEqual(self.tick(15.0).mode, Message.TERRAIN_STOP)
+        self.assertEqual(self.tick(7.0).mode, Message.TERRAIN_STOP)
 
     def test_terrain_invalid_does_not_stop_and_confirmed_hazard_ramps(self):
         n = self.node

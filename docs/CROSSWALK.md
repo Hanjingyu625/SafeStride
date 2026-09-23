@@ -60,6 +60,11 @@ sudo install -o "$USER" -g "$(id -gn)" -m 600 /path/to/new-key.txt \
 With a key present, the ROS node asynchronously downloads the V2X intersection
 map, caches it under `~/.cache/safestride/`, matches the selected crosswalk to
 an intersection within 120 m, and then requests its pedestrian signal timing.
+It first tries Seoul T-Data's current combined phase/countdown endpoint. If
+that service is unavailable to the configured key, it falls back to the two
+previously configured phase and timing endpoints. Both `protected` and
+`permissive` pedestrian green require a fresh matching countdown before entry
+can be allowed; a countdown by itself is never treated as a green signal.
 `SAFESTRIDE_INTERSECTION_ID` is only a bench fallback when no API key is
 configured. A configured key always enables live matching and never falls back
 to a stale fixed ID. With no valid ID, API key, network, or fresh signal value,
@@ -86,6 +91,20 @@ ros2 topic echo /diagnostics --field status
 ```
 
 Monitor-only mode publishes status without becoming a `/cmd_vel` publisher.
+The configured cruise target is 1.0 m/s. With a 1.0 m/s walking profile and
+feedback, the crosswalk target is 1.0 m/s during normal crossing and 1.1 m/s
+during caution (the existing +0.10 m/s assistance). Its configurable
+`maximum_assist_speed_mps` is 1.15 m/s, matching the supervisor forward limit
+and MCU target limit of 10000 mrad/s at the configured 0.115 m wheel radius.
+Keep these limits aligned when changing the drive configuration. The walking
+profile still learns actual moving speed for crossing-time estimates; raising
+the command ceiling does not assume a slow user can walk faster. Approach and
+exit targets remain capped at 0.50 m/s, and waiting requests zero speed.
+In monitor-only mode these are status targets, not motor commands. When motion
+output is enabled, supervisor slope scaling, acceleration limits, grip checks,
+and MCU Hall-feedback/PWM limits still apply; a requested speed is not a
+guarantee of measured speed. The old standalone v6 script is not this ROS path.
+
 Diagnostics include coordinates, heading source, candidate bearing, crossing
 direction, matched `itstId`, and distance to the intersection. Verify every
 state transition from recorded logs before enabling motion. If crosswalk motion
@@ -99,8 +118,39 @@ IDLE -> APPROACHING -> WAIT_AT_CURB or ENTRY_ALLOWED
      -> CROSSING or CROSSING_URGENT -> EXITING -> IDLE
 ```
 
+`/crosswalk/status.state` exposes seven internal phases numbered 0 through 6,
+not four display instructions. The main display decisions are CAN CROSS (fresh
+green with enough time), CAUTION (already crossing and time is tight), WAIT
+(not enough time or red), and NO SIGNAL DATA (signal unavailable, including
+during an internal urgent crossing). Normal
+CROSSING and CROSSING COMPLETE are separate progress indications. A
+photo of a green lamp does not make `signal_valid` true: the selected V2X
+intersection ID, pedestrian direction, source timestamp, and countdown must
+all match. The `SafeStride/Crosswalk Controller` `/diagnostics` entry includes
+`signal_reason`, `signal_direction`, `signal_phase_value`,
+`signal_raw_countdown`, `wheel_odometry_fresh`, and crosswalk distance for
+field diagnosis. Inspect it alongside `/crosswalk/status`; keep motion output
+disabled until its selected signal head matches the physical crossing.
+`entry_allowed` is true only in `ENTRY_ALLOWED` (state 3); it never means
+"continue crossing" in states 4-6. Crossing assistance can remain active after
+entry even when a new entry would not be safe.
+
 If entry is detected while waiting, the policy changes to
 `CROSSING_URGENT`; it does not command a stop after the user is already in the
 roadway. Signal loss before entry stops at the curb, while signal loss during a
 crossing requests continued assistance and an urgent status. Local hardware
 safety can always override this request.
+# Human-readable guidance topic
+
+`ros2 topic echo /crosswalk/guidance std_msgs/msg/String`
+
+This topic publishes JSON with Korean `state` and `reason` strings on each
+status update. Guidance states are CAN CROSS, CAUTION, WAIT, NO SIGNAL (shown
+in Korean), plus NO GUIDANCE for no selected crossing, missing GPS before
+entry, or completed crossing. CAUTION distinguishes short signal time from
+unknown position, ETA, or completion; only short time advises prompt crossing.
+Signal loss during crossing does not instruct stopping in the road.
+
+The existing `/crosswalk/status` seven-state interface remains compatible with
+motor control and LCD firmware. This additional topic does not change the LCD
+layout or motor behavior. Read it after rebuilding and restarting navigation.

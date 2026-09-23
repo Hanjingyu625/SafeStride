@@ -167,7 +167,7 @@ __all__ = [
 class SlopeBrakePolicy:
     """Non-latching BRAKE with angle hysteresis and valid-sample recovery dwell."""
 
-    def __init__(self, enter_deg=10.0, release_deg=7.0, recovery_s=0.5):
+    def __init__(self, enter_deg=7.0, release_deg=4.0, recovery_s=0.5):
         self.enter = finite_parameter('brake_enter_deg', enter_deg, minimum=0.0,
                                       maximum=45.0, minimum_inclusive=False)
         self.release = finite_parameter('brake_release_deg', release_deg, minimum=0.0,

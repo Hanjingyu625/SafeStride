@@ -13,6 +13,31 @@ constexpr uint16_t TELEMETRY_PERIOD_MS = 50U;
 constexpr uint16_t SESSION_LOSS_TIMEOUT_MS = 1500U;
 constexpr int AVR_BOOT_COUNTER_EEPROM_ADDRESS = 8;
 
+// CdS lighting: A0 is assigned; relay pin and trigger polarity are NOT yet known.
+// Output stays disabled until wiring/polarity are confirmed. Values below are
+// provisional ADC counts, not lux or field-calibrated thresholds.
+constexpr uint8_t LIGHT_SENSOR_PIN = A0;
+constexpr int8_t LIGHT_RELAY_PIN = -1;
+constexpr int8_t LIGHT_RELAY_ON_LEVEL = -1;
+constexpr bool LIGHT_OUTPUT_ENABLED = false;
+// Proposed divider: 5V -- CdS -- A0 -- fixed resistor -- GND.
+constexpr bool LIGHT_BRIGHT_IS_HIGH = true;
+constexpr uint16_t LIGHT_ON_BRIGHTNESS = 350U;
+constexpr uint16_t LIGHT_OFF_BRIGHTNESS = 550U;
+constexpr uint16_t LIGHT_SAMPLE_MS = 50U;
+constexpr uint16_t LIGHT_CONFIRM_MS = 1000U;
+
+static_assert(LIGHT_ON_BRIGHTNESS < LIGHT_OFF_BRIGHTNESS &&
+              LIGHT_OFF_BRIGHTNESS <= 1023U, "Invalid light hysteresis");
+static_assert(LIGHT_SAMPLE_MS > 0U && LIGHT_CONFIRM_MS >= LIGHT_SAMPLE_MS,
+              "Invalid light timing");
+// D0/D1 are USB serial; D8/D9 are AltSoftSerial; A4/A5 are I2C.
+static_assert(!LIGHT_OUTPUT_ENABLED ||
+              (LIGHT_RELAY_PIN >= 2 && LIGHT_RELAY_PIN <= 13 &&
+               LIGHT_RELAY_PIN != 8 && LIGHT_RELAY_PIN != 9 &&
+               (LIGHT_RELAY_ON_LEVEL == LOW || LIGHT_RELAY_ON_LEVEL == HIGH)),
+              "Assign a free relay pin and known ON level before enabling light output");
+
 // The TOF-10120 datasheet gives the 8-bit address as 0xA4. Arduino Wire uses
 // the corresponding 7-bit address, 0x52.
 constexpr uint8_t TOF_I2C_ADDRESS = 0x52U;

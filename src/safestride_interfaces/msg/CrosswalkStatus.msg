@@ -24,4 +24,5 @@ float32 target_speed_kmh
 string command_mode
 string reason
 string intersection_id
+string intersection_name
 uint32 crosswalk_index

@@ -136,8 +136,8 @@ VisualTFT에서 다음 네이티브 프로젝트를 연다.
 1. 화면 `0`: SafeStride 로고 부팅 화면
 2. 화면 `1`: 속도, 주행 여부, 도로 상황과 경사 상태 화면
 
-`controls.csv`의 기능 ID 1~16은 Lua에서 직접 사용하므로 임의로 바꾸지 않는다.
-ID 17~21은 카드 배경과 하단 상태 바다. DEV 버튼은 화면 `1`, ID `11`이며
+`controls.csv`의 기능 ID 1~16과 노면 ID 23은 Lua에서 직접 사용하므로 임의로 바꾸지 않는다.
+ID 17~22는 카드 배경과 하단 상태 바다. DEV 버튼은 화면 `1`, ID `11`이며
 동작·송신 데이터가 없고 Lua도 비활성화한다.
 
 VisualTFT 기본 글꼴의 한글이 가상 화면에서 `?`로 대체되는 것을 확인했으므로 실제
@@ -156,14 +156,14 @@ VisualTFT의 `도구 → 프로토콜 및 변수 설정`에서 다음과 같이 
 | UART | TTL, `19200 baud`, `8 data bits`, `no parity`, `1 stop bit` |
 | 변수 형식 | Holding Register, unsigned 16-bit word |
 | 시작 주소 | `0x0000` |
-| 마지막 주소 | `0x000F` |
+| 마지막 주소 | `0x0019` |
 | 호스트 쓰기 | Function Code `0x10`, Write Multiple Registers 허용 |
 
-16개 변수를 정확히 다음 주소와 이름으로 만든다.
+26개 변수를 정확히 다음 주소와 이름으로 만든다.
 
 | 주소 | VisualTFT 변수 | 값 |
 |---:|---|---|
-| `0000` | `ss_version` | snapshot 버전, 현재 `2` |
+| `0000` | `ss_version` | snapshot 버전, 현재 `3` |
 | `0001` | `ss_heartbeat` | 200 ms마다 변하는 생존 카운터 |
 | `0002` | `ss_valid` | speed=1, hands=2, crosswalk=4, pitch=8, ToF=16, walker=32 |
 | `0003` | `ss_speed` | km/h × 100, `65535`는 무효 |
@@ -178,14 +178,15 @@ VisualTFT의 `도구 → 프로토콜 및 변수 설정`에서 다음과 같이 
 | `000C` | `ss_braking` | 제동 중이면 1 |
 | `000D` | `ss_faults` | Drive fault bit mask |
 | `000E` | `ss_host_link` | Pi snapshot이 fresh하면 1 |
-| `000F` | `ss_flags` | armed=1, deadman=2, estop=4, watchdog=8, entry=16, urgent=32, signal=64 |
+| `000F` | `ss_flags` | 하위 비트는 주행·신호 상태, bit7~15는 노면 유효성·종류·신뢰도 |
+| `0010`~`0019` | `ss_location_0`~`ss_location_9` | 교차로 영문 위치명 ASCII 20바이트, 레지스터당 2바이트 |
 
 주소는 VisualTFT에서 16진수로 입력한다. `ss_pitch`는 레지스터 자체는 unsigned
 16-bit로 만들고 Lua에서 2의 보수 signed 값으로 변환한다. `40001` 방식의 표시
 주소를 요구하는 도구가 있더라도 실제 Modbus PDU 시작 주소는 `0x0000`이어야 한다.
 
 모든 변수는 읽기/쓰기 허용, 배율 1, Flash 저장 비활성으로 설정한다.
-기본값은 `registers.csv`의 `default` 열을 따른다. 특히 `ss_version=2`,
+기본값은 `registers.csv`의 `default` 열을 따른다. 특히 `ss_version=3`,
 `ss_valid=0`, `ss_host_link=0`, `ss_speed/ss_seconds/ss_distance=65535`로
 초기화해야 출고·재부팅 시 예전 주행 값을 정상 상태처럼 표시하지 않는다.
 텍스트 컨트롤은 문자열 모드로 만들고 Lua가 갱신하도록 자동 숫자 바인딩을 끈다.
@@ -217,12 +218,14 @@ VisualTFT에서 프로젝트를 컴파일하고 가상 화면을 실행한다. �
 - 정상 속도와 양손 감지
 - 제동 및 위험 감지
 - 횡단보도 N/A, 대기와 진입 가능
+- 교차로명(`SUSEO STN` 등)과 이름 없는 횡단보도 대체 문구
 - 양수·음수 pitch와 급경사
 - heartbeat 정지 시 약 1초 안에 통신 끊김 표시
 - DEV 버튼이 눌리지 않음
 
-HTML 시뮬레이터에서 보이는 `서울시 광진구`는 예시 데이터다. 현재 HMI packet에는
-위치 문자열이 없으므로 실제 LCD에는 `위치: N/A`가 정상이다.
+HTML 시뮬레이터에서 보이는 `서울시 광진구`는 예시 데이터다. 실제 LCD는 HMI v3의
+교차로 영문 이름만 접두어 없이 표시한다. 주변 횡단보도가 없을 때는 `Location: N/A`,
+횡단보도는 감지됐지만 이름이 없을 때는 `CROSSWALK NEARBY`를 표시한다.
 
 ## 5. Terrain과 연결하기 전에 LCD 단독 다운로드
 
@@ -298,12 +301,12 @@ source install/setup.bash
 경사 보정 변경 시 safety supervisor의 `uphill_pitch_sign`과 `pitch_offset_rad`도
 일치시킨다. `/terrain/status`의 raw pitch를 LCD relay가 한 번 보정한다.
 
-Pi는 기존 TerrainBridgeNode의 USB 연결만 사용하여 200 ms마다 32바이트
+Pi는 기존 TerrainBridgeNode의 USB 연결만 사용하여 200 ms마다 52바이트
 HMI snapshot(`0x30`)을 보낸다. 별도 serial 프로세스를 실행하지 않는다.
-HMI v2 capability는 bit 11이며, bit 10의 과거 초안과 구별한다.
+HMI v3 capability는 bit 12이며, bit 10의 과거 초안 및 bit 11의 v2와 구별한다.
 Terrain은 600 ms 동안 snapshot이 없으면 데이터를 무효화하며 LCD는 자체
 heartbeat 감시로 Terrain 전원이 꺼져도 1초 내 연결 끊김을 표시한다.
-LCD 상태(`0x31`, `<BBHII`, 12 bytes)는 버전 2, ACK 유효 여부, exception code,
+LCD 상태(`0x31`, `<BBHII`, 12 bytes)는 버전 3, ACK 유효 여부, exception code,
 누적 ACK 수, 누적 오류 수다. 센서 telemetry의 기존 payload는 유지한다.
 
 ## 7. Terrain Uno와 LCD 배선
@@ -373,7 +376,7 @@ ros2 topic echo /diagnostics
 | 문구가 `?`로 표시됨 | 저장소의 ASCII 영문 프로젝트를 다시 열고 컴파일했는지 확인 |
 | 계속 `Waiting for link` | ROS 실행, Terrain USB serial, HMI capability와 `hmi.enabled` |
 | LCD ACK 없음 | TTL/RS232 단자 구분, TX/RX 교차, 공통 GND, slave ID와 19200 8N1 |
-| Modbus exception | holding register 0x0000..0x000F와 FC16 허용 여부 |
+| Modbus exception | holding register 0x0000..0x0019와 FC16 허용 여부 |
 | 값은 바뀌지만 문구가 이상함 | 변수 이름·주소·uint16 형식, Lua와 control ID |
 | 경사 부호가 반대 | `hmi.pitch_sign`과 safety supervisor의 pitch 부호 설정 일치 여부 |
 | 잠시 정상 후 연결 끊김 | 5 V 강하, UART 배선 노이즈, Pi/Terrain serial 재연결 기록 |
@@ -382,7 +385,7 @@ ros2 topic echo /diagnostics
 
 - [ ] LCD 라벨과 16P 인터페이스 보드 모델을 확인했다.
 - [ ] 저장소의 VisualTFT M series 480 × 272 프로젝트를 열고 컴파일했다.
-- [ ] Modbus slave 1, 19200 8N1, holding register 0000..000F를 설정했다.
+- [ ] Modbus slave 1, 19200 8N1, holding register 0000..0019를 설정했다.
 - [ ] `controls.csv`, `registers.csv`, `safestride.lua`를 프로젝트에 반영했다.
 - [ ] 영문 문구와 모든 상태를 VisualTFT 가상 화면에서 확인했다.
 - [ ] Terrain과 분리된 LCD에 프로젝트를 다운로드했다.
