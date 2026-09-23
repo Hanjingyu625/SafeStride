@@ -32,6 +32,7 @@ LCD 최초 설정 및 전원 배선은 [디스플레이 안내](../docs/DISPLAY_
 |---|---|
 | D0/D1 | 미연결, Raspberry Pi USB serial용 예약 |
 | A4 | TOF-10120 SDA, GY-521 MPU6050 SDA |
+| A0 | 조도센서 |
 | A5 | TOF-10120 SCL, GY-521 MPU6050 SCL |
 | D9 (TX) | ezHMI TTL DIN/RX |
 | D8 (RX) | ezHMI TTL DOUT/TX, ACK 수신 |
