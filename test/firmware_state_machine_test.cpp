@@ -7,7 +7,6 @@ namespace {
 
 uint32_t g_test_millis = 0UL;
 int g_pressure_adc = 200;
-int g_hall_adc = 512;
 
 }  // namespace
 
@@ -15,12 +14,13 @@ HardwareSerial Serial;
 
 void pinMode(uint8_t, uint8_t) {}
 void digitalWrite(uint8_t, uint8_t) {}
-int digitalRead(uint8_t) { return LOW; }
+int digitalRead(uint8_t pin) {
+  return pin == safestride_config::HALL_DIGITAL_PIN ? HIGH : LOW;
+}
 void analogWrite(uint8_t, int) {}
 int analogRead(uint8_t pin) {
-  return pin == safestride_config::HALL_ANALOG_PIN
-      ? g_hall_adc
-      : g_pressure_adc;
+  (void)pin;
+  return g_pressure_adc;
 }
 int digitalPinToInterrupt(uint8_t) { return 0; }
 void attachInterrupt(int, void (*)(), int) {}

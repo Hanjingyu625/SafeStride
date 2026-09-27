@@ -11,7 +11,7 @@
 
 #include "config.h"
 #include "controller_state.h"
-#include "analog_hall_sensor.h"
+#include "digital_hall_sensor.h"
 #include "motor_control.h"
 #include "pressure_sensor.h"
 #include "protocol.h"
@@ -53,7 +53,7 @@ constexpr uint8_t PRESSURE_FLAG_CALIBRATED = 1U << 2U;
 proto::FrameReceiver g_receiver;
 DriveController g_drive;
 PressureSensorPair g_pressure;
-AnalogHallSensor g_hall;
+DigitalHallSensor g_hall;
 
 ControllerState g_state = ControllerState::BOOT;
 uint16_t g_fault_bits = 0U;

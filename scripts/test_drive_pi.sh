@@ -72,7 +72,7 @@ fi
 echo "Publishing a supervised 0.08 m/s command for ${duration}s."
 echo "Hold both pressure sensors; no set_enabled true call is required."
 echo "Releasing either side requests the 0.6 s dead-man stop ramp."
-echo "The left A3 WSH135 Hall sensor closes the shared motor speed loop."
+echo "The left D2 A314x digital Hall sensor closes the shared motor speed loop (12 pulses/rev)."
 timeout --signal=INT "${duration}s" ros2 topic pub --rate 20 /cmd_vel \
   geometry_msgs/msg/TwistStamped \
   "{twist: {linear: {x: 0.08}, angular: {z: 0.0}}}" \

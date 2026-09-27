@@ -21,11 +21,11 @@ cl /nologo /utf-8 /std:c++14 /EHsc /W4 /I"%ROOT%\test\arduino_stub" /I"%ROOT%\fi
 if errorlevel 1 goto :fail
 cl /nologo /utf-8 /std:c++14 /EHsc /W4 /I"%ROOT%\test\arduino_stub" /I"%ROOT%\firmware\safestride_mcu" "%ROOT%\test\firmware_pressure_sensor_test.cpp" "%ROOT%\firmware\safestride_mcu\pressure_sensor.cpp" /Fe:"%OUT%\pressure_test.exe"
 if errorlevel 1 goto :fail
-cl /nologo /utf-8 /std:c++14 /EHsc /W4 /I"%ROOT%\test\arduino_stub" /I"%ROOT%\firmware\safestride_mcu" "%ROOT%\test\firmware_analog_hall_sensor_test.cpp" "%ROOT%\firmware\safestride_mcu\analog_hall_sensor.cpp" "%ROOT%\firmware\safestride_mcu\motor_control.cpp" /Fe:"%OUT%\analog_hall_test.exe"
+cl /nologo /utf-8 /std:c++14 /EHsc /W4 /I"%ROOT%\test\arduino_stub" /I"%ROOT%\firmware\safestride_mcu" "%ROOT%\test\firmware_digital_hall_sensor_test.cpp" "%ROOT%\firmware\safestride_mcu\digital_hall_sensor.cpp" "%ROOT%\firmware\safestride_mcu\motor_control.cpp" /Fe:"%OUT%\digital_hall_test.exe"
 if errorlevel 1 goto :fail
 cl /nologo /utf-8 /std:c++14 /EHsc /W4 /I"%ROOT%\test\arduino_stub" /I"%ROOT%\firmware\safestride_mcu" "%ROOT%\test\firmware_motor_control_test.cpp" "%ROOT%\firmware\safestride_mcu\motor_control.cpp" /Fe:"%OUT%\motor_test.exe"
 if errorlevel 1 goto :fail
-cl /nologo /utf-8 /std:c++14 /EHsc /W4 /I"%ROOT%\test\arduino_stub" /I"%ROOT%\firmware\safestride_mcu" "%ROOT%\test\firmware_state_machine_test.cpp" "%ROOT%\firmware\safestride_mcu\analog_hall_sensor.cpp" "%ROOT%\firmware\safestride_mcu\motor_control.cpp" "%ROOT%\firmware\safestride_mcu\pressure_sensor.cpp" "%ROOT%\firmware\safestride_mcu\protocol.cpp" /Fe:"%OUT%\state_machine_test.exe"
+cl /nologo /utf-8 /std:c++14 /EHsc /W4 /I"%ROOT%\test\arduino_stub" /I"%ROOT%\firmware\safestride_mcu" "%ROOT%\test\firmware_state_machine_test.cpp" "%ROOT%\firmware\safestride_mcu\digital_hall_sensor.cpp" "%ROOT%\firmware\safestride_mcu\motor_control.cpp" "%ROOT%\firmware\safestride_mcu\pressure_sensor.cpp" "%ROOT%\firmware\safestride_mcu\protocol.cpp" /Fe:"%OUT%\state_machine_test.exe"
 if errorlevel 1 goto :fail
 cl /nologo /utf-8 /std:c++14 /EHsc /W4 /I"%ROOT%\test\arduino_stub" /I"%ROOT%\firmware\terrain_mcu" "%ROOT%\test\firmware_tof10120_test.cpp" "%ROOT%\firmware\terrain_mcu\tof10120_sensor.cpp" /Fe:"%OUT%\tof_test.exe"
 if errorlevel 1 goto :fail
@@ -49,7 +49,7 @@ if not errorlevel 0 goto :fail
 "%OUT%\pressure_test.exe"
 if errorlevel 1 goto :fail
 if not errorlevel 0 goto :fail
-"%OUT%\analog_hall_test.exe"
+"%OUT%\digital_hall_test.exe"
 if errorlevel 1 goto :fail
 if not errorlevel 0 goto :fail
 "%OUT%\motor_test.exe"

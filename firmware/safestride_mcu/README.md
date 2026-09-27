@@ -1,18 +1,30 @@
 # Drive Uno firmware
 
-단일 모터드라이버, 왼쪽 A3 WSH135 Hall, 왼쪽 A2/오른쪽 A1 압력 dead-man과 CRC serial watchdog을
-담당한다. WSH135는 부팅 시 무자계 기준값을 학습하고, 기준값에서 30 ADC 이상
-벗어나면 자석 1개를 센 뒤 12 ADC 이내로 돌아와야 다음 pulse를 센다. 회전당
-12 pulse이며 압력 threshold는 좌우 80이다. `HALL_CALIBRATED=true`, `PRESSURE_THRESHOLDS_CALIBRATED=true`,
+단일 모터드라이버, 왼쪽 D2 A3141/A3144 디지털 Hall, 왼쪽 A2/오른쪽 A1 압력 dead-man과 CRC serial watchdog을
+담당한다. Hall 출력의 HIGH→LOW 전환을 외부 인터럽트로 센다. LOW 유지나 HIGH 복귀는
+추가 펄스가 아니며, 부팅 시 LOW여도 회전으로 세지 않는다. 회전당
+12 pulse이며 압력 threshold는 좌우 35이다. `HALL_CALIBRATED=true`, `PRESSURE_THRESHOLDS_CALIBRATED=true`,
 `MAGNET_BENCH_MODE=false`, `ENABLE_ESTOP=false`가 운영 기본값이다.
 
 오른쪽 Hall 입력은 없다. protocol의 오른쪽 pulse/velocity는 왼쪽 값을 복제한
 공통 드라이브 추정치이다. 횡방향 조향이 중요하지 않은 시스템이기 때문에, 한쪽 값을 바탕으로 종방향 속도만 추종한다.
 
-WSH135 배선은 마킹이 보이는 평평한 면을 정면으로 보고 다리를 아래로 했을 때
-왼쪽부터 `VDD(5V)`, `GND`, `OUT(A3)`이다. 출력에는 저항 부하를 달지 않고,
-노이즈가 있으면 OUT-GND 사이에 0.01~0.1 uF 커패시터를 센서 가까이에 단다.
-전원을 넣을 때는 자석이 센서 앞에 없도록 둔다.
+첨부 A3141~A3144 데이터시트의 UA 3핀 소자는 글씨 면을 정면으로 보고 다리를 아래로 하면
+왼쪽부터 `VCC(5V)`, `GND`, `OUT(D2)`이다. 모듈 제품이면 소자 다리 순서가 아닌 모듈 단자 표기를 따른다.
+기존 A3의 OUT 선을 Drive Uno D2로 옮긴다. D2는 모터 PWM D5, 방향 D6/D8, 압력 A2/A1과 겹치지 않는다.
+OUT-5V 사이 4.7kΩ 풀업 저항, VCC-GND 사이 0.1µF 바이패스 커패시터를 센서 가까이에 연결한다.
+펌웨어의 내부 풀업도 활성화하지만 긴 배선은 외부 풀업을 사용한다. 기존 아날로그 OUT의 큰 필터 커패시터는 제거한다.
+전원/풀업은 5V를 사용하고 OUT에 배터리 12V를 연결하지 않는다.
+
+A314x는 단극성이다. 기존 WSH135처럼 양쪽 자극을 모두 감지하지 않는다.
+모든 바퀴 자석을 감지되는 극으로 배치하고, 모터 출력을 끈 상태로 천천히 한 바퀴 돌려
+`/wheel/hall`의 왼쪽 누적 펄스가 정확히 12 증가하는지 확인한다. 자석은 각 통과 사이에 LOW→HIGH로 복귀할 간격이 필요하다.
+이 코드의 `HALL_CALIBRATED=true`는 기존 설정 보존이며 새 장착의 실측 교정 완료를 의미하지 않는다.
+6개만 검출된다면 우선 자석 극성을 고친다. 실제 펄스 수를 변경할 경우 MCU와 Pi의 회전당 펄스 설정을 함께 맞춰야 한다.
+
+20ms 최소 펄스 간격, 5초 측정 유효기간, 스톨·과속 보호, 속도/PWM 정책과 protocol v6는 유지한다.
+인터럽트에서 시간만 기록하고 제어 루프에서 원자적으로 복사하므로 5ms 제어 주기보다 짧은 LOW도 검출한다.
+ADC 영점 학습은 필요 없다. 이 펌웨어는 이전 아날로그 WSH135 입력과 호환되지 않는다.
 
 ```bash
 arduino-cli compile --fqbn arduino:avr:uno firmware/safestride_mcu

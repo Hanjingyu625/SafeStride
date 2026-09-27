@@ -45,19 +45,9 @@ constexpr bool DEADMAN_DIRECT_DRIVE = false;
 // interval. E-stop, watchdog and hardware faults still call immediateStop().
 constexpr uint16_t DEADMAN_RELEASE_RAMP_MS = 600U;
 
-// WSH135 is a linear analogue Hall sensor on the LEFT wheel. At 5 V its
-// no-field output is near 2.5 V. A3 is sampled around that boot-time baseline;
-// either magnetic polarity counts once, then must return inside the release
-// band before another pulse can be counted. Twelve magnets are fitted.
-constexpr uint8_t HALL_ANALOG_PIN = A3;
-constexpr uint32_t HALL_SAMPLE_PERIOD_US = CONTROL_PERIOD_US;
-constexpr uint8_t HALL_ADC_SAMPLES = 8U;
-constexpr uint8_t HALL_BASELINE_SAMPLES = 64U;
-constexpr uint16_t HALL_BASELINE_SAMPLE_DELAY_US = 250U;
-constexpr int32_t HALL_BASELINE_TRACK_DIVISOR = 128L;
-constexpr uint16_t HALL_TRIGGER_DELTA_ADC = 30U;
-constexpr uint16_t HALL_RELEASE_DELTA_ADC = 12U;
-// Keep the ADC trigger/release hysteresis separate from speed detection.
+// A3141/A3144: LEFT wheel, active-low open collector, Uno INT0 (D2).
+// OUT needs a pull-up to 5 V. Verify all 12 magnets present the sensing pole.
+constexpr uint8_t HALL_DIGITAL_PIN = 2U;
 // With twelve magnets, 8 km/h produces a period of about 27.1 ms.
 // The 20 ms glitch window still admits the 25 rad/s plausibility threshold.
 // Verify magnetic pulse width and EMI with the actual harness.
@@ -233,14 +223,8 @@ static_assert(
         HALL_ZERO_TIMEOUT_US > HALL_MIN_PULSE_INTERVAL_US,
     "Hall timing limits are invalid");
 static_assert(
-    HALL_ADC_SAMPLES > 0U && HALL_BASELINE_SAMPLES > 0U &&
-        HALL_SAMPLE_PERIOD_US > 0UL &&
-        HALL_BASELINE_TRACK_DIVISOR > 0L,
-    "analogue Hall sampling configuration is invalid");
-static_assert(
-    HALL_TRIGGER_DELTA_ADC > HALL_RELEASE_DELTA_ADC &&
-        HALL_TRIGGER_DELTA_ADC <= 1023U,
-    "analogue Hall thresholds require trigger/release hysteresis");
+    HALL_DIGITAL_PIN == 2U || HALL_DIGITAL_PIN == 3U,
+    "Digital Hall requires an Uno external interrupt pin");
 static_assert(
     COMMAND_WATCHDOG_MAX_MS >= COMMAND_TTL_MIN_MS,
     "command TTL range is invalid");
@@ -298,8 +282,8 @@ static_assert(
     "Drive pressure channels must match the installed A2/A1 harness");
 static_assert(
     PRESSURE_LEFT_PIN != PRESSURE_RIGHT_PIN &&
-        PRESSURE_LEFT_PIN != HALL_ANALOG_PIN &&
-        PRESSURE_RIGHT_PIN != HALL_ANALOG_PIN &&
+        PRESSURE_LEFT_PIN != HALL_DIGITAL_PIN &&
+        PRESSURE_RIGHT_PIN != HALL_DIGITAL_PIN &&
         PRESSURE_LEFT_PIN != ESTOP_PIN &&
         PRESSURE_RIGHT_PIN != ESTOP_PIN,
     "Drive pressure, Hall, and E-stop pins must be distinct");
