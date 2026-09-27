@@ -33,6 +33,8 @@ LCD 최초 설정 및 전원 배선은 [디스플레이 안내](../docs/DISPLAY_
 | UNO 핀 | 연결 대상 |
 |---|---|
 | D0/D1 | 미연결, Raspberry Pi USB serial용 예약 |
+| A0 | CdS와 10kΩ 분압 중간점 (5V–CdS–A0–10kΩ–GND) |
+| D4 | 1채널 5V 릴레이 IN, HIGH=ON 설정, COM–NO 사용 (Terrain README 참고) |
 | A4 | TOF-10120 SDA, GY-521 MPU6050 SDA |
 | A5 | TOF-10120 SCL, GY-521 MPU6050 SCL |
 | D9 (TX) | ezHMI TTL DIN/RX |

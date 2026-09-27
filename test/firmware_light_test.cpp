@@ -65,10 +65,23 @@ int main() {
   exercisePolarity(HIGH, false);
 
   namespace cfg = safestride_terrain_config;
-  LightController disabled({cfg::LIGHT_SENSOR_PIN, cfg::LIGHT_RELAY_PIN,
+  LightController configured({cfg::LIGHT_SENSOR_PIN, cfg::LIGHT_RELAY_PIN,
       cfg::LIGHT_RELAY_ON_LEVEL, cfg::LIGHT_OUTPUT_ENABLED,
       cfg::LIGHT_BRIGHT_IS_HIGH, cfg::LIGHT_ON_BRIGHTNESS,
       cfg::LIGHT_OFF_BRIGHTNESS, cfg::LIGHT_SAMPLE_MS, cfg::LIGHT_CONFIRM_MS});
+  writes = output_modes = 0;
+  configured.begin(0);
+  assert(configured.outputReady() && level == LOW);
+  adc = 350;
+  configured.update(0);
+  configured.update(1000);
+  assert(configured.requestedOn() && level == HIGH);
+  adc = 550;
+  configured.update(1050);
+  configured.update(2050);
+  assert(!configured.requestedOn() && level == LOW);
+
+  LightController disabled(settings(false, HIGH, true));
   writes = output_modes = 0;
   disabled.begin(0);
   adc = 0;
