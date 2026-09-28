@@ -4,6 +4,21 @@ from safestride_navigation.crosswalk_guidance import describe_crosswalk
 
 
 class GuidanceTest(unittest.TestCase):
+    def test_red_on_approach_is_explained_as_red(self):
+        result = describe_crosswalk('APPROACHING', 'crosswalk detected ahead', True, True,
+                                    signal_reason='red pedestrian signal')
+        self.assertEqual(result['decision'], 'WAIT')
+        self.assertEqual(result['reason'], '보행 신호가 빨간불')
+
+    def test_four_active_decisions_and_inactive_are_distinct(self):
+        for state, valid, expected in (
+            ('ENTRY_ALLOWED', True, 'GO'), ('WAIT_AT_CURB', True, 'WAIT'),
+            ('CROSSING_URGENT', True, 'CAUTION'), ('CROSSING', False, 'NO_SIGNAL'),
+            ('IDLE', False, 'NONE'),
+        ):
+            with self.subTest(state=state):
+                self.assertEqual(describe_crosswalk(state, '', True, valid)['decision'], expected)
+
     def test_entry_and_crossing(self):
         for state in ('ENTRY_ALLOWED', 'CROSSING'):
             self.assertEqual(describe_crosswalk(state, '', True, True)['state'],

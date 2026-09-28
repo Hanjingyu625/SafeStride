@@ -1,7 +1,7 @@
 """Human-readable guidance; never used as a motor command."""
 
 
-def describe_crosswalk(state, reason, gps_valid, signal_valid):
+def _describe_crosswalk(state, reason, gps_valid, signal_valid, signal_reason):
     crossing = state in ('CROSSING', 'CROSSING_URGENT')
     if not gps_valid:
         return {'state': '주의' if crossing else '안내 없음',
@@ -15,6 +15,8 @@ def describe_crosswalk(state, reason, gps_valid, signal_valid):
         return {'state': '신호 없음',
                 'reason': '신호정보 수신 불가; 횡단 중 실제 신호 직접 확인' if crossing
                 else '신호정보 수신 불가; 실제 신호 직접 확인'}
+    if not crossing and signal_reason == 'red pedestrian signal':
+        return {'state': '기다려', 'reason': '보행 신호가 빨간불'}
     if state == 'CROSSING_URGENT':
         explanations = {
             'continue crossing; remaining signal is tight':
@@ -37,3 +39,16 @@ def describe_crosswalk(state, reason, gps_valid, signal_valid):
     else:
         detail = '예상 횡단시간에 비해 남은 녹색시간이 부족함'
     return {'state': '기다려', 'reason': detail}
+
+
+def describe_crosswalk(state, reason, gps_valid, signal_valid, *, signal_reason=''):
+    """Four active guidance decisions; NONE is reserved for no active crossing."""
+    result = _describe_crosswalk(state, reason, gps_valid, signal_valid, signal_reason)
+    result['decision'] = {
+        '건널 수 있음': 'GO',
+        '기다려': 'WAIT',
+        '주의': 'CAUTION',
+        '신호 없음': 'NO_SIGNAL',
+        '안내 없음': 'NONE',
+    }[result['state']]
+    return result

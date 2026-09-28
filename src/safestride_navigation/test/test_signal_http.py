@@ -9,6 +9,7 @@ import pytest
 from safestride_navigation.signal_logic import (
     DEFAULT_TIMING_URL, SignalApiClient, SignalApiError,
     current_signal_url, request_signal_data, retry_after_seconds,
+    load_signal_api_key,
 )
 
 
@@ -60,3 +61,26 @@ def test_backoff_survives_intersection_changes_and_expires():
     assert fetch.call_count == 1
     clock.return_value = 400
     assert client.get('secret', '43', url=DEFAULT_TIMING_URL, timeout_s=3) == {'ok': True}
+
+
+def test_normal_polling_allows_one_second_but_not_candidate_bursts():
+    clock = Mock(return_value=100)
+    fetch = Mock(return_value={'ok': True})
+    client = SignalApiClient(clock=clock, fetch=fetch)
+    client.get('test', '42', url=DEFAULT_TIMING_URL, timeout_s=3)
+    clock.return_value = 100.5
+    assert client.poll_interval_remaining([DEFAULT_TIMING_URL]) == 0.5
+    with pytest.raises(SignalApiError):
+        client.get('test', '43', url=DEFAULT_TIMING_URL, timeout_s=3)
+    clock.return_value = 101
+    assert client.poll_interval_remaining([DEFAULT_TIMING_URL]) == 0
+    client.get('test', '42', url=DEFAULT_TIMING_URL, timeout_s=3)
+    assert fetch.call_count == 2
+
+
+def test_saved_key_loads_without_prompt_and_explicit_missing_path_is_not_ignored(tmp_path, monkeypatch):
+    saved = tmp_path / 'key.txt'
+    saved.write_text('\ufeffsaved-test-key\n', encoding='utf-8')
+    monkeypatch.setenv('SAFESTRIDE_SIGNAL_API_KEY_FILE', str(saved))
+    assert load_signal_api_key() == 'saved-test-key'
+    assert load_signal_api_key(str(tmp_path / 'missing')) == ''

@@ -224,7 +224,10 @@ gps_node:
 crosswalk_controller:
   ros__parameters:
     crosswalk_file: ''  # 횡단보도 지도 JSON 경로. 빈 값은 준비 감시; run.sh에서 파일 경로 전달 가능
-    api_key_file: ''  # 신호 API 키 파일 경로. run.sh에서 전달 가능
+    api_key_file: ''  # 저장된 키 자동 로드. run.sh 또는 /etc/safestride/signal_api_key.txt 우선
+    signal_url: https://t-data.seoul.go.kr/apig/apiman-gateway/tapi/v2xSignalPhaseTimingCurrentInfo/1.0
+    signal_phase_url: https://t-data.seoul.go.kr/apig/apiman-gateway/tapi/v2xSignalPhaseCurrentInfo/1.0
+    signal_combined_url: ''  # 승인된 개별 실시간 API 두 개를 병렬 조회
     intersection_id: ''  # 시험용 고정 교차로 ID. 실제 GPS/지도 매칭이 우선
     intersection_map_page_size: 100  # 교차로 지도 API 한 페이지의 요청 건수
     intersection_map_max_pages: 30  # 교차로 지도 조회 최대 페이지 수
@@ -248,7 +251,7 @@ crosswalk_controller:
     wheel_motion_min_speed_mps: 0.02  # 바퀴 이동으로 인정할 최소 속도(m/s)
     wheel_motion_hold_s: 3.5  # 최근 바퀴 이동 확인을 유지할 최대 시간(초). 저속 펄스 간격 고려
     allow_gps_speed_fallback: false  # false: Hall odometry 우선/필수. GPS 속도만으로 이동을 대신 확인하지 않음
-    signal_refresh_interval_s: 3.0  # 신호정보 재조회 간격(초)
+    signal_refresh_interval_s: 1.0  # 정상 응답 시 각 API를 약 1초마다 조회. 429는 재시도 대기 준수
     signal_cache_max_age_s: 12.0  # 신호 캐시 최대 허용 나이(초)
     signal_request_timeout_s: 3.0  # 신호 API 요청 제한시간(초)
     maximum_crosswalk_distance_m: 80.0  # 횡단보도 후보 탐색 최대거리(m)

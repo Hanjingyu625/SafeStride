@@ -1,46 +1,51 @@
-"""Read-only current-signal check; never prints the API key or request URL."""
+"""Bounded check of the production signal client using the saved API key."""
 import argparse
 import json
 from pathlib import Path
 import sys
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src/safestride_navigation'))
-from safestride_navigation.signal_logic import latest_signal_record
+from safestride_navigation.signal_logic import (
+    DEFAULT_PHASE_URL, DEFAULT_TIMING_URL, OPPOSITE_DIRECTION, SignalApiClient,
+    evaluate_pedestrian_signal, load_signal_api_key, request_signal_bundle,
+)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--key-file', type=Path, required=True)
+    parser.add_argument('--key-file', default='', help='Optional override of automatic key lookup')
     parser.add_argument('--intersection', required=True)
-    parser.add_argument('--key-param', choices=('apikey', 'apiKey'), default='apikey')
-    parser.add_argument('--legacy-check', action='store_true',
-                        help='One-off historical endpoint check, never for polling')
+    parser.add_argument('--samples', type=int, choices=range(1, 31), default=1, metavar='1..30')
     args = parser.parse_args()
-    key = args.key_file.read_text(encoding='utf-8-sig').strip()
-    endpoints = ('v2xSignalPhaseTimingInformation', 'v2xSignalPhaseInformation') if args.legacy_check else (
-        'v2xSignalPhaseTimingCurrentInfo', 'v2xSignalPhaseCurrentInfo')
-    for endpoint in endpoints:
-        query = urllib.parse.urlencode(dict({args.key_param: key}, itstId=args.intersection,
-                                           type='json', pageNo=1, numOfRows=100))
-        url = 'https://t-data.seoul.go.kr/apig/apiman-gateway/tapi/' + endpoint + '/1.0?' + query
-        try:
-            with urllib.request.urlopen(url, timeout=10) as response:
-                data = json.loads(response.read().decode('utf-8-sig'))
-            record = latest_signal_record(data, args.intersection)
-            fields = {k: v for k, v in record.items() if 'Pdsg' in k and v is not None}
-            print(json.dumps(dict(endpoint=endpoint, status=200, intersection=record['itstId'],
-                  source_age_s=round(time.time()-float(record['trsmUtcTime'])/1000, 2),
-                  pedestrian=fields), ensure_ascii=False))
-        except urllib.error.HTTPError as error:
-            detail = error.read().decode('utf-8', errors='replace').replace(key, '[REDACTED]')
-            print(json.dumps(dict(endpoint=endpoint, status=error.code,
-                  retry_after=error.headers.get('Retry-After'), detail=detail[:500]), ensure_ascii=False))
-        except Exception as error:
-            print(json.dumps(dict(endpoint=endpoint, error=type(error).__name__)))
+    key = load_signal_api_key(args.key_file)
+    if not key:
+        parser.error('No saved signal API key found')
+    client = SignalApiClient()
+    for sample in range(args.samples):
+        started = time.monotonic()
+        result = request_signal_bundle(key, args.intersection, url=DEFAULT_TIMING_URL,
+                                      phase_url=DEFAULT_PHASE_URL, timeout_s=3, client=client)
+        now = time.time()
+        timing, phase = result.get('timing'), result.get('phase')
+        heads = {}
+        for direction in OPPOSITE_DIRECTION:
+            if (phase or {}).get(direction + 'PdsgStatNm') is None:
+                continue
+            remaining, valid, reason = evaluate_pedestrian_signal(timing, phase, direction, now)
+            heads[direction] = dict(valid=valid, remaining_s=remaining, reason=reason,
+                                    phase=phase[direction + 'PdsgStatNm'])
+        print(json.dumps(dict(sample=sample + 1, intersection=args.intersection,
+              timing_received=timing is not None, phase_received=phase is not None,
+              source_timestamps={name: (result.get(name) or {}).get('trsmUtcTime')
+                                 for name in ('timing', 'phase')},
+              errors={k: v for k, v in result.items() if k.endswith('_error')},
+              pedestrian=heads), ensure_ascii=False), flush=True)
+        if any(result.get(name + '_error') for name in ('timing', 'phase')):
+            break
+        if sample + 1 < args.samples:
+            # Small scheduling allowance prevents probing faster than the client limit.
+            time.sleep(max(0, 1.05 - (time.monotonic() - started)))
 
 
 if __name__ == '__main__':

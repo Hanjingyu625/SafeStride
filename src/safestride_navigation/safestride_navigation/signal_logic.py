@@ -2,7 +2,9 @@
 
 import json
 import math
+import os
 import time
+from pathlib import Path
 from email.utils import parsedate_to_datetime
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal, InvalidOperation
@@ -21,7 +23,7 @@ DEFAULT_PHASE_URL = (
     'https://t-data.seoul.go.kr/apig/apiman-gateway/'
     'tapi/v2xSignalPhaseCurrentInfo/1.0'
 )
-DEFAULT_COMBINED_URL = ''  # Optional; deployment gateway currently returns 404.
+DEFAULT_COMBINED_URL = ''  # The two separately approved current APIs are the default.
 OPPOSITE_DIRECTION = {
     'nt': 'st',
     'ne': 'sw',
@@ -41,6 +43,23 @@ def current_signal_url(url):
         base + 'v2xSignalPhaseTimingInformation/1.0': DEFAULT_TIMING_URL,
         base + 'v2xSignalPhaseInformation/1.0': DEFAULT_PHASE_URL,
     }.get(url, url)
+
+
+def load_signal_api_key(path=''):
+    """Use a saved key on every startup; explicit configuration has priority."""
+    configured = path or os.environ.get('SAFESTRIDE_SIGNAL_API_KEY_FILE', '')
+    candidates = [Path(configured).expanduser()] if configured else [
+        Path('/etc/safestride/signal_api_key.txt'),
+        Path(__file__).resolve().parents[3] / 'raspberry_pi/api_key.txt',
+    ]
+    for source in candidates:
+        try:
+            key = source.read_text(encoding='utf-8-sig').strip()
+        except (OSError, UnicodeError):
+            continue
+        if key and 'CHANGE_ME' not in key:
+            return key
+    return ''
 
 
 def retry_after_seconds(value, now=None):
@@ -63,10 +82,22 @@ class SignalApiError(RuntimeError):
 
 class SignalApiClient:
     """Endpoint-wide backoff, including when the selected intersection changes."""
-    def __init__(self, *, clock=time.monotonic, fetch=None):
+    def __init__(self, *, clock=time.monotonic, fetch=None, minimum_interval_s=1.0):
+        if not math.isfinite(minimum_interval_s) or minimum_interval_s <= 0:
+            raise ValueError('minimum_interval_s must be finite and positive')
+        self._minimum_interval_s = minimum_interval_s
         self._clock = clock
         self._fetch = fetch or request_signal_data
         self._blocked = {}
+
+    def poll_interval_remaining(self, urls):
+        """Let the ROS timer defer normal polls instead of reporting jitter as an API error."""
+        now = self._clock()
+        return max([0.0] + [
+            until - now for url in urls
+            for until, reason in [self._blocked.get(current_signal_url(url), (0.0, ''))]
+            if reason == 'signal poll interval'
+        ])
 
     def get(self, api_key, intersection_id, *, url, timeout_s, **kwargs):
         url = current_signal_url(url)
@@ -75,7 +106,7 @@ class SignalApiClient:
         if now < until:
             raise SignalApiError('%s; retry in %.1fs' % (reason, until - now),
                                  retry_after_s=until - now)
-        self._blocked[url] = (now + 3.0, 'signal poll interval')
+        self._blocked[url] = (now + self._minimum_interval_s, 'signal poll interval')
         try:
             return self._fetch(api_key, intersection_id, url=url, timeout_s=timeout_s, **kwargs)
         except SignalApiError as error:
