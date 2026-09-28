@@ -45,19 +45,9 @@ constexpr bool DEADMAN_DIRECT_DRIVE = false;
 // interval. E-stop, watchdog and hardware faults still call immediateStop().
 constexpr uint16_t DEADMAN_RELEASE_RAMP_MS = 600U;
 
-// WSH135 is a linear analogue Hall sensor on the LEFT wheel. At 5 V its
-// no-field output is near 2.5 V. A3 is sampled around that boot-time baseline;
-// either magnetic polarity counts once, then must return inside the release
-// band before another pulse can be counted. Twelve magnets are fitted.
-constexpr uint8_t HALL_ANALOG_PIN = A3;
-constexpr uint32_t HALL_SAMPLE_PERIOD_US = CONTROL_PERIOD_US;
-constexpr uint8_t HALL_ADC_SAMPLES = 8U;
-constexpr uint8_t HALL_BASELINE_SAMPLES = 64U;
-constexpr uint16_t HALL_BASELINE_SAMPLE_DELAY_US = 250U;
-constexpr int32_t HALL_BASELINE_TRACK_DIVISOR = 128L;
-constexpr uint16_t HALL_TRIGGER_DELTA_ADC = 30U;
-constexpr uint16_t HALL_RELEASE_DELTA_ADC = 12U;
-// Keep the ADC trigger/release hysteresis separate from speed detection.
+// A3141/A3144: LEFT wheel, active-low open collector, Uno INT0 (D2).
+// OUT needs a pull-up to 5 V. Verify all 12 magnets present the sensing pole.
+constexpr uint8_t HALL_DIGITAL_PIN = 2U;
 // With twelve magnets, 8 km/h produces a period of about 27.1 ms.
 // The 20 ms glitch window still admits the 25 rad/s plausibility threshold.
 // Verify magnetic pulse width and EMI with the actual harness.
@@ -102,11 +92,11 @@ constexpr uint8_t MOTOR_IN2_PIN = 8U;
 constexpr int8_t MOTOR_SIGN = 1;
 constexpr uint16_t MAX_PWM = 140U;  // shared drive output ceiling
 // Initial feed-forward model; PWM counts are on Arduino's 0..255 scale.
-// 30 is a bias, NOT a minimum output. Calibrate 60 at 1.0 m/s under load.
+// 40 is a bias, NOT a minimum output. Calibrate 60 at 1.0 m/s under load.
 // Nominal FF=60 is an initial model, not a measured speed calibration.
-constexpr uint8_t MOTOR_FF_BIAS_PWM = 30U;
+constexpr uint8_t MOTOR_FF_BIAS_PWM = 40U;
 constexpr uint8_t MOTOR_FF_NOMINAL_PWM = 60U;
-constexpr uint8_t MOTOR_START_PWM = 20U;
+constexpr uint8_t MOTOR_START_PWM = 30U;
 constexpr float MOTOR_NOMINAL_MRAD_S = 1.0F / 0.115F * 1000.0F;
 constexpr float MOTOR_PWM_RISE_PER_S = 20.0F;
 constexpr float TERRAIN_RECOVERY_PWM_RISE_PER_S = 10.0F;
@@ -233,14 +223,8 @@ static_assert(
         HALL_ZERO_TIMEOUT_US > HALL_MIN_PULSE_INTERVAL_US,
     "Hall timing limits are invalid");
 static_assert(
-    HALL_ADC_SAMPLES > 0U && HALL_BASELINE_SAMPLES > 0U &&
-        HALL_SAMPLE_PERIOD_US > 0UL &&
-        HALL_BASELINE_TRACK_DIVISOR > 0L,
-    "analogue Hall sampling configuration is invalid");
-static_assert(
-    HALL_TRIGGER_DELTA_ADC > HALL_RELEASE_DELTA_ADC &&
-        HALL_TRIGGER_DELTA_ADC <= 1023U,
-    "analogue Hall thresholds require trigger/release hysteresis");
+    HALL_DIGITAL_PIN == 2U || HALL_DIGITAL_PIN == 3U,
+    "Digital Hall requires an Uno external interrupt pin");
 static_assert(
     COMMAND_WATCHDOG_MAX_MS >= COMMAND_TTL_MIN_MS,
     "command TTL range is invalid");
@@ -298,8 +282,8 @@ static_assert(
     "Drive pressure channels must match the installed A2/A1 harness");
 static_assert(
     PRESSURE_LEFT_PIN != PRESSURE_RIGHT_PIN &&
-        PRESSURE_LEFT_PIN != HALL_ANALOG_PIN &&
-        PRESSURE_RIGHT_PIN != HALL_ANALOG_PIN &&
+        PRESSURE_LEFT_PIN != HALL_DIGITAL_PIN &&
+        PRESSURE_RIGHT_PIN != HALL_DIGITAL_PIN &&
         PRESSURE_LEFT_PIN != ESTOP_PIN &&
         PRESSURE_RIGHT_PIN != ESTOP_PIN,
     "Drive pressure, Hall, and E-stop pins must be distinct");

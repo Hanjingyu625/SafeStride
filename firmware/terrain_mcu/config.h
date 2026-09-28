@@ -13,14 +13,15 @@ constexpr uint16_t TELEMETRY_PERIOD_MS = 50U;
 constexpr uint16_t SESSION_LOSS_TIMEOUT_MS = 1500U;
 constexpr int AVR_BOOT_COUNTER_EEPROM_ADDRESS = 8;
 
-// CdS lighting: A0 is assigned; relay pin and trigger polarity are NOT yet known.
-// Output stays disabled until wiring/polarity are confirmed. Values below are
-// provisional ADC counts, not lux or field-calibrated thresholds.
+// CdS on A0, 1-channel 5V relay IN on D4, COM/NO contacts.
+// HIGH = ON per EDUINO D-41 seller example; verify on the installed module.
+// SRD-05VDC-SL-C names the relay body, not its module's trigger polarity.
+// Thresholds are provisional ADC counts, not lux or field-calibrated values.
 constexpr uint8_t LIGHT_SENSOR_PIN = A0;
-constexpr int8_t LIGHT_RELAY_PIN = -1;
-constexpr int8_t LIGHT_RELAY_ON_LEVEL = -1;
-constexpr bool LIGHT_OUTPUT_ENABLED = false;
-// Proposed divider: 5V -- CdS -- A0 -- fixed resistor -- GND.
+constexpr int8_t LIGHT_RELAY_PIN = 4;
+constexpr int8_t LIGHT_RELAY_ON_LEVEL = HIGH;
+constexpr bool LIGHT_OUTPUT_ENABLED = true;
+// Divider: 5V -- CdS -- A0 -- 10 kohm -- GND.
 constexpr bool LIGHT_BRIGHT_IS_HIGH = true;
 constexpr uint16_t LIGHT_ON_BRIGHTNESS = 350U;
 constexpr uint16_t LIGHT_OFF_BRIGHTNESS = 550U;

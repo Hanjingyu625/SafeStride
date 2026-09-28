@@ -125,7 +125,7 @@ int TwoWire::read() {
 int main() {
   namespace proto = safestride_protocol;
   setup();
-  assert(!g_light.outputReady() && !g_light.hasSample());
+  assert(g_light.outputReady() && !g_light.hasSample());
   sendHello();
   g_serial_tx_length = 0U;
 
@@ -198,14 +198,14 @@ int main() {
   assert(frame.type==safestride_hmi::STATUS_PACKET_TYPE && frame.payload_length==12);
   assert(frame.payload[0]==3 && frame.payload[1]==0);
 
-  // Local lighting continues through host session loss; no relay is configured.
+  // Local lighting continues through host session loss with relay output enabled.
   g_session_active = false;
   loop();
   assert(g_light.hasSample() && g_light.rawAdc() == 0U);
   assert(!g_light.requestedOn());
   g_now_ms += cfg::LIGHT_CONFIRM_MS;
   loop();
-  assert(g_light.requestedOn() && !g_light.outputReady());
+  assert(g_light.requestedOn() && g_light.outputReady());
 
   printf("firmware terrain session/telemetry/HMI tests: OK\n");
   return 0;

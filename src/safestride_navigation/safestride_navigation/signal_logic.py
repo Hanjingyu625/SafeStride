@@ -154,7 +154,7 @@ def evaluate_pedestrian_signal(timing, phase, direction, now, max_age_s=12.0):
 
 
 def request_signal_bundle(api_key, intersection_id, *, url, phase_url,
-                          timeout_s, combined_url=None):
+                          timeout_s, combined_url=None, direction=None):
     if combined_url:
         try:
             combined = request_signal_data(
@@ -164,10 +164,12 @@ def request_signal_bundle(api_key, intersection_id, *, url, phase_url,
                 (key[:-6], value)
                 for key, value in combined.items()
                 if key.endswith('PdsgStatNm') and value is not None
+                and (direction is None or key == direction + 'PdsgStatNm')
             ]
             if pedestrian_states and all(
                 state == 'stop-And-Remain'
-                or _valid_signal(combined.get(prefix + 'RmdrCs')) is not None
+                or (state in ('protected-Movement-Allowed', 'permissive-Movement-Allowed')
+                    and _valid_signal(combined.get(prefix + 'RmdrCs')) is not None)
                 for prefix, state in pedestrian_states
             ):
                 return {'timing': combined, 'phase': combined}

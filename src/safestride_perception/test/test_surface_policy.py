@@ -6,8 +6,10 @@ from safestride_perception.surface_policy import (
 
 def test_prediction_requires_confidence_and_clear_top1_margin():
     assert prediction_is_confident(0.80, 0.30)
-    assert not prediction_is_confident(0.70, 0.62)
-    assert not prediction_is_confident(0.60, 0.20)
+    assert not prediction_is_confident(0.54, 0.20)
+    assert not prediction_is_confident(0.55, 0.48)
+    assert prediction_is_confident(0.60, 0.20)
+    assert prediction_is_confident(0.55, 0.40)
     assert not prediction_is_confident(float('nan'), 0.20)
 
 

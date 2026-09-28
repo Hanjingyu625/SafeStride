@@ -11,7 +11,7 @@
 
 #include "config.h"
 #include "controller_state.h"
-#include "analog_hall_sensor.h"
+#include "digital_hall_sensor.h"
 #include "motor_control.h"
 #include "pressure_sensor.h"
 #include "protocol.h"
@@ -53,7 +53,7 @@ constexpr uint8_t PRESSURE_FLAG_CALIBRATED = 1U << 2U;
 proto::FrameReceiver g_receiver;
 DriveController g_drive;
 PressureSensorPair g_pressure;
-AnalogHallSensor g_hall;
+DigitalHallSensor g_hall;
 
 ControllerState g_state = ControllerState::BOOT;
 uint16_t g_fault_bits = 0U;
@@ -490,7 +490,7 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   const int16_t slope_ff = static_cast<int16_t>(proto::readU16(frame.payload + 8U));
   const uint8_t pwm_cap = frame.payload[10U];
   const uint8_t mode = frame.payload[11U];
-  if (slope_ff < -60 || slope_ff > 30 || pwm_cap > cfg::MAX_PWM || mode > 2U ||
+  if (slope_ff < -60 || slope_ff > 45 || pwm_cap > cfg::MAX_PWM || mode > 2U ||
       (mode != 0U && (target != 0L || slope_ff != 0))) return false;
   if ((enable != 0U && enable != 1U) || reserved != 0U) {
     return false;

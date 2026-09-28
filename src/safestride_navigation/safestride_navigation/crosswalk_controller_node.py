@@ -263,6 +263,7 @@ class CrosswalkController(Node):
         self._phase_cache = None
         self._signal_cache_time: Optional[float] = None
         self._last_signal_request = -math.inf
+        self._last_signal_request_key = None
         self._signal_error = ''
         self._last_diagnostic = -math.inf
         self._last_summary = ''
@@ -595,15 +596,19 @@ class CrosswalkController(Node):
             timeout_s=self._signal_request_timeout,
         )
 
-    def _request_signal_if_due(self, intersection_id: str, now: float) -> None:
+    def _request_signal_if_due(self, intersection_id: str, now: float,
+                               direction: str) -> None:
+        request_key = (intersection_id, direction)
         if (
             not self._api_key
             or not intersection_id
             or self._signal_future is not None
-            or now - self._last_signal_request < self._signal_refresh
+            or (request_key == self._last_signal_request_key
+                and now - self._last_signal_request < self._signal_refresh)
         ):
             return
         self._last_signal_request = now
+        self._last_signal_request_key = request_key
         self._signal_future_id = intersection_id
         self._signal_future = self._executor.submit(
             request_signal_bundle,
@@ -613,6 +618,7 @@ class CrosswalkController(Node):
             phase_url=self._phase_url,
             combined_url=self._combined_url,
             timeout_s=self._signal_request_timeout,
+            direction=direction,
         )
 
     def _signal_state(
@@ -621,10 +627,15 @@ class CrosswalkController(Node):
         direction: str,
         now: float,
     ) -> Tuple[Optional[float], bool, str]:
-        self._request_signal_if_due(intersection_id, now)
+        if not intersection_id:
+            return None, False, 'no matched V2X intersection'
+        if not self._api_key:
+            return None, False, 'signal API key unavailable'
+        self._request_signal_if_due(intersection_id, now, direction)
+        if self._signal_cache_id != intersection_id:
+            return None, False, 'awaiting signal for intersection ' + intersection_id
         if (
             self._phase_cache is None
-            or self._signal_cache_id != intersection_id
             or not self._fresh(
                 now,
                 self._signal_cache_time,
@@ -636,7 +647,11 @@ class CrosswalkController(Node):
         remaining, valid, reason = evaluate_pedestrian_signal(
             self._signal_cache, self._phase_cache, direction, now,
             self._signal_cache_max_age)
-        return remaining, valid, reason if valid else self._signal_error or reason
+        if not valid:
+            reason = '%s [intersection=%s, direction=%s]' % (reason, intersection_id, direction)
+            if self._signal_error:
+                reason += '; ' + self._signal_error
+        return remaining, valid, reason
 
     def _publish_command(self, speed_mps: float) -> None:
         message = TwistStamped()

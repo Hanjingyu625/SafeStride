@@ -245,6 +245,15 @@ void loop() {
       now_ms - g_last_telemetry_ms >= cfg::TELEMETRY_PERIOD_MS) {
     g_last_telemetry_ms = now_ms;
     sendTelemetry();
+    // Optional diagnostic packet: raw ADC, sampled, requested ON, output ready.
+    // Keep the existing terrain/motor protocol payloads unchanged.
+    uint8_t light_payload[5] = {0U};
+    proto::writeU16(light_payload, g_light.rawAdc());
+    light_payload[2] = g_light.hasSample();
+    light_payload[3] = g_light.requestedOn();
+    light_payload[4] = g_light.outputReady();
+    proto::sendFrame(Serial, 0x22U, g_tx_sequence++, g_session_id,
+                     now_ms, light_payload, sizeof(light_payload));
   }
 }
 

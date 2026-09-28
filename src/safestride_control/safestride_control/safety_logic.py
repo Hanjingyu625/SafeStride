@@ -205,6 +205,6 @@ def slope_feedforward_pwm(pitch_rad, state):
         return 0
     degrees = math.degrees(pitch_rad)
     if state == SlopeSpeedPolicy.UPHILL:
-        return round(min(30.0, max(0.0, 5.0 * (degrees - 3.0))))
+        return round(min(45.0, max(0.0, 7.5 * (degrees - 3.0))))
     # Downhill stopping uses the explicit PWM ramp mode, not subtractive FF.
     return 0

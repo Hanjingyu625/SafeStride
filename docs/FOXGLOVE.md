@@ -13,14 +13,15 @@ SafeStride의 Drive MCU, Terrain MCU, GPS와 웹캠 노드 상태를 한 화면�
 | 패널 | 표시 정보 |
 |---|---|
 | State Transitions | Drive 상태, dead-man, 압력 alert, TOF alert/hazard, 횡단보도 상태, 노면 분류 |
-| Raw Messages | `/walker/status`, `/handle/pressure`, `/terrain/status` 원본 값과 유효성 플래그 |
+| Raw Messages | `/walker/status` 원본 값. Terrain·압력 원본 패널은 제거 |
 | Diagnostics | `/diagnostics`의 MCU·GPS·웹캠·지도/API 준비 상태와 오류 |
 | Speed | `/wheel/hall.left_speed_kmh`, `/walker/status.measured_speed_kmh`, 단위 km/h. GPS 곡선은 기본 비활성화 |
-| Pressure | 좌 A2·우 A1 filtered ADC와 현재 임계값 40 |
+| Pressure Indicators | `left_present`, `right_present` 기반 좌우 손 감지 ON/OFF. 초록=ON, 짙은 회색=OFF, 미수신=데이터 없음 |
+| Light | ADC 0–1023 그래프, ON 350/OFF 550 기준선, 별도 조명 요구 ON/OFF 표시(실제 점등 피드백 아님) |
 | TOF | filtered/reference 거리와 error/change, 단위 m |
 | USB Camera (우측 상단) | `/camera/image/compressed`의 실제 웹캠 영상, 1 FPS |
 | Surface (영상 바로 아래) | 노면 종류, 신뢰도(0–1), 판정 유효성 |
-| Inclination | `/terrain/status.pitch_rad`, `roll_rad` 직접 표시, 단위 radian, 자동 Y축 범위 |
+| Inclination | `/terrain/pitch_deg`, `/terrain/roll_deg`, 단위 degree, 자동 Y축 범위 |
 
 홀 속도는 현재 설정된 휠 반지름 0.115 m를 사용해 다음과 같이 표시한다.
 
@@ -76,7 +77,7 @@ Foxglove에서 모터 enable이나 `/cmd_vel` 명령을 보낼 수 없다.
 
 레이아웃 파일을 수정해도 앱에 이미 저장된 레이아웃은 자동 갱신되지 않는다.
 수정된 JSON을 다시 Import해야 적용된다. 기울기는 원본 라디안 값이며
-0.1745 rad가 약 10도다. GPS 속도는 필요한 경우 Speed 패널에서 켠다.
+기울기는 degree로 표시한다. GPS 속도는 필요한 경우 Speed 패널에서 켠다.
 Raw Messages에도 값이 없으면 그래프 경로보다 Bridge의 토픽 노출/수신을
 먼저 확인한다. 레이아웃 변경으로 Bridge 오류나 누락된 메시지 정의가
 복구되는 것은 아니다.
@@ -87,8 +88,8 @@ Raw Messages에도 값이 없으면 그래프 경로보다 Bridge의 토픽 노�
 
 - `/walker/status`: `link_ok=true`, `state=2(ARMED)`는 실제 enable 뒤에만 정상이다.
   `SAFE_STOP=3`, `ESTOP=4`, `FAULT=5`는 원인을 먼저 해소한다.
-- Pressure: 손을 올리면 좌 A2와 우 A1이 임계값 40 위에 있고
-  `deadman=true`가 되어야 한다. calibration/임계값은 대시보드에서 변경하지 않는다.
+- Pressure: 좌우 손 감지 표시가 각각 MCU의 `left_present`/`right_present`를 따른다.
+  ADC에 UI 자체 역치를 적용하지 않는다. calibration/임계값은 대시보드에서 변경하지 않는다.
 - Hall speed: 바퀴 정지 시 0 근처, 회전 시 양의 km/h가 나타나야 한다.
 - TOF: 평지에서는 filtered와 reference가 가깝고, 단차에서 error/change와
   TOF alert가 함께 변해야 한다.
@@ -188,3 +189,24 @@ Foxglove는 관측 도구일 뿐 안전 판정이나 모터 차단 권한을 대
 `require_range_sensors=false`, `surface_control_enabled=false`,
 `require_surface_condition=false`로 ToF·노면 입력을 모니터링에만 사용한다.
 MPU 경사 제어와 손잡이·통신 정지는 별개로 유지한다.
+# 조도 및 각도 확인
+
+`config/foxglove/safestride.json`을 Foxglove의 레이아웃 가져오기로 다시 불러온다.
+조도 ADC 그래프와 degree 단위 pitch/roll 그래프가 포함되어 있다.
+
+- `/terrain/light/adc.data`: A0 원시 ADC(0–1023), lux 아님. 미샘플은 NaN.
+- `/terrain/light/requested_on.data`: MCU의 점등 요구 상태(실제 점등 피드백 아님).
+- `/terrain/light/output_enabled.data`: MCU 릴레이 출력 준비 상태.
+- `/terrain/pitch_deg.data`, `/terrain/roll_deg.data`: `/terrain/status`와 같은
+  offset 보정 후 각도를 degree로 변환. IMU 무효 또는 통신 timeout 시 NaN.
+
+조도값은 Terrain 펌웨어와 Pi bridge를 함께 갱신해야 나타난다. 기존 펌웨어는
+조도 토픽을 발행하지 않는다. 연결이 끊기면 조도 발행도 중단되므로 최신 수신
+시각을 함께 확인한다. Bool 토픽은 Raw Messages 또는 Indicator로 추가할 수 있다.
+현재 기본 기준은 ADC ≤350이 1초 지속하면 ON, ≥550이 1초 지속하면 OFF이다.
+
+```bash
+ros2 topic echo /terrain/light/adc
+ros2 topic echo /terrain/light/requested_on
+ros2 topic echo /terrain/pitch_deg
+```

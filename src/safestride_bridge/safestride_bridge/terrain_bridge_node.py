@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import secrets
+import struct
 import time
 from typing import Optional
 
@@ -13,6 +14,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from safestride_interfaces.msg import TerrainStatus
 from sensor_msgs.msg import Imu, Range
+from std_msgs.msg import Bool, Float32
 
 try:
     import serial
@@ -40,6 +42,7 @@ from .hmi_model import STATUS_PACKET_TYPE
 
 CAP_TOF10120 = 1 << 8
 CAP_MPU6050 = 1 << 9
+LIGHT_STATUS_PACKET_TYPE = 0x22
 GRAVITY_M_S2 = 9.80665
 
 
@@ -98,6 +101,15 @@ class TerrainBridgeNode(Node):
         self._tof_pub = self.create_publisher(
             Range, self._topic_tof, qos_profile_sensor_data
         )
+        self._light_adc_pub = self.create_publisher(
+            Float32, '/terrain/light/adc', 10)
+        self._light_on_pub = self.create_publisher(
+            Bool, '/terrain/light/requested_on', 10)
+        self._light_ready_pub = self.create_publisher(
+            Bool, '/terrain/light/output_enabled', 10)
+        self._pitch_deg_pub = self.create_publisher(Float32, '/terrain/pitch_deg', 10)
+        self._roll_deg_pub = self.create_publisher(Float32, '/terrain/roll_deg', 10)
+        self._last_light_sequence = None
         self._imu_pub = self.create_publisher(
             Imu, self._topic_imu, qos_profile_sensor_data
         )
@@ -301,6 +313,31 @@ class TerrainBridgeNode(Node):
             self._handle_frame(frame, now)
 
     def _handle_frame(self, frame: Frame, now: float) -> None:
+        if frame.packet_type == LIGHT_STATUS_PACKET_TYPE:
+            if not self._session_started or frame.session_id != self._session_id:
+                self._session_errors += 1
+                return
+            if len(frame.payload) != 5:
+                self._payload_errors += 1
+                return
+            adc, sampled, requested_on, enabled = struct.unpack(
+                '<HBBB', frame.payload)
+            if adc > 1023 or any(
+                value > 1 for value in (sampled, requested_on, enabled)
+            ):
+                self._payload_errors += 1
+                return
+            previous = self._last_light_sequence
+            if (previous is not None and previous[0] == frame.session_id
+                    and not sequence_is_newer(frame.sequence, previous[1])):
+                self._sequence_errors += 1
+                return
+            self._last_light_sequence = (frame.session_id, frame.sequence)
+            self._light_adc_pub.publish(Float32(
+                data=float(adc) if sampled else float('nan')))
+            self._light_on_pub.publish(Bool(data=bool(requested_on)))
+            self._light_ready_pub.publish(Bool(data=bool(enabled)))
+            return
         if frame.packet_type == PacketType.HELLO:
             if frame.session_id != 0:
                 self._session_errors += 1
@@ -573,6 +610,11 @@ class TerrainBridgeNode(Node):
                 if telemetry.mpu_valid else float('nan')
             )
         self._status_pub.publish(message)
+        valid = message.mpu_valid and message.telemetry_age <= self._telemetry_timeout
+        self._pitch_deg_pub.publish(Float32(
+            data=math.degrees(message.pitch_rad) if valid else float('nan')))
+        self._roll_deg_pub.publish(Float32(
+            data=math.degrees(message.roll_rad) if valid else float('nan')))
 
     def _diagnostic_tick(self) -> None:
         self._publish_status()

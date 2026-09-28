@@ -25,8 +25,8 @@ SCALES = {
 def prediction_is_confident(
     confidence: float,
     runner_up_confidence: float,
-    threshold: float = 0.65,
-    min_margin: float = 0.15,
+    threshold: float = 0.55,
+    min_margin: float = 0.08,
 ) -> bool:
     """Accept a prediction only when top-1 is strong and unambiguous."""
     values = (confidence, runner_up_confidence, threshold, min_margin)
@@ -43,7 +43,7 @@ def prediction_is_confident(
 def speed_scale(
     label: str,
     confidence: float,
-    threshold: float = 0.65,
+    threshold: float = 0.55,
 ) -> float:
     if not 0.0 <= confidence <= 1.0 or confidence < threshold:
         return 0.0

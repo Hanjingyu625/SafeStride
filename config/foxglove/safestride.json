@@ -1,66 +1,110 @@
 {
   "layout": {
     "direction": "row",
-    "splitPercentage": 35,
+    "splitPercentage": 25,
     "first": {
       "direction": "column",
-      "splitPercentage": 34,
+      "splitPercentage": 40,
       "first": "StateTransitions!safestride-state",
       "second": {
         "direction": "column",
-        "splitPercentage": 52,
-        "first": {
-          "direction": "column",
-          "splitPercentage": 34,
-          "first": "RawMessages!walker-status",
-          "second": {
-            "direction": "column",
-            "splitPercentage": 50,
-            "first": "RawMessages!pressure",
-            "second": "RawMessages!terrain"
-          }
-        },
+        "splitPercentage": 55,
+        "first": "RawMessages!walker-status",
         "second": "DiagnosticsSummary!diagnostics"
       }
     },
     "second": {
       "direction": "row",
-      "splitPercentage": 58,
+      "splitPercentage": 55,
       "first": {
         "direction": "column",
-        "splitPercentage": 33,
-        "first": "Plot!speed",
+        "splitPercentage": 22,
+        "first": {
+          "direction": "row",
+          "splitPercentage": 50,
+          "first": "Indicator!pressure-left",
+          "second": "Indicator!pressure-right"
+        },
         "second": {
           "direction": "column",
-          "splitPercentage": 50,
-          "first": "Plot!pressure",
-          "second": "Plot!tof"
+          "splitPercentage": 45,
+          "first": "Plot!speed",
+          "second": {
+            "direction": "column",
+            "splitPercentage": 55,
+            "first": "Plot!light",
+            "second": "Plot!tof"
+          }
         }
       },
       "second": {
         "direction": "column",
-        "splitPercentage": 45,
+        "splitPercentage": 42,
         "first": "Image!camera",
         "second": {
           "direction": "column",
-          "splitPercentage": 42,
+          "splitPercentage": 28,
           "first": {
             "direction": "row",
-            "splitPercentage": 50,
-            "first": {
-              "direction": "column",
-              "splitPercentage": 60,
-              "first": "Indicator!surface-class",
-              "second": "Indicator!surface-valid"
-            },
-            "second": "Gauge!surface-confidence"
+            "splitPercentage": 55,
+            "first": "Indicator!surface-class",
+            "second": {
+              "direction": "row",
+              "splitPercentage": 50,
+              "first": "Indicator!surface-valid",
+              "second": "Gauge!surface-confidence"
+            }
           },
-          "second": "Plot!tilt"
+          "second": {
+            "direction": "column",
+            "splitPercentage": 72,
+            "first": "Plot!tilt",
+            "second": "Indicator!light-on"
+          }
         }
       }
     }
   },
   "configById": {
+    "Plot!light": {
+      "paths": [
+        {
+          "value": "/terrain/light/adc.data",
+          "label": "Light ADC (0–1023)",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "350",
+          "label": "ON ≤350",
+          "color": "#22c55e",
+          "enabled": true,
+          "showLine": true,
+          "lineStyle": "dashed",
+          "lineSize": 1
+        },
+        {
+          "value": "550",
+          "label": "OFF ≥550",
+          "color": "#f59e0b",
+          "enabled": true,
+          "showLine": true,
+          "lineStyle": "dashed",
+          "lineSize": 1
+        }
+      ],
+      "showLegend": true,
+      "showPlotValuesInLegend": true,
+      "xAxisVal": "timestamp",
+      "minYValue": 0,
+      "maxYValue": 1023,
+      "yAxisLabel": "Light ADC",
+      "timeWindowMode": "sliding",
+      "followingViewWidth": 30,
+      "showYAxisLabels": true,
+      "showXAxisLabels": true,
+      "showYAxisGridLines": true
+    },
     "StateTransitions!safestride-state": {
       "paths": [
         {
@@ -219,18 +263,6 @@
       "sortByLevel": true,
       "secondsUntilStale": 3
     },
-    "RawMessages!pressure": {
-      "topicPath": "/handle/pressure",
-      "diffEnabled": false,
-      "defaultExpanded": true,
-      "fontSize": 12
-    },
-    "RawMessages!terrain": {
-      "topicPath": "/terrain/status",
-      "diffEnabled": false,
-      "defaultExpanded": true,
-      "fontSize": 12
-    },
     "Plot!speed": {
       "paths": [
         {
@@ -275,52 +307,6 @@
       "playbackBarPosition": "right",
       "xAxisDisplayMethod": "relative",
       "yAxisLabel": "Speed (km/h)"
-    },
-    "Plot!pressure": {
-      "paths": [
-        {
-          "value": "/handle/pressure.left_filtered",
-          "label": "Left A2 filtered",
-          "color": "#42a5f5",
-          "enabled": true,
-          "lineSize": 2,
-          "showLine": true,
-          "timestampMethod": "receiveTime"
-        },
-        {
-          "value": "/handle/pressure.right_filtered",
-          "label": "Right A1 filtered",
-          "color": "#ef5350",
-          "enabled": true,
-          "lineSize": 2,
-          "showLine": true,
-          "timestampMethod": "receiveTime"
-        },
-        {
-          "value": "40",
-          "label": "Present threshold",
-          "color": "#ffa726",
-          "enabled": true,
-          "lineSize": 1,
-          "lineStyle": "dashed",
-          "showLine": true
-        }
-      ],
-      "minYValue": 0,
-      "maxYValue": 1023,
-      "showLegend": true,
-      "legendDisplay": "top",
-      "showPlotValuesInLegend": true,
-      "showXAxisLabels": true,
-      "showYAxisLabels": true,
-      "showYAxisGridLines": true,
-      "isSynced": true,
-      "xAxisVal": "timestamp",
-      "timeWindowMode": "sliding",
-      "followingViewWidth": 60,
-      "playbackBarPosition": "right",
-      "xAxisDisplayMethod": "relative",
-      "yAxisLabel": "Pressure ADC"
     },
     "Plot!tof": {
       "paths": [
@@ -392,8 +378,8 @@
     "Plot!tilt": {
       "paths": [
         {
-          "value": "/terrain/status.pitch_rad",
-          "label": "Pitch (rad)",
+          "value": "/terrain/pitch_deg.data",
+          "label": "Pitch (°)",
           "color": "#ab47bc",
           "enabled": true,
           "lineSize": 2,
@@ -401,8 +387,8 @@
           "timestampMethod": "receiveTime"
         },
         {
-          "value": "/terrain/status.roll_rad",
-          "label": "Roll (rad)",
+          "value": "/terrain/roll_deg.data",
+          "label": "Roll (°)",
           "color": "#26a69a",
           "enabled": true,
           "lineSize": 2,
@@ -422,7 +408,7 @@
       "followingViewWidth": 60,
       "playbackBarPosition": "right",
       "xAxisDisplayMethod": "relative",
-      "yAxisLabel": "Inclination (rad)"
+      "yAxisLabel": "Inclination (°)"
     },
     "Image!camera": {
       "imageMode": {
@@ -511,6 +497,69 @@
       "colorMode": "colormap",
       "colorMap": "red-yellow-green",
       "reverse": false
+    },
+    "Indicator!pressure-left": {
+      "path": "/handle/pressure.left_present",
+      "style": "background",
+      "fontSize": 28,
+      "fallbackColor": "#64748b",
+      "fallbackLabel": "왼손 감지 · 데이터 없음",
+      "rules": [
+        {
+          "operator": "=",
+          "rawValue": "true",
+          "color": "#22c55e",
+          "label": "왼손 감지 · ON"
+        },
+        {
+          "operator": "=",
+          "rawValue": "false",
+          "color": "#475569",
+          "label": "왼손 감지 · OFF"
+        }
+      ]
+    },
+    "Indicator!pressure-right": {
+      "path": "/handle/pressure.right_present",
+      "style": "background",
+      "fontSize": 28,
+      "fallbackColor": "#64748b",
+      "fallbackLabel": "오른손 감지 · 데이터 없음",
+      "rules": [
+        {
+          "operator": "=",
+          "rawValue": "true",
+          "color": "#22c55e",
+          "label": "오른손 감지 · ON"
+        },
+        {
+          "operator": "=",
+          "rawValue": "false",
+          "color": "#475569",
+          "label": "오른손 감지 · OFF"
+        }
+      ]
+    },
+    "Indicator!light-on": {
+      "path": "/terrain/light/requested_on.data",
+      "style": "background",
+      "fontSize": 28,
+      "fallbackColor": "#64748b",
+      "fallbackLabel": "조명 요구 · 데이터 없음",
+      "rules": [
+        {
+          "operator": "=",
+          "rawValue": "true",
+          "color": "#22c55e",
+          "label": "조명 요구 · ON"
+        },
+        {
+          "operator": "=",
+          "rawValue": "false",
+          "color": "#475569",
+          "label": "조명 요구 · OFF"
+        }
+      ]
     }
   },
   "globalVariables": {},

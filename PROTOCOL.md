@@ -88,3 +88,12 @@ BRAKE를 유지하며, 복귀 출력은 정상 제어 목표에 도달할 때까
 
 `WalkerStatus`에 위 정보와 `measured_speed_m_s`, `direction_valid=false`를 발행한다.
 속도 부호는 명령으로 추정한다. telemetry 수신 빈도는 새 Hall 측정 빈도가 아니다.
+# 선택적 조도 진단 패킷
+
+Terrain MCU는 활성 session에서 기존 telemetry 주기(50 ms)마다 `0x22`를 추가 전송한다.
+기존 v6 Terrain telemetry payload는 변경하지 않는다. payload는 little-endian
+`uint16 raw_adc`, `uint8 sampled`, `uint8 requested_on`, `uint8 output_ready`의 5바이트다.
+ADC 범위는 0–1023, bool은 0/1이다. 기존 프레임 CRC, session ID 및 sequence를 사용한다.
+이 패킷은 조명 관찰 전용이며 모터 제어와 telemetry freshness를 갱신하지 않는다.
+구형 bridge는 이 타입을 모르는 패킷으로 계산하므로 Terrain 펌웨어와 bridge를 함께
+갱신한다. 새 bridge와 구형 펌웨어 조합에서는 조도 메시지만 수신되지 않는다.
