@@ -7,6 +7,8 @@ namespace {
 
 uint32_t g_test_millis = 0UL;
 int g_pressure_adc = 200;
+uint8_t g_hall_level = HIGH;
+void (*g_hall_interrupt)() = nullptr;
 
 }  // namespace
 
@@ -15,7 +17,7 @@ HardwareSerial Serial;
 void pinMode(uint8_t, uint8_t) {}
 void digitalWrite(uint8_t, uint8_t) {}
 int digitalRead(uint8_t pin) {
-  return pin == safestride_config::HALL_DIGITAL_PIN ? HIGH : LOW;
+  return pin == safestride_config::HALL_DIGITAL_PIN ? g_hall_level : LOW;
 }
 void analogWrite(uint8_t, int) {}
 int analogRead(uint8_t pin) {
@@ -23,7 +25,9 @@ int analogRead(uint8_t pin) {
   return g_pressure_adc;
 }
 int digitalPinToInterrupt(uint8_t) { return 0; }
-void attachInterrupt(int, void (*)(), int) {}
+void attachInterrupt(int, void (*callback)(), int) {
+  g_hall_interrupt = callback;
+}
 void noInterrupts() {}
 void interrupts() {}
 uint32_t millis() { return g_test_millis; }
@@ -333,6 +337,47 @@ int main() {
   command[11]=0U;
   assert(handleCommand(brake_frame));
   assert(!g_terrain_stop_requested);
+
+  // Valid but too-fast moving commands cannot arm, yet must not tear down
+  // the session every second. The stop modes obey the same arm condition.
+  g_state = ControllerState::DISARMED;
+  g_stationary_tracking = false;
+  g_last_session_activity_ms = 0UL;
+  brake_frame.sequence = 104U;
+  proto::writeI32(command,500L);
+  command[11] = 0U;
+  assert(!handleCommand(brake_frame));
+  assert(g_last_session_activity_ms == g_test_millis);
+  assert(g_state == ControllerState::DISARMED);
+  enforceWatchdogs(g_test_millis);
+  assert(g_session_active);
+  proto::writeI32(command,0L);
+  command[11] = 1U;
+  assert(!handleCommand(brake_frame));
+  assert(g_state == ControllerState::DISARMED);
+
+  g_hall.begin(g_test_millis * 1000UL);
+  for (int i=0; i<2; ++i) {
+    g_test_millis += 200UL;
+    g_hall_level = LOW;
+    g_hall_interrupt();
+    g_hall_level = HIGH;
+    g_hall_interrupt();
+  }
+  g_hall.update(g_test_millis * 1000UL);
+  HallSample hall = {0UL,0UL,0xFFFFFFFFUL};
+  HallSample mirrored = hall;
+  readHallSamples(g_test_millis * 1000UL,hall,mirrored);
+  assert(hall.pulse_count == 2UL && hall.period_us == 200000UL);
+  assert(slowMovingArmEligible(hall));
+  assert(!slowMovingArmEligible({2UL,100000UL,0UL}));
+  assert(!slowMovingArmEligible({2UL,200000UL,800000UL}));
+  assert(!slowMovingArmEligible({1UL,200000UL,0UL}));
+  proto::writeI32(command,500L);
+  command[11] = 0U;
+  assert(handleCommand(brake_frame));
+  assert(g_state == ControllerState::ARMED);
+  assert(g_requested_mrad_s == 500L);
 
   printf("firmware watchdog/session state-machine tests: OK\n");
   return 0;

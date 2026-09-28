@@ -421,6 +421,15 @@ bool stationaryDwellMet() {
              cfg::ARM_STATIONARY_DWELL_MS;
 }
 
+bool slowMovingArmEligible(const HallSample& hall) {
+  // A single-channel Hall cannot prove direction, so use this only for a
+  // bounded, recently measured push while both hands and the link are valid.
+  return g_drive.feedbackReady() && hall.pulse_count >= 2UL &&
+         hall.age_us <= cfg::ARM_MOVING_MAX_PULSE_AGE_US &&
+         hall.period_us >= cfg::ARM_MOVING_MIN_PULSE_PERIOD_US &&
+         hall.period_us < cfg::HALL_ZERO_TIMEOUT_US;
+}
+
 // 검증을 통과한 새 명령만 watchdog 시각을 갱신한다. 수신 바이트가 있다는 이유만으로 갱신하지 않는다.
 void markAcceptedCommand(
     const safestride_protocol::FrameView& frame,
@@ -552,9 +561,17 @@ bool handleCommand(const safestride_protocol::FrameView& frame) {
   }
 
   if (g_state == ControllerState::DISARMED) {
-    if (mode == 0U && !cfg::MAGNET_BENCH_MODE && !cfg::DEADMAN_DIRECT_DRIVE &&
+    if (!cfg::MAGNET_BENCH_MODE && !cfg::DEADMAN_DIRECT_DRIVE &&
         !stationaryDwellMet()) {
-      return false;
+      HallSample left = {0UL, 0UL, 0xFFFFFFFFUL};
+      HallSample right = {0UL, 0UL, 0xFFFFFFFFUL};
+      readHallSamples(micros(), left, right);
+      if (!slowMovingArmEligible(left)) {
+        // The command is valid but cannot arm yet. Keep the session alive
+        // without accepting drive torque or refreshing the ARMED watchdog.
+        g_last_session_activity_ms = millis();
+        return false;
+      }
     }
     markAcceptedCommand(frame, ttl_ms);
     g_state = ControllerState::ARMED;

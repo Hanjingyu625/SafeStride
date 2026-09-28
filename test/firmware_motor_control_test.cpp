@@ -93,6 +93,14 @@ int main() {
   once.update(5000,no_speed,no_speed,8696,true);
   assert(once.appliedPwm() < 2);  // A cap release is not a new launch.
 
+  // A slow, freshly measured wheel already rolling at re-arm must ramp from
+  // zero instead of receiving the stationary 30-count start step.
+  DriveController rolling; rolling.begin(); primeFeedback(rolling);
+  HallSample rolling_hall = {2UL, 200000UL, 50000UL};
+  rolling.update(5000,rolling_hall,rolling_hall,8696,true);
+  assert(rolling.appliedPwm() <= 1);
+  assert(rolling.leftVelocityMradS() > cfg::ARM_MAX_MEASURED_SPEED_MRAD_S);
+
   // Deployed walking targets must reach the MCU without clipping.
   DriveController walking; walking.begin(); primeFeedback(walking);
   run(walking,2400,8696,60214UL);
@@ -145,10 +153,12 @@ int main() {
     const int initial = g_motor_pwm;
     HallSample h = {1000, 1504595UL, 0};
     int previous = initial;
-    for (int i=1; i<=600; ++i) {
+    const int ramp_ticks = cfg::TERRAIN_STOP_RAMP_US / 5000UL;
+    for (int i=1; i<=ramp_ticks; ++i) {
       terrain.update(5000,h,h,0,true,true,0,false,0,100,false,true);
       assert(g_motor_pwm <= previous);
-      assert(abs(g_motor_pwm - static_cast<int>(initial*(600-i)/600.0F+0.5F)) <= 1);
+      assert(abs(g_motor_pwm - static_cast<int>(
+          initial*(ramp_ticks-i)/static_cast<float>(ramp_ticks)+0.5F)) <= 1);
       previous = g_motor_pwm;
     }
     assert(g_motor_pwm==0 && terrain.braking());
@@ -191,7 +201,7 @@ int main() {
   // Output slew, zero target, fault/explicit brake bypass normal ramp.
   DriveController slew; slew.begin(); primeFeedback(slew);
   run(slew,100,696,752297UL);
-  assert(g_motor_pwm >= 30 && g_motor_pwm <= 40);
+  assert(g_motor_pwm >= 9 && g_motor_pwm <= 11);
   int before=g_motor_pwm;
   HallSample h={2000,752297UL,0};
   slew.update(5000,h,h,0,true,true,1160,true);

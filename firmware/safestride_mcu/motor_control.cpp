@@ -383,7 +383,7 @@ void DriveController::update(
   // A dedicated mode is necessary: ramping the speed setpoint can make the
   // speed controller add PWM. Fade the actual actuator output instead.
   if ((terrain_stop_requested ||
-       (terrain_stop_active_ && terrain_stop_elapsed_us_ < 3000000UL)) && !brake_requested &&
+       (terrain_stop_active_ && terrain_stop_elapsed_us_ < cfg::TERRAIN_STOP_RAMP_US)) && !brake_requested &&
       !fade_pwm_during_deceleration) {
     if (!terrain_stop_active_) {
       startup_pending_ = false;
@@ -392,7 +392,7 @@ void DriveController::update(
       terrain_stop_elapsed_us_ = 0UL;
       terrain_start_pwm_ = last_commanded_pwm_;
     }
-    const uint32_t duration = 3000000UL;
+    const uint32_t duration = cfg::TERRAIN_STOP_RAMP_US;
     terrain_stop_elapsed_us_ += elapsed_us < duration - terrain_stop_elapsed_us_
         ? elapsed_us : duration - terrain_stop_elapsed_us_;
     motor_pid_ = {0.0F, 0.0F};
@@ -523,7 +523,14 @@ void DriveController::update(
   // feedback-driven zero must not retrigger it; terrain recovery keeps its ramp.
   if (startup_pending_ && fabsf(target) > 20.0F) {
     startup_pending_ = false;
-    if (target > 20.0F && output > 0.0F && !terrain_recovering_) {
+    // A moving re-arm must rise through the normal PWM slew rather than
+    // injecting the one-time 30-count stationary launch step.
+    const bool already_moving = speed_valid_ &&
+        speed_age_us_ <= cfg::ARM_MOVING_MAX_PULSE_AGE_US &&
+        fabsf(filtered_left_mrad_s_) >
+            static_cast<float>(cfg::ARM_MAX_MEASURED_SPEED_MRAD_S);
+    if (target > 20.0F && output > 0.0F && !terrain_recovering_ &&
+        !already_moving) {
       last_commanded_pwm_ = fminf(output, cfg::MOTOR_START_PWM);
     }
   }
