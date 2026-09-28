@@ -271,7 +271,7 @@ foxglove_bridge:
     address: 0.0.0.0  # 모든 네트워크 인터페이스에서 접속 대기
     topic_whitelist:  # 아래 정규식과 일치하는 토픽을 화면에 제공
       - ^/(diagnostics|walker/status|wheel/hall|handle/pressure|battery_state)$  # 구동 상태·센서
-      - ^/terrain/(tof|imu|status)$  # 지형 센서
+      - ^/terrain/(tof|imu|status|pitch_deg|roll_deg|light/(adc|requested_on|output_enabled))$  # 지형·조도 센서
       - ^/(gps/fix|gps/speed|gps/speed_kmh|gps/speed_raw|gps/speed_raw_kmh|gps/course|crosswalk/status|odom|odom_kmh|cmd_vel_kmh|cmd_vel_safe_kmh|tf|tf_static|robot_description)$  # 위치·속도·좌표계
       - ^/perception/surface_condition$  # 노면 분류
       - ^/camera/image/compressed$  # 카메라 미리보기

@@ -1,6 +1,7 @@
 """Exercise production status publication without ROS or a serial device."""
 import ast
 import math
+import struct
 from pathlib import Path
 from types import SimpleNamespace as NS
 import unittest
@@ -9,6 +10,7 @@ import yaml
 
 from safestride_bridge.hmi_model import Snapshot
 from safestride_bridge.validation import bounded_int, finite_float
+from safestride_bridge.protocol import sequence_is_newer
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -27,7 +29,9 @@ tree = ast.parse(source.read_text(encoding='utf-8'))
 tree.body = [item for item in tree.body if isinstance(item, ast.ClassDef)
              or isinstance(item, ast.ImportFrom) and item.module == '__future__']
 scope = dict(Node=object, math=math, bounded_int=bounded_int,
-             finite_float=finite_float, TerrainStatus=Status)
+             finite_float=finite_float, TerrainStatus=Status, Float32=NS,
+             Bool=NS, struct=struct, sequence_is_newer=sequence_is_newer,
+             LIGHT_STATUS_PACKET_TYPE=0x22)
 exec(compile(tree, str(source), 'exec'), scope)
 Bridge = scope['TerrainBridgeNode']
 
@@ -50,6 +54,44 @@ class TerrainAttitudeTests(unittest.TestCase):
         self.messages = []
         self.node._status_pub = NS(publish=self.messages.append)
         self.node._last_telemetry_time = 1.0
+        self.pitch = []
+        self.roll = []
+        self.node._pitch_deg_pub = NS(publish=self.pitch.append)
+        self.node._roll_deg_pub = NS(publish=self.roll.append)
+
+    def test_degrees_and_stale_angles(self):
+        self.publish(pitch=-216, roll=41)
+        self.assertAlmostEqual(self.pitch[-1].data, math.degrees(-0.1))
+        self.assertAlmostEqual(self.roll[-1].data, math.degrees(0.1))
+        self.node._now = lambda: 2.0
+        self.node._publish_status()
+        self.assertTrue(math.isnan(self.pitch[-1].data))
+
+    def test_light_packet_session_bounds_and_replay(self):
+        node = self.node
+        node._session_started = True
+        node._session_id = 7
+        node._last_light_sequence = None
+        node._session_errors = node._payload_errors = node._sequence_errors = 0
+        adc, on, ready = [], [], []
+        node._light_adc_pub = NS(publish=adc.append)
+        node._light_on_pub = NS(publish=on.append)
+        node._light_ready_pub = NS(publish=ready.append)
+        frame = NS(packet_type=0x22, session_id=7, sequence=1,
+                   payload=struct.pack('<HBBB', 321, 1, 1, 1))
+        node._handle_frame(frame, 1.0)
+        self.assertEqual(adc[-1].data, 321.0)
+        self.assertTrue(on[-1].data and ready[-1].data)
+        node._handle_frame(frame, 1.0)
+        self.assertEqual(node._sequence_errors, 1)
+        frame.session_id = 8
+        node._handle_frame(frame, 1.0)
+        self.assertEqual(node._session_errors, 1)
+        frame.session_id = 7
+        frame.payload = struct.pack('<HBBB', 1024, 1, 1, 1)
+        node._handle_frame(frame, 1.0)
+        self.assertEqual(node._payload_errors, 1)
+        self.assertEqual(len(adc), 1)
 
     def publish(self, pitch=-116, roll=-59, valid=True):
         self.node._last_telemetry = NS(
