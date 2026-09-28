@@ -27,10 +27,10 @@ common=(
 
 "${cxx}" "${common[@]}" \
   -I"${workspace}/firmware/safestride_mcu" \
-  "${workspace}/test/firmware_analog_hall_sensor_test.cpp" \
-  "${workspace}/firmware/safestride_mcu/analog_hall_sensor.cpp" \
+  "${workspace}/test/firmware_digital_hall_sensor_test.cpp" \
+  "${workspace}/firmware/safestride_mcu/digital_hall_sensor.cpp" \
   "${workspace}/firmware/safestride_mcu/motor_control.cpp" \
-  -o "${build_dir}/analog_hall_test"
+  -o "${build_dir}/digital_hall_test"
 
 "${cxx}" "${common[@]}" \
   -I"${workspace}/firmware/safestride_mcu" \
@@ -41,7 +41,7 @@ common=(
 "${cxx}" "${common[@]}" \
   -I"${workspace}/firmware/safestride_mcu" \
   "${workspace}/test/firmware_state_machine_test.cpp" \
-  "${workspace}/firmware/safestride_mcu/analog_hall_sensor.cpp" \
+  "${workspace}/firmware/safestride_mcu/digital_hall_sensor.cpp" \
   "${workspace}/firmware/safestride_mcu/motor_control.cpp" \
   "${workspace}/firmware/safestride_mcu/pressure_sensor.cpp" \
   "${workspace}/firmware/safestride_mcu/protocol.cpp" \
@@ -71,10 +71,15 @@ common=(
   "${workspace}/test/firmware_hmi_test.cpp" \
   -o "${build_dir}/hmi_test"
 
+"${cxx}" "${common[@]}" \
+  "${workspace}/test/firmware_light_test.cpp" \
+  -o "${build_dir}/light_test"
+
+"${build_dir}/light_test"
 "${build_dir}/hmi_test"
 "${build_dir}/protocol_test"
 "${build_dir}/pressure_test"
-"${build_dir}/analog_hall_test"
+"${build_dir}/digital_hall_test"
 "${build_dir}/motor_test"
 "${build_dir}/state_machine_test"
 "${build_dir}/tof_test"

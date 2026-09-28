@@ -56,6 +56,16 @@ class TestCrossingPolicy(unittest.TestCase):
         self.assertAlmostEqual(
             machine.command(1.0, 1.0)['target_speed_mps'], 1.1)
 
+    def test_entry_allowed_only_means_a_new_entry_is_safe(self):
+        machine = CrossingStateMachine(clock=FakeClock())
+        for state in ('IDLE', 'APPROACHING', 'WAIT_AT_CURB', 'CROSSING',
+                      'CROSSING_URGENT', 'EXITING'):
+            with self.subTest(state=state):
+                machine.set_state(state, 'test')
+                self.assertFalse(machine.command(1.0, 0.5)['entry_allowed'])
+        machine.set_state('ENTRY_ALLOWED', 'test')
+        self.assertTrue(machine.command(1.0, 0.5)['entry_allowed'])
+
     def test_fast_feedback_remains_bounded_by_drive_ceiling(self):
         machine = CrossingStateMachine(clock=FakeClock())
         for state in ('CROSSING', 'CROSSING_URGENT'):
@@ -124,6 +134,26 @@ class TestCrossingPolicy(unittest.TestCase):
         self.wheel_update(machine, -5, 0, None)
         self.wheel_update(machine, 0, 6, None, east_m=6)
         self.assertEqual(machine.state, 'WAIT_AT_CURB')
+
+    def test_wheel_motion_without_forward_gps_progress_does_not_start_crossing(self):
+        machine = CrossingStateMachine(clock=FakeClock())
+        self.wheel_update(machine, -5, 0, None)
+        self.wheel_update(machine, -3.5, 0, None)
+        self.wheel_update(machine, -3.5, 2, None)
+        self.assertEqual(machine.state, 'WAIT_AT_CURB')
+
+    def test_stale_wheel_odometry_does_not_block_gps_confirmed_exit(self):
+        clock = FakeClock()
+        machine = CrossingStateMachine(clock=clock)
+        self.wheel_update(machine, -5, 0)
+        self.wheel_update(machine, -5, 0)
+        self.wheel_update(machine, -3.5, 1.5)
+        self.assertEqual(machine.state, 'CROSSING')
+        far_latitude = 7 / 111_320.0
+        update(machine, far_latitude, 30.0)
+        clock.advance(2.1)
+        update(machine, far_latitude, 30.0)
+        self.assertEqual(machine.state, 'EXITING')
 
     def test_gps_jump_cannot_complete_with_short_wheel_distance(self):
         clock = FakeClock()

@@ -68,7 +68,7 @@ def populated_snapshot(walker_message, crosswalk_message, terrain_message):
 
 class HmiOperatingScenarioTests(unittest.TestCase):
     def test_six_operating_scenarios_encode_exact_register_words(self):
-        # Register order is the production 0..15 VisualTFT/Modbus contract.
+        # Register order is status 0..15 plus packed location 16..25.
         scenarios = {
             "ready": (
                 populated_snapshot(
@@ -77,7 +77,7 @@ class HmiOperatingScenarioTests(unittest.TestCase):
                     terrain(),
                 ),
                 0.1,
-                (2, 1, 63, 125, 3, 3, 15, 42, 0, 0, 0, 2, 0, 0, 1, 83),
+                (3, 1, 63, 125, 3, 3, 15, 42, 0, 0, 0, 2, 0, 0, 1, 83) + (0,) * 10,
             ),
             "uphill": (
                 populated_snapshot(
@@ -86,7 +86,7 @@ class HmiOperatingScenarioTests(unittest.TestCase):
                     terrain(8.5),
                 ),
                 0.1,
-                (2, 1, 63, 85, 3, 2, UNKNOWN, 35, 85, 0, 0, 2, 0, 0, 1, 3),
+                (3, 1, 63, 85, 3, 2, UNKNOWN, 35, 85, 0, 0, 2, 0, 0, 1, 3) + (0,) * 10,
             ),
             "downhill": (
                 populated_snapshot(
@@ -95,7 +95,7 @@ class HmiOperatingScenarioTests(unittest.TestCase):
                     terrain(-7.0),
                 ),
                 0.1,
-                (2, 1, 63, 70, 3, 4, 9, 21, 65466, 0, 0, 2, 0, 0, 1, 67),
+                (3, 1, 63, 70, 3, 4, 9, 21, 65466, 0, 0, 2, 0, 0, 1, 67) + (0,) * 10,
             ),
             "braking": (
                 populated_snapshot(
@@ -104,7 +104,7 @@ class HmiOperatingScenarioTests(unittest.TestCase):
                     terrain(),
                 ),
                 0.1,
-                (2, 1, 63, 20, 3, 2, 5, 15, 0, 0, 0, 2, 1, 0, 1, 67),
+                (3, 1, 63, 20, 3, 2, 5, 15, 0, 0, 0, 2, 1, 0, 1, 67) + (0,) * 10,
             ),
             "hazard": (
                 populated_snapshot(
@@ -113,19 +113,19 @@ class HmiOperatingScenarioTests(unittest.TestCase):
                     terrain(tof_alert=3, hazard=True),
                 ),
                 0.1,
-                (2, 1, 63, 0, 3, 2, UNKNOWN, 15, 0, 3, 1, 2, 0, 0, 1, 3),
+                (3, 1, 63, 0, 3, 2, UNKNOWN, 15, 0, 3, 1, 2, 0, 0, 1, 3) + (0,) * 10,
             ),
             "stale_topics": (
                 populated_snapshot(walker(), crosswalk(3, 4.2), terrain()),
                 2.0,
-                (2, 1, 0, UNKNOWN, 0, 0, UNKNOWN, UNKNOWN, 0, 5, 0, 0, 0, 0, 1, 0),
+                (3, 1, 0, UNKNOWN, 0, 0, UNKNOWN, UNKNOWN, 0, 5, 0, 0, 0, 0, 1, 0) + (0,) * 10,
             ),
         }
 
         for name, (model, now, expected) in scenarios.items():
             with self.subTest(name=name):
                 payload = model.pack(now)
-                self.assertEqual(len(payload), 32)
+                self.assertEqual(len(payload), 52)
                 self.assertEqual(FORMAT.unpack(payload), expected)
 
 

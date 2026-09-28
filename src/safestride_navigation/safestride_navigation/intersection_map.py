@@ -96,17 +96,24 @@ def select_intersection_id(
     nearest: Optional[Mapping[str, Any]],
     configured_id: Any,
 ) -> tuple[str, str, str]:
+    nearest_id = str((nearest or {}).get('intersection_id', '') or '').strip()
+    nearest_name = str((nearest or {}).get('name', '') or '').strip()
+
+    def matching_name(identifier: Any) -> str:
+        normalized = str(identifier or '').strip()
+        return nearest_name if normalized and normalized == nearest_id else ''
+
     choices = (
-        ('locked', locked_id, ''),
+        ('locked', locked_id, matching_name(locked_id)),
         (
             'crosswalk_data',
             (crosswalk or {}).get('intersection_id', ''),
-            '',
+            matching_name((crosswalk or {}).get('intersection_id', '')),
         ),
         (
             'v2x_nearest',
-            (nearest or {}).get('intersection_id', ''),
-            (nearest or {}).get('name', ''),
+            nearest_id,
+            nearest_name,
         ),
         ('configured_fallback', configured_id, ''),
     )

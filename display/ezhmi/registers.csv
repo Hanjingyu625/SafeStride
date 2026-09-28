@@ -1,5 +1,5 @@
 address_hex,name,type,default,meaning
-0000,ss_version,uint16,2,Snapshot version
+0000,ss_version,uint16,3,Snapshot version
 0001,ss_heartbeat,uint16,0,Changes every 200 ms
 0002,ss_valid,uint16,0,Validity bits speed=1 hands=2 crosswalk=4 pitch=8 tof=16 walker=32
 0003,ss_speed,uint16,65535,Speed km/h x100; 65535 unknown
@@ -14,4 +14,14 @@ address_hex,name,type,default,meaning
 000C,ss_braking,uint16,0,Braking flag
 000D,ss_faults,uint16,0,Drive fault bitmask
 000E,ss_host_link,uint16,0,Fresh Pi snapshot present
-000F,ss_flags,uint16,0,Armed=1 deadman=2 estop=4 watchdog=8 entry_allowed=16 urgent=32 signal_valid=64
+000F,ss_flags,uint16,0,Low bits armed/deadman/estop/watchdog/entry/urgent/signal; bit7 surface valid; bits8..10 surface class; bits11..15 confidence 0..31
+0010,ss_location_0,uint16,0,ASCII location bytes 0..1 (high byte first)
+0011,ss_location_1,uint16,0,ASCII location bytes 2..3 (high byte first)
+0012,ss_location_2,uint16,0,ASCII location bytes 4..5 (high byte first)
+0013,ss_location_3,uint16,0,ASCII location bytes 6..7 (high byte first)
+0014,ss_location_4,uint16,0,ASCII location bytes 8..9 (high byte first)
+0015,ss_location_5,uint16,0,ASCII location bytes 10..11 (high byte first)
+0016,ss_location_6,uint16,0,ASCII location bytes 12..13 (high byte first)
+0017,ss_location_7,uint16,0,ASCII location bytes 14..15 (high byte first)
+0018,ss_location_8,uint16,0,ASCII location bytes 16..17 (high byte first)
+0019,ss_location_9,uint16,0,ASCII location bytes 18..19 (high byte first)

@@ -13,6 +13,32 @@ constexpr uint16_t TELEMETRY_PERIOD_MS = 50U;
 constexpr uint16_t SESSION_LOSS_TIMEOUT_MS = 1500U;
 constexpr int AVR_BOOT_COUNTER_EEPROM_ADDRESS = 8;
 
+// CdS on A0, 1-channel 5V relay IN on D4, COM/NO contacts.
+// HIGH = ON per EDUINO D-41 seller example; verify on the installed module.
+// SRD-05VDC-SL-C names the relay body, not its module's trigger polarity.
+// Thresholds are provisional ADC counts, not lux or field-calibrated values.
+constexpr uint8_t LIGHT_SENSOR_PIN = A0;
+constexpr int8_t LIGHT_RELAY_PIN = 4;
+constexpr int8_t LIGHT_RELAY_ON_LEVEL = HIGH;
+constexpr bool LIGHT_OUTPUT_ENABLED = true;
+// Divider: 5V -- CdS -- A0 -- 10 kohm -- GND.
+constexpr bool LIGHT_BRIGHT_IS_HIGH = true;
+constexpr uint16_t LIGHT_ON_BRIGHTNESS = 350U;
+constexpr uint16_t LIGHT_OFF_BRIGHTNESS = 550U;
+constexpr uint16_t LIGHT_SAMPLE_MS = 50U;
+constexpr uint16_t LIGHT_CONFIRM_MS = 1000U;
+
+static_assert(LIGHT_ON_BRIGHTNESS < LIGHT_OFF_BRIGHTNESS &&
+              LIGHT_OFF_BRIGHTNESS <= 1023U, "Invalid light hysteresis");
+static_assert(LIGHT_SAMPLE_MS > 0U && LIGHT_CONFIRM_MS >= LIGHT_SAMPLE_MS,
+              "Invalid light timing");
+// D0/D1 are USB serial; D8/D9 are AltSoftSerial; A4/A5 are I2C.
+static_assert(!LIGHT_OUTPUT_ENABLED ||
+              (LIGHT_RELAY_PIN >= 2 && LIGHT_RELAY_PIN <= 13 &&
+               LIGHT_RELAY_PIN != 8 && LIGHT_RELAY_PIN != 9 &&
+               (LIGHT_RELAY_ON_LEVEL == LOW || LIGHT_RELAY_ON_LEVEL == HIGH)),
+              "Assign a free relay pin and known ON level before enabling light output");
+
 // The TOF-10120 datasheet gives the 8-bit address as 0xA4. Arduino Wire uses
 // the corresponding 7-bit address, 0x52.
 constexpr uint8_t TOF_I2C_ADDRESS = 0x52U;

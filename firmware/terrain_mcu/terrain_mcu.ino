@@ -10,6 +10,7 @@
 #endif
 
 #include "config.h"
+#include "light_controller.h"
 #include "mpu6050_sensor.h"
 #include "protocol.h"
 #include "tof10120_sensor.h"
@@ -26,6 +27,10 @@ void sendDisplayStatus(uint32_t now_ms);
 #endif
 
 namespace cfg = safestride_terrain_config;
+LightController g_light({cfg::LIGHT_SENSOR_PIN, cfg::LIGHT_RELAY_PIN,
+    cfg::LIGHT_RELAY_ON_LEVEL, cfg::LIGHT_OUTPUT_ENABLED,
+    cfg::LIGHT_BRIGHT_IS_HIGH, cfg::LIGHT_ON_BRIGHTNESS,
+    cfg::LIGHT_OFF_BRIGHTNESS, cfg::LIGHT_SAMPLE_MS, cfg::LIGHT_CONFIRM_MS});
 namespace proto = safestride_protocol;
 
 constexpr uint32_t CAP_TOF10120 = 1UL << 8U;
@@ -204,6 +209,7 @@ void setup() {
   Wire.begin();
   Serial.begin(cfg::SERIAL_BAUD);
   const uint32_t now_ms = millis();
+  g_light.begin(now_ms);
   g_lcd.begin(now_ms);
   g_tof.begin(now_ms);
   g_mpu.begin(now_ms);
@@ -222,6 +228,7 @@ void loop() {
 #endif
   processHostProtocol();
   const uint32_t now_ms = millis();
+  g_light.update(now_ms);
   g_tof.update(now_ms);
   g_mpu.update(now_ms);
   g_display.tick(now_ms);
@@ -243,7 +250,7 @@ void loop() {
 
 void sendDisplayStatus(uint32_t now_ms) {
 #if EZHMI_ENABLED
-  uint8_t payload[12] = {2U, static_cast<uint8_t>(g_lcd.linkOk(now_ms)), 0U, 0U};
+  uint8_t payload[12] = {3U, static_cast<uint8_t>(g_lcd.linkOk(now_ms)), 0U, 0U};
   proto::writeU16(payload + 2U, g_lcd.exception_code);
   proto::writeU32(payload + 4U, g_lcd.ack_count);
   proto::writeU32(payload + 8U, g_lcd.error_count);

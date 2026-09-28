@@ -7,7 +7,6 @@ namespace {
 
 uint32_t g_test_millis = 0UL;
 int g_pressure_adc = 200;
-int g_hall_adc = 512;
 
 }  // namespace
 
@@ -15,12 +14,13 @@ HardwareSerial Serial;
 
 void pinMode(uint8_t, uint8_t) {}
 void digitalWrite(uint8_t, uint8_t) {}
-int digitalRead(uint8_t) { return LOW; }
+int digitalRead(uint8_t pin) {
+  return pin == safestride_config::HALL_DIGITAL_PIN ? HIGH : LOW;
+}
 void analogWrite(uint8_t, int) {}
 int analogRead(uint8_t pin) {
-  return pin == safestride_config::HALL_ANALOG_PIN
-      ? g_hall_adc
-      : g_pressure_adc;
+  (void)pin;
+  return g_pressure_adc;
 }
 int digitalPinToInterrupt(uint8_t) { return 0; }
 void attachInterrupt(int, void (*)(), int) {}
@@ -309,9 +309,12 @@ int main() {
   assert(g_state==ControllerState::ARMED && g_brake_requested);
   assert(!handleCommand(brake_frame)); // duplicate cannot refresh/alter state
   brake_frame.sequence=101U;
-  command[11]=0U; proto::writeI32(command,696L); proto::writeI16(command+8,8);
+  command[11]=0U; proto::writeI32(command,696L); proto::writeI16(command+8,45);
   assert(handleCommand(brake_frame));
-  assert(!g_brake_requested && g_slope_ff_pwm==8 && g_requested_mrad_s==696L);
+  assert(!g_brake_requested && g_slope_ff_pwm==45 && g_requested_mrad_s==696L);
+  brake_frame.sequence=102U; proto::writeI16(command+8,46);
+  assert(!handleCommand(brake_frame));
+  proto::writeI16(command+8,45);
   brake_frame.sequence=102U; command[10]=141U;
   assert(!handleCommand(brake_frame));
   assert(g_last_command_sequence==101U && g_drive_pwm_cap==140U);

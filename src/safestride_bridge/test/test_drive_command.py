@@ -62,6 +62,9 @@ class TestDriveCommand(unittest.TestCase):
         self.assertEqual((self.packets[-1].mode, self.packets[-1].slope_ff_pwm), (0, -18))
 
     def test_pwm_cap_140_reaches_wire(self):
+        self.b._on_cmd_vel(self.message(ff=45, cap=140))
+        self.b._command_tick()
+        self.assertEqual(self.packets[-1].slope_ff_pwm, 45)
         self.b._on_cmd_vel(self.message(cap=140))
         self.b._command_tick()
         self.assertEqual(self.packets[-1].drive_pwm_cap, 140)
@@ -77,7 +80,7 @@ class TestDriveCommand(unittest.TestCase):
 
     def test_stale_future_invalid_messages_cannot_refresh_command(self):
         for msg in (self.message(stamp=9), self.message(stamp=11),
-                    self.message(target=math.nan), self.message(ff=31),
+                    self.message(target=math.nan), self.message(ff=46),
                     self.message(mode=2), self.message(cap=141), self.message(mode=1)):
             self.b._on_cmd_vel(self.message())
             self.b._on_cmd_vel(msg)

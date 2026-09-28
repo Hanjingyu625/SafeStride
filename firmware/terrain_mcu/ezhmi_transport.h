@@ -3,7 +3,7 @@
 #include "hmi_state.h"
 
 // LCD must run the SafeStride VisualTFT configuration documented in
-// docs/DISPLAY_KO.md: Modbus slave 1, 19200 8N1, holding registers 0..15.
+// docs/DISPLAY_KO.md: Modbus slave 1, 19200 8N1, holding registers 0..25.
 // This is a project configuration, NOT the LCD factory protocol.
 #ifndef EZHMI_ENABLED
 #define EZHMI_ENABLED 1
@@ -19,7 +19,8 @@
 #include <AltSoftSerial.h>
 // Uno ATmega328P only: RX=D8, TX=D9. Timer1 and PWM D10 unavailable.
 static_assert(EZHMI_SLAVE_ID>0 && EZHMI_SLAVE_ID<248, "No broadcast writes");
-static_assert(EZHMI_REGISTER_BASE<=65520, "Register block exceeds 16-bit address space");
+static_assert(EZHMI_REGISTER_BASE<=65535-(safestride_hmi::WORDS-1),
+              "Register block exceeds 16-bit address space");
 #endif
 
 class EzhmiTransport {
@@ -62,9 +63,9 @@ class EzhmiTransport {
     if(static_cast<uint32_t>(now-started_)<3000 || waiting_ ||
        static_cast<uint32_t>(now-last_tx_)<200 ||
        static_cast<uint32_t>(now-last_byte_)<5) return;
-    uint8_t frame[41];
+    uint8_t frame[7+safestride_hmi::WORDS*2+2];
     const size_t n=safestride_hmi::buildWrite(frame,EZHMI_SLAVE_ID,EZHMI_REGISTER_BASE,state.words);
-    // 41 bytes fit the unmodified AltSoftSerial TX ring (68 bytes).
+    // 61 bytes fit the unmodified AltSoftSerial TX ring (68 bytes).
     // The previous request has drained by the 150/200 ms transaction limits.
     uart_.write(frame,n); last_tx_=now; waiting_=true; rx_n_=0;
 #else

@@ -22,6 +22,10 @@ class SignalPhaseTests(unittest.TestCase):
         self.timing = None
         self.assertEqual(self.evaluate(), (0.0, True, 'red pedestrian signal'))
 
+    def test_permissive_green_is_valid_with_fresh_countdown(self):
+        self.phase['ntPdsgStatNm'] = 'permissive-Movement-Allowed'
+        self.assertEqual(self.evaluate()[:2], (25.0, True))
+
     def test_countdown_alone_does_not_imply_green(self):
         self.phase = None
         self.assertFalse(self.evaluate()[1])
@@ -53,6 +57,73 @@ class SignalPhaseTests(unittest.TestCase):
         self.assertIsNone(result['timing'])
         self.assertEqual(result['phase'], self.phase)
         self.assertEqual(result['timing_error'], 'timing unavailable')
+
+    def test_combined_current_record_keeps_phase_and_countdown_paired(self):
+        combined = {**self.timing, **self.phase}
+        with patch('safestride_navigation.signal_logic.request_signal_data',
+                   return_value=combined) as fetch:
+            result = request_signal_bundle(
+                'test', '42', url='timing', phase_url='phase',
+                combined_url='combined', timeout_s=1)
+        self.assertEqual(result, {'timing': combined, 'phase': combined})
+        fetch.assert_called_once_with(
+            'test', '42', url='combined', timeout_s=1, key_param='apikey')
+
+    def test_combined_failure_falls_back_to_existing_endpoints(self):
+        def fetch(_key, _intersection, *, url, timeout_s, key_param='apiKey'):
+            if url == 'combined':
+                raise RuntimeError('not subscribed')
+            return self.timing if url == 'timing' else self.phase
+
+        with patch('safestride_navigation.signal_logic.request_signal_data',
+                   side_effect=fetch):
+            result = request_signal_bundle(
+                'test', '42', url='timing', phase_url='phase',
+                combined_url='combined', timeout_s=1)
+        self.assertEqual(result['timing'], self.timing)
+        self.assertEqual(result['phase'], self.phase)
+
+    def test_unrelated_missing_head_does_not_discard_requested_green(self):
+        combined = {**self.timing, **self.phase,
+                    'etPdsgStatNm': 'unknown', 'etPdsgRmdrCs': None}
+        with patch('safestride_navigation.signal_logic.request_signal_data',
+                   return_value=combined) as fetch:
+            result = request_signal_bundle(
+                'test', '42', url='timing', phase_url='phase',
+                combined_url='combined', timeout_s=1, direction='nt')
+        self.assertEqual(result['phase'], combined)
+        self.assertEqual(fetch.call_count, 1)
+
+    def test_requested_missing_head_falls_back_not_other_green(self):
+        combined = {**self.timing, **self.phase}
+        def fetch(_key, _intersection, *, url, **kwargs):
+            if url == 'combined':
+                return combined
+            return self.timing if url == 'timing' else self.phase
+        with patch('safestride_navigation.signal_logic.request_signal_data',
+                   side_effect=fetch) as mocked:
+            result = request_signal_bundle(
+                'test', '42', url='timing', phase_url='phase',
+                combined_url='combined', timeout_s=1, direction='et')
+        self.assertEqual(mocked.call_count, 3)
+        self.assertFalse(evaluate_pedestrian_signal(
+            result['timing'], result['phase'], 'et', 1001)[1])
+
+    def test_combined_green_without_countdown_falls_back(self):
+        incomplete = {**self.phase, 'ntPdsgRmdrCs': None}
+
+        def fetch(_key, _intersection, *, url, timeout_s, key_param='apiKey'):
+            if url == 'combined':
+                return incomplete
+            return self.timing if url == 'timing' else self.phase
+
+        with patch('safestride_navigation.signal_logic.request_signal_data',
+                   side_effect=fetch):
+            result = request_signal_bundle(
+                'test', '42', url='timing', phase_url='phase',
+                combined_url='combined', timeout_s=1)
+        self.assertEqual(result['timing'], self.timing)
+        self.assertEqual(result['phase'], self.phase)
 
 
 class StationaryPositionTests(unittest.TestCase):

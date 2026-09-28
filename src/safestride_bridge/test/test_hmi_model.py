@@ -4,7 +4,9 @@ from types import SimpleNamespace as Msg
 
 from safestride_bridge.hmi_model import (
     Snapshot, FORMAT, UNKNOWN, SPEED, HANDS, CROSS, PITCH, WALKER,
-    ARMED, DEADMAN, ENTRY_ALLOWED, SIGNAL_VALID,
+    ARMED, DEADMAN, ENTRY_ALLOWED, SIGNAL_VALID, SURFACE_VALID,
+    SURFACE_SHIFT, SURFACE_CONFIDENCE_SHIFT, BASE_WORDS, LOCATION_WORDS,
+    ascii_location,
 )
 
 
@@ -22,7 +24,7 @@ class HmiModelTests(unittest.TestCase):
         model = Snapshot()
         model.update('walker', walker(), 1.0)
         words = FORMAT.unpack(model.pack(1.1))
-        self.assertEqual(words[0], 2)
+        self.assertEqual(words[0], 3)
         self.assertEqual(words[3], 125)
         self.assertEqual(words[2], SPEED | WALKER)
         self.assertEqual(words[15], ARMED | DEADMAN)
@@ -84,6 +86,41 @@ class HmiModelTests(unittest.TestCase):
         model = Snapshot()
         model.update('walker', walker(), 5)
         self.assertEqual(model.words(4)[2], 0)
+
+    def test_surface_class_and_confidence_use_extended_flags(self):
+        model = Snapshot()
+        surface = Msg(valid=True, classification=3, confidence=.78)
+        model.update('surface', surface, 0)
+        flags = model.words(.1)[15]
+        self.assertTrue(flags & SURFACE_VALID)
+        self.assertEqual((flags >> SURFACE_SHIFT) & 7, 3)
+        self.assertEqual((flags >> SURFACE_CONFIDENCE_SHIFT) & 31, 24)
+        self.assertEqual(model.words(2.5)[15], 0)
+
+        surface.confidence = math.nan
+        model.update('surface', surface, 3)
+        self.assertEqual(model.words(3.1)[15], 0)
+
+    def test_intersection_name_is_romanized_for_ascii_lcd(self):
+        self.assertEqual(ascii_location('수서역'), 'SUSEO STN')
+        self.assertEqual(ascii_location('선사사거리'), 'SEONSA JCT')
+        self.assertEqual(
+            ascii_location('난곡우체국앞'),
+            'NANGOK POST OFFICE',
+        )
+        model = Snapshot()
+        cross = Msg(
+            gps_valid=True, state=2, signal_valid=False,
+            entry_allowed=False, urgent=False, edge_distance_m=4.2,
+            signal_remaining_s=math.nan, intersection_name='수서역',
+        )
+        model.update('crosswalk', cross, 0)
+        words = model.words(.1)
+        encoded = bytearray()
+        for word in words[BASE_WORDS:BASE_WORDS + LOCATION_WORDS]:
+            encoded.extend((word >> 8, word & 0xff))
+        self.assertEqual(encoded.rstrip(b'\0'), b'SUSEO STN')
+        self.assertEqual(len(FORMAT.pack(*words)), 52)
 
 
 if __name__ == '__main__':

@@ -18,7 +18,8 @@ scope = dict(Snapshot=Snapshot, PACKET_TYPE=PACKET_TYPE, CAPABILITY=CAPABILITY,
              DiagnosticStatus=type('DiagnosticStatus', (), dict(OK=0, WARN=1)),
              __name__='safestride_bridge.hmi_relay', __package__='safestride_bridge',
              WalkerStatus=NS, HandlePressure=NS, CrosswalkStatus=NS,
-             TerrainStatus=NS, qos_profile_sensor_data=object())
+             TerrainStatus=NS, SurfaceCondition=NS,
+             qos_profile_sensor_data=object())
 exec(compile(ast.Module(body=[klass], type_ignores=[]), str(path), 'exec'), scope)
 Relay = scope['HmiRelay']
 
@@ -50,8 +51,12 @@ class HmiRelayTests(unittest.TestCase):
         decoded = FrameParser().feed(wire)[0]
         self.assertEqual(decoded.packet_type, PACKET_TYPE)
         self.assertEqual(decoded.session_id, 123)
-        self.assertEqual(decoded.payload[:2], b'\x02\x00')
+        self.assertEqual(decoded.payload[:2], b'\x03\x00')
         self.assertEqual(self.params['hmi.topics.terrain'], '/terrain/custom_status')
+        self.assertEqual(
+            self.params['hmi.topics.surface'],
+            '/perception/surface_condition',
+        )
 
     def test_old_firmware_and_disconnected_links_receive_nothing(self):
         self.node._capabilities = 1 << 10  # prototype v1
@@ -69,7 +74,7 @@ class HmiRelayTests(unittest.TestCase):
 
     def status(self, payload=None, seq=1):
         return Frame(packet_type=STATUS_PACKET_TYPE, sequence=seq, session_id=123,
-                     timestamp_ms=10000, payload=payload or STATUS_FORMAT.pack(2,1,0,5,0))
+                     timestamp_ms=10000, payload=payload or STATUS_FORMAT.pack(3,1,0,5,0))
 
     def test_ack_health_expires_and_resets(self):
         self.assertTrue(self.relay.accept_status(self.status(), 10))
@@ -81,7 +86,7 @@ class HmiRelayTests(unittest.TestCase):
         self.assertTrue(self.relay.accept_status(self.status(), 10))
         self.assertFalse(self.relay.accept_status(self.status(b'bad', 2), 10))
         self.assertTrue(self.relay.accept_status(
-            self.status(STATUS_FORMAT.pack(2,0,2,5,1), 2), 10))
+            self.status(STATUS_FORMAT.pack(3,0,2,5,1), 2), 10))
         self.assertIn('ACK missing', self.relay.diagnostic(10).message)
 
 
