@@ -31,8 +31,8 @@ constexpr uint16_t COMMAND_TTL_MIN_MS = 20U;
 
 // Motion limits at the wheel output shaft.
 constexpr int32_t MAX_WHEEL_TARGET_MRAD_S = 10000L;
-constexpr int32_t MAX_ACCEL_MRAD_S2 = 1200L;
-constexpr int32_t MAX_DECEL_MRAD_S2 = 2500L;
+constexpr int32_t MAX_ACCEL_MRAD_S2 = 6000L;
+constexpr int32_t MAX_DECEL_MRAD_S2 = 5000L;
 constexpr int32_t ARM_MAX_MEASURED_SPEED_MRAD_S = 100L;
 constexpr uint16_t ARM_STATIONARY_DWELL_MS = 250U;
 
@@ -98,7 +98,7 @@ constexpr uint8_t MOTOR_FF_BIAS_PWM = 40U;
 constexpr uint8_t MOTOR_FF_NOMINAL_PWM = 60U;
 constexpr uint8_t MOTOR_START_PWM = 30U;
 constexpr float MOTOR_NOMINAL_MRAD_S = 1.0F / 0.115F * 1000.0F;
-constexpr float MOTOR_PWM_RISE_PER_S = 20.0F;
+constexpr float MOTOR_PWM_RISE_PER_S = 30.0F;
 constexpr float TERRAIN_RECOVERY_PWM_RISE_PER_S = 10.0F;
 constexpr float MOTOR_PWM_FALL_PER_S = 60.0F;
 constexpr uint32_t MOTOR_REVERSAL_BRAKE_US = 150000UL;

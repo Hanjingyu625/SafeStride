@@ -121,7 +121,7 @@ safety_supervisor:
     max_forward_velocity: 1.15
     max_reverse_velocity: 0.08
     max_angular_velocity: 0.0
-    max_linear_acceleration: 0.20
+    max_linear_acceleration: 0.50
     max_linear_deceleration: 0.50
     max_angular_acceleration: 0.50
     max_angular_deceleration: 1.00
@@ -151,7 +151,33 @@ safety_supervisor:
 cruise_command:
   ros__parameters:
     speed_mps: 1.0
+    minimum_speed_mps: 0.0
+    maximum_speed_mps: 1.15
+    push_speed_step_mps: 0.03
+    pull_speed_step_mps: 0.05
+    push_repeat_s: 0.40
+    pull_repeat_s: 0.30
+    hall_delta_threshold_mps: 0.05
+    imu_delta_velocity_threshold_mps: 0.03
+    feedback_threshold_pwm: 3.0
+    intent_window_s: 0.50
+    target_proximity_mps: 0.05
+    maximum_learning_pitch_deg: 3.0
+    status_timeout_s: 0.50
+    hall_speed_max_age_s: 0.75
+    imu_timeout_s: 0.30
+    terrain_timeout_s: 0.35
+    drive_command_timeout_s: 0.50
+    gps_timeout_s: 2.0
+    gps_disagreement_mps: 0.40
+    gps_disagreement_hold_s: 2.0
+    imu_forward_sign: 1.0
     publish_rate_hz: 20.0
+    status_topic: /walker/status
+    imu_topic: /terrain/imu
+    terrain_topic: /terrain/status
+    gps_speed_topic: /gps/speed
+    drive_command_topic: /drive/command
     command_topic: /cmd_vel
     frame_id: base_link
 

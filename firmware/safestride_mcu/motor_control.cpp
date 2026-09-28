@@ -514,8 +514,8 @@ void DriveController::update(
   output = clampFloat(output, -cap, cap);
   if (!speed_valid_) output = clampFloat(output,
       -cfg::MOTOR_FF_NOMINAL_PWM, cfg::MOTOR_FF_NOMINAL_PWM);
-  // 출력 크기를 늘릴 때 20count/s, 줄일 때 60count/s로 제한한다.
-  // After the one-time launch step, 30->60 takes at least 1.5 seconds.
+  // 출력 크기를 늘릴 때 30count/s, 줄일 때 60count/s로 제한한다.
+  // After the one-time launch step, 30->60 takes at least 1.0 second.
   // After a terrain stop, retain the slower rise limit. The speed controller
   // determines the PWM needed at target speed; there is no blind PWM sweep.
   const float desired_output = output;

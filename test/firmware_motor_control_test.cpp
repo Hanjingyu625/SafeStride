@@ -75,7 +75,7 @@ int main() {
   // A forward launch jumps to 30 once, with stop and cap priority intact.
   DriveController launch; launch.begin(); primeFeedback(launch);
   HallSample no_speed = {0, 0, 0xFFFFFFFFUL};
-  for (int i = 0; i < 4; ++i) launch.update(5000,no_speed,no_speed,8696,true);
+  launch.update(5000,no_speed,no_speed,8696,true);
   assert(launch.appliedPwm() == 30);
   launch.update(5000,no_speed,no_speed,0,true);
   assert(launch.appliedPwm() == 0);
@@ -86,7 +86,7 @@ int main() {
   assert(launch.appliedPwm() == 0);
 
   DriveController once; once.begin(); primeFeedback(once);
-  for (int i = 0; i < 4; ++i) once.update(5000,no_speed,no_speed,8696,true);
+  once.update(5000,no_speed,no_speed,8696,true);
   assert(once.appliedPwm() == 30);
   once.update(5000,no_speed,no_speed,8696,true,true,0,false,0,0);
   assert(once.appliedPwm() == 0);
@@ -160,7 +160,7 @@ int main() {
       terrain.update(5000,absent,absent,696,true,true);
     assert(g_motor_pwm >= 9 && g_motor_pwm <= 10);
     // Recovery uses 10 count/s only until it catches the normal controller
-    // output. A later demand change returns to the ordinary 20 count/s slew.
+    // output. A later demand change returns to the ordinary 30 count/s slew.
     run(terrain,1020,696,752297UL);
     assert(g_motor_pwm >= 40 && g_motor_pwm <= 42);
     run(terrain,20,696,752297UL,30);
@@ -191,7 +191,7 @@ int main() {
   // Output slew, zero target, fault/explicit brake bypass normal ramp.
   DriveController slew; slew.begin(); primeFeedback(slew);
   run(slew,100,696,752297UL);
-  assert(g_motor_pwm >= 30 && g_motor_pwm <= 40);
+  assert(g_motor_pwm >= 41 && g_motor_pwm <= 43);
   int before=g_motor_pwm;
   HallSample h={2000,752297UL,0};
   slew.update(5000,h,h,0,true,true,1160,true);

@@ -128,7 +128,7 @@ safety_supervisor:
     max_forward_velocity: 1.15  # 전진 목표 상한(m/s, 4.14km/h)
     max_reverse_velocity: 0.08  # 후진 목표 크기 상한(m/s)
     max_angular_velocity: 0.0  # 회전 목표 상한(rad/s). 현재 회전 요청은 지원하지 않음
-    max_linear_acceleration: 0.20  # Pi 목표 선속도 상승률(m/s²). MCU에 별도 각속도 ramp도 있음
+    max_linear_acceleration: 0.50  # Pi 목표 선속도 상승률(m/s²). MCU에 별도 각속도 ramp도 있음
     max_linear_deceleration: 0.50  # 정상 목표 선속도 하강률(m/s²). BRAKE·손 해제·지형 감속은 별도 경로
     max_angular_acceleration: 0.50  # 목표 회전속도 상승률(rad/s²). 현재 회전 상한은 0
     max_angular_deceleration: 1.00  # 목표 회전속도 하강률(rad/s²)
@@ -151,11 +151,37 @@ safety_supervisor:
     diagnostics_topic: /diagnostics  # 정지·제한 이유 발행
     output_frame_id: base_link  # 목표 메시지의 기준 좌표계
 
-# 안전 제한을 적용하기 전의 기본 직진 목표를 계속 발행한다.
+# 안전 제한 전 목표를 기본 1.0m/s에서 출발해 Hall·IMU·속도오차 투표로 조정한다.
 cruise_command:
   ros__parameters:
-    speed_mps: 1.0  # 기본 요청 선속도(m/s, 3.6km/h). 노드에서 허용하는 설정 범위는 0~1.0
-    publish_rate_hz: 20.0  # 기본 목표 발행 주기(Hz)
+    speed_mps: 1.0  # 출발·양손 해제 후 복귀할 기본 목표(m/s, 3.6km/h)
+    minimum_speed_mps: 0.0  # 적응형 목표 하한(m/s)
+    maximum_speed_mps: 1.15  # 적응형 목표 상한(m/s, 4.14km/h)
+    push_speed_step_mps: 0.03  # 앞으로 밀기 확정 시 한 번에 높일 목표속도
+    pull_speed_step_mps: 0.05  # 뒤로 당기기 확정 시 한 번에 낮출 목표속도
+    push_repeat_s: 0.40  # 밀기 의도가 계속될 때 상승 반복 간격(초)
+    pull_repeat_s: 0.30  # 당기기 의도가 계속될 때 하강 반복 간격(초)
+    hall_delta_threshold_mps: 0.05  # 0.5초 창에서 Hall 속도변화 투표 역치(m/s)
+    imu_delta_velocity_threshold_mps: 0.03  # 0.5초 IMU 적분 속도변화 투표 역치(m/s)
+    feedback_threshold_pwm: 3.0  # MCU P보정량을 사용할 밀기/당기기 투표 역치(PWM count)
+    intent_window_s: 0.50  # Hall·IMU 변화를 비교하는 창(초)
+    target_proximity_mps: 0.05  # 목표 근처에서만 추가 가속을 허용하는 여유(m/s)
+    maximum_learning_pitch_deg: 3.0  # 오르막·내리막 보정 없이 목표를 배울 최대 절대 경사(도)
+    status_timeout_s: 0.50  # MCU 상태가 이보다 오래되면 목표 적응 중지
+    hall_speed_max_age_s: 0.75  # 적응에 사용할 Hall 속도의 최대 펄스 나이(초)
+    imu_timeout_s: 0.30  # IMU 가속도 최대 나이(초)
+    terrain_timeout_s: 0.35  # 평지 판정에 사용할 지형 상태 최대 나이(초)
+    drive_command_timeout_s: 0.50  # DRIVE·경사 FF 상태 최대 나이(초)
+    gps_timeout_s: 2.0  # GPS 속도를 장기 검증에 쓸 최대 나이(초)
+    gps_disagreement_mps: 0.40  # GPS와 Hall의 지속 불일치 역치(m/s)
+    gps_disagreement_hold_s: 2.0  # 불일치로 적응을 막기 전 유지 시간(초)
+    imu_forward_sign: 1.0  # IMU x가 전방이면 1, 반대 배치면 -1
+    publish_rate_hz: 20.0  # 목표 갱신·발행 주기(Hz)
+    status_topic: /walker/status  # Hall 속도·MCU P보정·주행 상태
+    imu_topic: /terrain/imu  # 전방 선형가속도
+    terrain_topic: /terrain/status  # 평지·경사 판정
+    gps_speed_topic: /gps/speed  # 장기 속도 불일치 검증용
+    drive_command_topic: /drive/command  # 안전 감독의 DRIVE·경사 FF 확인용
     command_topic: /cmd_vel  # 안전 감독에 전달할 원래 목표 토픽
     frame_id: base_link  # 목표 기준 좌표계
 

@@ -96,7 +96,7 @@ class SafetySupervisor(Node):
         self.declare_parameter('max_reverse_velocity', 0.08)
         self.declare_parameter('max_angular_velocity', 0.35)
         self.declare_parameter('max_surface_speed_scale', 1.25)
-        self.declare_parameter('max_linear_acceleration', 0.20)
+        self.declare_parameter('max_linear_acceleration', 0.50)
         self.declare_parameter('max_linear_deceleration', 0.50)
         self.declare_parameter('max_angular_acceleration', 0.50)
         self.declare_parameter('max_angular_deceleration', 1.00)

@@ -292,8 +292,8 @@ P = speed_valid ? 12 × (ω_target-ω_measured)/1000 : 0
 → 목표 반대 방향 금지
 → min(Pi pwm_cap, MCU MAX_PWM=140) 제한
 → 무효 Hall이면 후보 크기 60 제한
-→ 한 번의 전진 시작 step 최대 20
-→ 정상 상승 20count/s, 지형 정지 복귀 상승 10count/s, 하강 60count/s
+→ 한 번의 전진 시작 step 최대 30
+→ 정상 상승 30count/s, 지형 정지 복귀 상승 10count/s, 하강 60count/s
 → 상한/방향 재적용 → writeMotor()
 ```
 
@@ -407,9 +407,9 @@ Hall 무효 시 60 제한은 출력 후보에 적용된다. 이미 더 높은 �
 | `HALL_MAX_PLAUSIBLE_MRAD_S`, `HALL_OVERSPEED_CONFIRM_PULSES` | 25000 / 2 | Hall 비현실적 속도 fault |
 | `MOTOR_PWM_PIN`, `MOTOR_IN1_PIN`, `MOTOR_IN2_PIN`, `MOTOR_SIGN` | 5 / 6 / 8 / +1 | 실제 출력 핀/배선 부호 |
 | `MAX_PWM` | 140 | Arduino count 상한 |
-| `MOTOR_FF_BIAS_PWM`, `MOTOR_FF_NOMINAL_PWM`, `MOTOR_START_PWM` | 30 / 60 / 20 | FF bias/1m/s 예측값/초기 step |
+| `MOTOR_FF_BIAS_PWM`, `MOTOR_FF_NOMINAL_PWM`, `MOTOR_START_PWM` | 40 / 60 / 30 | FF bias/1m/s 예측값/초기 step |
 | `MOTOR_NOMINAL_MRAD_S` | 1/0.115×1000 | FF 모델 기준 각속도 |
-| `MOTOR_PWM_RISE_PER_S`, `TERRAIN_RECOVERY_PWM_RISE_PER_S`, `MOTOR_PWM_FALL_PER_S` | 20 / 10 / 60 | PWM 상승/복귀 상승/하강 제한 |
+| `MOTOR_PWM_RISE_PER_S`, `TERRAIN_RECOVERY_PWM_RISE_PER_S`, `MOTOR_PWM_FALL_PER_S` | 30 / 10 / 60 | PWM 상승/복귀 상승/하강 제한 |
 | `MOTOR_REVERSAL_BRAKE_US` | 150000 | 역전 전 BRAKE 시간 |
 | `SPEED_BRAKE_ABSOLUTE_MRAD_S`, `SPEED_BRAKE_RELEASE_MRAD_S`, `SPEED_BRAKE_CONFIRM_PULSES` | 8km/h / 7km/h 각속도 환산 / 2 | 절대 과속 BRAKE/해제/확인 |
 | `MOTOR_PID_KP`, `MOTOR_PID_KI`, `MOTOR_PID_KD`, `PID_INTEGRAL_LIMIT` | 12 / 0 / 0 / 30 | 피드백 게인/적분 상태 제한 |
