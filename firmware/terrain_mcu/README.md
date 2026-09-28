@@ -33,7 +33,10 @@ A0에서 CdS 분압 전압을 50 ms마다 읽고, Terrain 내부에서 조명 ON
   COM–NO 연결은 사용자 확인 사항이다. 배터리/조명의 실제 전압·전류는 미확인이다.
 - 추후 관찰용 접근자: `g_light.rawAdc()`, `hasSample()`, `requestedOn()`,
   `outputReady()`. `requestedOn()`은 논리 요구 상태이며 실제 점등 피드백이 아니다.
-  Pi 프로토콜, LCD 표시, USB 직렬 텍스트 출력은 추가하지 않았다.
+  선택적 진단 패킷 0x22로 ADC·샘플 유무·요구 ON·출력 활성화를 Pi에 전달한다.
+  ROS 확인은 `/terrain/light/adc`, `/terrain/light/requested_on`,
+  `/terrain/light/output_enabled`를 사용한다. ADC는 lux가 아닌 0–1023 값이다.
+  LCD 표시와 USB 직렬 텍스트 출력은 추가하지 않았다.
   센서 단선과 정상적인 극단 밝기는 ADC만으로 구분하지 않는다.
 
 사용자 지정 제품: [쿠팡 1채널 5V 릴레이](https://www.coupang.com/vp/products/7495734120?itemId=19610387283&vendorItemId=86717369619).
