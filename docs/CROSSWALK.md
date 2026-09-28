@@ -40,11 +40,71 @@ intersection MAP CSV normalized for offline startup. Override it with
 API is available, the controller refreshes this seed in the background and
 caches the newer result without blocking signal timing requests.
 
-While wheel or filtered GPS movement is confirmed, a fresh RMC course or at
-least 2 m of GPS position movement supplies travel direction. Candidates more
-than 60 degrees away from that direction are rejected. Before a heading is
-available, the nearest polygon is used. GPS course is direction of travel, not
-a compass heading, so it is intentionally unavailable while stationary.
+## Heading and candidate selection (2026-09-28)
+
+While motion is confirmed, fresh GPS RMC course or at least 2 m of GPS
+position movement supplies the initial north reference. `/terrain/imu` then
+propagates that bearing through turns, including pivots without translation.
+The IMU quaternion supplies only gravity roll/pitch, never absolute yaw.
+The node computes yaw rate from the sensor Y/Z rates and roll/pitch, then
+converts ROS counterclockwise yaw to clockwise compass bearing. This assumes
+the documented upright `imu_link` mounting; `heading_gyro_sign` defaults to
++1 and permits -1 for an inverted yaw sign. It is not an arbitrary mounting
+transform. Verify that a clockwise 90-degree pivot increases bearing by 90
+degrees before relying on the field results.
+
+GPS corrections use 20% of the shortest angular difference. During turns
+above 3 deg/s and for 1 second afterward, GPS course corrections are suppressed
+to avoid restoring the previous trajectory. Quiet wheel-confirmed standstill
+and absolute yaw rate below 0.5 deg/s for 2 seconds permit slow bias learning
+(time constant 10 seconds). A slow pivot can still resemble bias; this is a
+bounded estimate, not a compass measurement.
+
+IMU stamps, frame, validity, quaternion norm and finite values are checked;
+roll or pitch beyond 45 degrees invalidates this heading path. A gap exceeding
+0.35 seconds or non-increasing IMU timestamps discards the integrated heading.
+A new GPS observation is needed to reanchor. GPS-only heading expires after
+5 seconds. With continuous IMU, heading expires 20 seconds after the last
+accepted GPS anchor. Confidence is a heuristic decreasing linearly from 1
+to 0 over that interval, not a calibrated probability. It must be at least
+0.5 to confirm a crosswalk. With defaults, gyro-only confirmation is therefore
+possible up to 10 seconds after the GPS anchor; GPS-only confirmation up to
+2.5 seconds. Replayed GPS observations never refresh the anchor age.
+
+The spatial index still searches within 80 m of a crosswalk edge, but the ROS
+node ranks all nearby candidates instead of rejecting those over 60 degrees
+from the heading. Ranking uses distance to the nearest end of the crossing,
+heading agreement with both its centre and axis, and recent change in entrance
+distance. The score is entrance distance plus confidence-weighted angular
+penalties (12 m at 90-degree axis error, 12 m at 180-degree centre bearing
+error), minus approach rate clipped to +/-2 as a score bonus. These are
+ranking weights, not GPS error estimates. A side-on crossing remains visible
+as a candidate before a turn.
+
+Confirmation requires heading confidence >=0.5, axis error <=60 degrees,
+centre bearing error <=60 degrees (waived within 1 m of the polygon), and at
+least a 3-point lead over the next candidate for 2 continuous seconds. Gaps
+between selection updates over 1 second restart confirmation. Ties or missing
+heading keep candidates visible but do not grant entry. `/crosswalk/guidance`
+reports `방향 확인 중`; the existing LCD continues to use the seven-state status.
+
+At 50 m the policy approaches, at 18 m it may provisionally lock a confirmed
+candidate, and at 7 m it checks the corridor and signal window. Before entry,
+a candidate/direction change or lost confirmation clears the old lock,
+intersection ID, progress history and entry grant **before** signal lookup.
+The new intersection and pedestrian direction are evaluated again; an old
+intersection response cannot authorize the new one. Uncertain selection within
+7 m requests WAIT_AT_CURB (zero policy target). Confirmation can restore the
+usual signal checks. Once crossing has been detected, the selected crossing
+remains locked despite changing candidates or loss of heading. Existing
+crossing-completion and urgent-assistance rules remain in effect.
+
+Diagnostics expose `heading_source`, `heading_confidence`,
+`selection_confirmed`, `selection_margin_m`, `selection_candidate_count`, and
+`entrance_distance_m` alongside the existing GPS and signal fields. These
+changes improve selection logic but do not remove GPS/map position error or
+supply an initial heading while stationary. Runtime defaults keep motor output
+disabled. Field validation still needs actual sensor logs.
 
 ## Configure signal timing
 

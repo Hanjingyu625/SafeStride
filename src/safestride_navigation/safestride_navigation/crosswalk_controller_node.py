@@ -12,13 +12,15 @@ from geometry_msgs.msg import TwistStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from sensor_msgs.msg import NavSatFix, NavSatStatus
+from sensor_msgs.msg import Imu, NavSatFix, NavSatStatus
 from std_msgs.msg import Float32, String
 
 from safestride_interfaces.msg import CrosswalkStatus
 
 from .crossing_policy import CrossingParameters, CrossingStateMachine
 from .crosswalk_guidance import describe_crosswalk
+from .crosswalk_selection import CrosswalkSelector
+from .heading_fusion import HeadingFusion
 from .crosswalk_data import (
     CrosswalkSpatialIndex,
     load_crosswalks,
@@ -88,6 +90,13 @@ class CrosswalkController(Node):
             'gps_timeout_s': 2.0,
             'speed_timeout_s': 1.0,
             'heading_timeout_s': 5.0,
+            'imu_topic': '/terrain/imu',
+            'heading_imu_frame': 'imu_link',
+            'heading_gyro_sign': 1.0,
+            'heading_imu_timeout_s': 0.35,
+            'heading_coast_s': 20.0,
+            'selection_hold_s': 2.0,
+            'selection_margin_m': 3.0,
             'heading_min_move_m': 2.0,
             'heading_max_step_m': 30.0,
             'candidate_heading_tolerance_deg': 60.0,
@@ -243,6 +252,15 @@ class CrosswalkController(Node):
             heading_min_move_m=self._heading_min_move,
             heading_max_step_m=self._heading_max_step,
         )
+        self._heading_fusion = HeadingFusion(
+            self._heading_timeout, self._positive('heading_imu_timeout_s'),
+            self._positive('heading_coast_s'))
+        self._selector = CrosswalkSelector(
+            self._positive('selection_hold_s'), self._positive('selection_margin_m'))
+        self._gyro_sign = float(self.get_parameter('heading_gyro_sign').value)
+        if self._gyro_sign not in (-1.0, 1.0):
+            raise ValueError('heading_gyro_sign must be -1 or 1')
+        self._imu_frame = str(self.get_parameter('heading_imu_frame').value)
         self._gps_speed: Optional[float] = None
         self._gps_speed_time: Optional[float] = None
         self._odom_speed: Optional[float] = None
@@ -339,6 +357,9 @@ class CrosswalkController(Node):
             self._odom_callback,
             10,
         )
+        self.create_subscription(
+            Imu, str(self.get_parameter('imu_topic').value),
+            self._imu_callback, qos_profile_sensor_data)
         self._command_publisher = self.create_publisher(
             TwistStamped,
             str(self.get_parameter('command_topic').value),
@@ -520,8 +541,42 @@ class CrosswalkController(Node):
             allow_gps_speed_fallback=self._allow_gps_speed_fallback,
         )
 
+    def _imu_callback(self, message: Imu) -> None:
+        now = self._now()
+        stamp = message.header.stamp.sec + message.header.stamp.nanosec * 1e-9
+        q = message.orientation
+        values = (q.x, q.y, q.z, q.w, message.angular_velocity.y,
+                  message.angular_velocity.z, stamp)
+        if (message.header.frame_id != self._imu_frame
+                or message.angular_velocity_covariance[0] < 0
+                or message.orientation_covariance[0] < 0
+                or not all(math.isfinite(v) for v in values)
+                or not -1e-6 <= now - stamp <= self._heading_fusion.imu_timeout_s
+                or abs(sum(v * v for v in values[:4]) - 1.0) > 0.05):
+            self._heading_fusion.invalidate_imu()
+            return
+        # Bridge orientation has gravity roll/pitch and deliberately no yaw.
+        roll = math.atan2(2 * (q.w * q.x + q.y * q.z),
+                          1 - 2 * (q.x * q.x + q.y * q.y))
+        pitch = math.asin(max(-1.0, min(1.0, 2 * (q.w * q.y - q.z * q.x))))
+        if abs(pitch) > math.radians(45) or abs(roll) > math.radians(45):
+            self._heading_fusion.invalidate_imu()
+            return
+        yaw_rate = (math.sin(roll) * message.angular_velocity.y
+                    + math.cos(roll) * message.angular_velocity.z) / math.cos(pitch)
+        stationary = (self._fresh(now, self._odom_time, self._speed_timeout)
+                      and self._odom_speed is not None
+                      and self._odom_speed < self._wheel_motion_min_speed
+                      and not self._wheel_motion_active(now))
+        self._heading_fusion.gyro(self._gyro_sign * yaw_rate, stamp, stationary)
+
     def _heading(self, now: float) -> Optional[float]:
-        return self._gps_motion.heading(now, self._heading_timeout)
+        # Expire discontinuous IMU history before accepting a new GPS anchor.
+        self._heading_fusion.heading(now)
+        self._heading_fusion.gps(
+            self._gps_motion.heading(now, self._heading_timeout),
+            self._gps_motion.heading_time, now)
+        return self._heading_fusion.heading(now)
 
     def _consume_signal_future(self, now: float) -> None:
         future = self._signal_future
@@ -809,7 +864,7 @@ class CrosswalkController(Node):
                 value='%.1f' % heading if heading is not None else 'nan',
             ),
             KeyValue(
-                key='heading_source', value=self._gps_motion.heading_source
+                key='heading_source', value=self._heading_fusion.source
             ),
             KeyValue(
                 key='crosswalk_index',
@@ -902,6 +957,11 @@ class CrosswalkController(Node):
                 (self._signal_cache or {}).get('trsmUtcTime', ''))),
             KeyValue(key='signal_cache_age_s', value=str(
                 now - self._signal_cache_time if self._signal_cache_time is not None else math.inf)),
+            KeyValue(key='heading_confidence', value=str(self._heading_fusion.confidence)),
+            KeyValue(key='selection_confirmed', value=str((active or {}).get('selection_confirmed', False))),
+            KeyValue(key='selection_margin_m', value=str((active or {}).get('selection_margin_m', math.nan))),
+            KeyValue(key='selection_candidate_count', value=str((active or {}).get('selection_candidate_count', 0))),
+            KeyValue(key='entrance_distance_m', value=str((active or {}).get('entrance_distance_m', math.nan))),
             KeyValue(key='crosswalk_length_m', value=str((active or {}).get('length_m', math.nan))),
             KeyValue(key='crosswalk_lateral_error_m', value=str((active or {}).get('lateral_error_m', math.nan))),
             KeyValue(
@@ -981,12 +1041,14 @@ class CrosswalkController(Node):
             assert self._fix is not None
             latitude, longitude = self._fix
             candidate = (
-                self._crosswalk_index.nearest(
-                    latitude,
-                    longitude,
+                self._selector.select(
+                    self._crosswalk_index.candidates(
+                        latitude, longitude, self._maximum_crosswalk_distance),
+                    latitude, longitude, now,
                     maximum_distance_m=self._maximum_crosswalk_distance,
                     heading_deg=heading,
-                    maximum_heading_error_deg=self._heading_tolerance,
+                    heading_confidence=self._heading_fusion.confidence,
+                    heading_tolerance_deg=self._heading_tolerance,
                 )
                 if self._crosswalk_index is not None
                 else None
@@ -1056,9 +1118,12 @@ class CrosswalkController(Node):
                     not in ('WAIT_AT_CURB', 'ENTRY_ALLOWED', 'CROSSING_URGENT')
                 ),
             )
-            if self._controller.state == 'WAIT_AT_CURB' and signal_reason == 'red pedestrian signal':
+            if (self._controller.state == 'WAIT_AT_CURB'
+                    and self._controller.reason != 'crosswalk direction or selection uncertain'
+                    and signal_reason == 'red pedestrian signal'):
                 self._controller.reason = 'wait; pedestrian signal is red'
         else:
+            self._selector.reset()
             if self._controller.state in ('CROSSING', 'CROSSING_URGENT'):
                 self._controller.set_state(
                     'CROSSING_URGENT', 'continue crossing; GPS unavailable or stale')

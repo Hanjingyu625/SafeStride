@@ -108,6 +108,25 @@ class CrossingStateMachine:
         latitude: float,
         longitude: float,
     ) -> Optional[Dict[str, Any]]:
+        if self.state not in ('CROSSING', 'CROSSING_URGENT', 'EXITING'):
+            if self.locked_crosswalk is not None:
+                locked = self.locked_crosswalk
+                changed = candidate is None or any(
+                    candidate.get(key) != locked.get(key)
+                    for key in ('index', 'crossing_direction', 'signal_direction'))
+                if changed or not candidate.get('selection_confirmed', True):
+                    # This runs before signal lookup as well as policy update.
+                    # Never carry an old intersection/entry grant to a new choice.
+                    self.reset('crosswalk selection changed or uncertain')
+                elif candidate is not None:
+                    # Keep pre-entry diagnostic scores current while retaining
+                    # the same geometric crossing and intersection lock.
+                    for key in ('selection_confirmed', 'selection_margin_m',
+                                'selection_candidate_count', 'entrance_distance_m',
+                                'heading_confidence', 'heading_deg',
+                                'heading_error_deg', 'axis_alignment_error_deg'):
+                        if key in candidate:
+                            locked[key] = candidate[key]
         if self.locked_crosswalk is not None:
             return evaluate_locked_crosswalk(
                 self.locked_crosswalk,
@@ -198,6 +217,10 @@ class CrossingStateMachine:
             self.reset('no crosswalk candidate')
             return None, None, None
 
+        if (self.state in ('WAIT_AT_CURB', 'ENTRY_ALLOWED')
+                and self.locked_crosswalk is None):
+            self.set_state('APPROACHING', 'rechecking crosswalk selection')
+
         in_corridor = (
             active.get('lateral_error_m', 0.0)
             <= self.parameters.maximum_lateral_error_m
@@ -229,6 +252,7 @@ class CrossingStateMachine:
             if (
                 self.locked_crosswalk is None
                 and active['edge_distance_m'] <= self.parameters.lock_distance_m
+                and active.get('selection_confirmed', True)
             ):
                 selected_id = str(
                     active.get('intersection_id') or intersection_id or ''
@@ -236,6 +260,14 @@ class CrossingStateMachine:
                 self.lock(active, selected_id)
                 active = self.current_crosswalk(candidate, latitude, longitude)
                 assert active is not None
+                in_corridor = (active['lateral_error_m']
+                               <= self.parameters.maximum_lateral_error_m)
+            if not active.get('selection_confirmed', True):
+                if active['edge_distance_m'] <= self.parameters.curb_zone_m:
+                    self.set_state('WAIT_AT_CURB', 'crosswalk direction or selection uncertain')
+                else:
+                    self.reason = 'crosswalk direction or selection uncertain'
+                return active, required_entry_time, None
             if active['edge_distance_m'] <= self.parameters.curb_zone_m and in_corridor:
                 if (
                     signal_valid

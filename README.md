@@ -30,7 +30,11 @@ Raspberry Pi: BE-220 GPS + serial bridges -> safety supervisor -> diagnostics/Fo
   낮아진 바닥을 구분한다. 확정 시 모터 명령을 즉시 0으로 만들고 MCU
   watchdog이 재활성화 전까지 정지 상태를 유지한다.
 - MPU6050은 3축 가속도·자이로와 중력 기반 roll/pitch를 발행한다. 지자기센서가
-  없으므로 yaw는 관측하지 않는다. 5도 이상 pitch가 0.5초 지속되면 경사로
+  없으므로 IMU 자체의 절대 yaw는 관측하지 않는다. 횡단보도 노드는 이동 중 GPS로
+  방향 기준을 잡은 뒤 자이로로 회전을 추적한다. 최초 방향은 GPS 이동이 필요하며,
+  방향·후보가 불확실하면 진입 허가 없이 `방향 확인 중`으로 안내한다.
+  상세 조건은 [횡단보도 설명](docs/CROSSWALK.md)을 참조한다.
+  5도 이상 pitch가 0.5초 지속되면 경사로
   확정해 내리막은 연속 감속하고 오르막은 목표속도를 유지하며 PWM을 보조한다.
   평지 기준 PWM 60 + 경사 FF + Hall P 제어이며 Hall 대기시간은 5초다.
   장착 부호는 `uphill_pitch_sign`으로 반전한다. 급내리막·MPU 오류는 BRAKE를

@@ -264,7 +264,14 @@ crosswalk_controller:
     heading_timeout_s: 5.0  # 진행방향 입력 허용 나이(초)
     heading_min_move_m: 2.0  # 위치 변화로 방향을 계산하는 최소 이동거리(m)
     heading_max_step_m: 30.0  # 방향 추정에서 허용할 최대 위치 변화(m). 큰 GPS 점프 제외
-    candidate_heading_tolerance_deg: 60.0  # 횡단보도 후보와 진행방향의 허용 각도 차이(도)
+    candidate_heading_tolerance_deg: 60.0  # 후보 삭제가 아닌 선택 확정 시 방향 오차 상한(도)
+    imu_topic: /terrain/imu  # GPS로 잡은 절대방향에 자이로 회전량을 반영
+    heading_imu_frame: imu_link  # 수평 장착 IMU 프레임; roll/pitch로 yaw rate 보정
+    heading_gyro_sign: 1.0  # ROS 양의 yaw=반시계. 실제 장착 반전 시 -1 (현장 회전 확인)
+    heading_imu_timeout_s: 0.35  # IMU 단절 시 방향 무효화; 새로운 GPS 방향으로 재설정
+    heading_coast_s: 20.0  # GPS 기준 이후 연속 IMU만으로 방향을 유지하는 최대 시간(초)
+    selection_hold_s: 2.0  # 방향·후보 점수차 조건이 연속 유지돼야 선택 확정
+    selection_margin_m: 3.0  # 1·2순위 종합 점수의 최소 차이(m 환산 점수; 실측거리 아님)
     gps_change_threshold_m: 0.5  # GPS 위치가 갱신됐다고 인정하는 거리 변화(m)
     gps_stuck_timeout_s: 5.0  # 움직임이 있는데 좌표가 변하지 않으면 GPS 정체로 판단하는 시간(초)
     gps_stuck_speed_mps: 0.15  # GPS 좌표 정체 검사에 사용하는 이동속도 기준(m/s)

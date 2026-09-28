@@ -11,6 +11,9 @@ def describe_crosswalk(state, reason, gps_valid, signal_valid):
         complete = state == 'EXITING' or reason == 'crossing completed'
         return {'state': '안내 없음',
                 'reason': '횡단 완료' if complete else '선택된 횡단보도 없음'}
+    if reason == 'crosswalk direction or selection uncertain':
+        return {'state': '방향 확인 중',
+                'reason': '주변 횡단보도 있음; 방향과 횡단보도 선택 확인 중'}
     if not signal_valid:
         return {'state': '신호 없음',
                 'reason': '신호정보 수신 불가; 횡단 중 실제 신호 직접 확인' if crossing

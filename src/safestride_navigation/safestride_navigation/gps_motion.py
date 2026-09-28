@@ -151,6 +151,10 @@ class GpsMotionTracker:
         self._heading_time = now
         self.heading_source = 'rmc_course'
 
+    @property
+    def heading_time(self):
+        return self._heading_time
+
     def heading(self, now: float, timeout_s: float) -> Optional[float]:
         if (
             self._heading_time is not None

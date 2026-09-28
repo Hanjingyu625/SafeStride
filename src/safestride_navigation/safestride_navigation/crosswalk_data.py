@@ -381,6 +381,10 @@ class CrosswalkSpatialIndex:
                 )
         return result
 
+    def candidates(self, latitude, longitude, maximum_distance_m):
+        """Nearby records for temporal ranking; exact edge cutoff is downstream."""
+        return self._nearby(latitude, longitude, maximum_distance_m)
+
     def nearest(
         self,
         latitude: float,
