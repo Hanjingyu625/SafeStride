@@ -292,6 +292,7 @@ def nearest_crosswalk(
             'crossing_bearing_deg': crossing_bearing,
             'crossing_direction': bearing_to_direction(crossing_bearing),
             'signal_bearing_deg': signal_bearing,
+            'signal_direction_source': 'crosswalk_data' if best.get('signal_direction') else 'walking_axis_inferred',
             'signal_direction': (
                 best.get('signal_direction') or bearing_to_direction(signal_bearing)
             ),

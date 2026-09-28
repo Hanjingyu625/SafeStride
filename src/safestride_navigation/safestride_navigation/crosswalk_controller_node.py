@@ -39,6 +39,7 @@ from .signal_logic import (
     evaluate_pedestrian_signal,
     newer_signal_record,
     request_signal_bundle,
+    SignalApiClient,
 )
 from .speed_profile import UserSpeedProfile
 
@@ -263,6 +264,7 @@ class CrosswalkController(Node):
         self._phase_cache = None
         self._signal_cache_time: Optional[float] = None
         self._last_signal_request = -math.inf
+        self._signal_client = SignalApiClient()
         self._last_signal_request_key = None
         self._signal_error = ''
         self._last_diagnostic = -math.inf
@@ -544,7 +546,7 @@ class CrosswalkController(Node):
             self._signal_cache_time = self._last_signal_request
             self._signal_error = '; '.join(
                 name + ': ' + result[name + '_error']
-                for name in ('timing', 'phase') if result.get(name + '_error'))
+                for name in ('combined', 'timing', 'phase') if result.get(name + '_error'))
         except Exception as error:
             self._signal_error = str(error)
 
@@ -603,8 +605,7 @@ class CrosswalkController(Node):
             not self._api_key
             or not intersection_id
             or self._signal_future is not None
-            or (request_key == self._last_signal_request_key
-                and now - self._last_signal_request < self._signal_refresh)
+            or now - self._last_signal_request < self._signal_refresh
         ):
             return
         self._last_signal_request = now
@@ -619,6 +620,7 @@ class CrosswalkController(Node):
             combined_url=self._combined_url,
             timeout_s=self._signal_request_timeout,
             direction=direction,
+            client=self._signal_client,
         )
 
     def _signal_state(
@@ -673,6 +675,7 @@ class CrosswalkController(Node):
         target_speed_mps: float,
         intersection_id: str,
         intersection_name: str,
+        signal_reason: str,
     ) -> None:
         status = CrosswalkStatus()
         status.header.stamp = self.get_clock().now().to_msg()
@@ -705,6 +708,14 @@ class CrosswalkController(Node):
         guidance = describe_crosswalk(
             self._controller.state, status.reason, gps_valid, signal_valid,
         )
+        guidance.update({
+            'signal_reason': signal_reason,
+            'intersection_id': intersection_id,
+            'crosswalk_index': int(active['index']) if active else None,
+            'signal_direction': str(active.get('signal_direction', '')) if active else '',
+            'signal_direction_source': str(active.get('signal_direction_source', 'unknown')) if active else '',
+            'signal_valid': signal_valid,
+        })
         self._guidance_publisher.publish(
             String(data=json.dumps(guidance, ensure_ascii=False)),
         )
@@ -1110,6 +1121,7 @@ class CrosswalkController(Node):
             target_speed_mps=desired_speed,
             intersection_id=intersection_id,
             intersection_name=intersection_name,
+            signal_reason=signal_reason,
         )
         self._publish_diagnostic(
             now,

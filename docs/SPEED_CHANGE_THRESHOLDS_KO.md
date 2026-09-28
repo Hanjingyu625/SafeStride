@@ -2,7 +2,20 @@
 
 ## 횡단보도 신호 및 판정 보정
 
-2026-09-22 횡단보도 수정 반영: 허용 녹색 현시에
+2026-09-28 신호 조회 수정: 기본 조회는 `v2xSignalPhaseTimingCurrentInfo`와
+`v2xSignalPhaseCurrentInfo`이며 기존 두 historical URL 설정도 이 주소로 변환한다.
+통합 API 우선 조회는 기본 비활성화하고 명시적으로 설정한 경우에만 사용한다.
+교차로/방향이 바뀌어도 기본 3초 조회 간격을 우회하지 않는다.
+HTTP 429는 Retry-After를 따르고, 헤더가 없으면 300초 대기한다.
+401/403/404도 300초, 통신 오류는 5초 후 재시도한다. 대기는 endpoint 단위이며
+다른 교차로를 선택해도 해제하지 않는다. 신호의 12초 유효기간은 늘리지 않았다.
+이 변경은 통신 실패를 정상 신호로 바꾸지 않으며 모터 속도/상한은 변경하지 않는다.
+`/crosswalk/guidance`에 signal_reason, intersection_id, crosswalk_index,
+signal_direction, signal_direction_source, signal_valid를 추가했다.
+`walking_axis_inferred`는 진행 방향에서 추정한 값으로 실제 신호등 매칭 확인을 뜻하지 않는다.
+기존 교차로 근접 매칭 및 방향 추정은 아직 현장 검증이 필요하다.
+
+이전 2026-09-22 횡단보도 수정: 허용 녹색 현시에
 `permissive-Movement-Allowed`를 포함하고 현시·잔여시간 통합 조회를 우선한다.
 진입 허가는 기존 시간 조건을 충족한 `ENTRY_ALLOWED`에서만 참이다.
 이미 횡단 중인 `CROSSING_URGENT`의 보조는 유지되지만 새 진입 허가를 뜻하지 않는다.
