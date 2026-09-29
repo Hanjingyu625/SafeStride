@@ -12,6 +12,8 @@ def _describe_crosswalk(state, reason, gps_valid, signal_valid, signal_reason):
         return {'state': '안내 없음',
                 'reason': '횡단 완료' if complete else '선택된 횡단보도 없음'}
     if not signal_valid:
+        if 'outside signal lookup range' in signal_reason:
+            return {'state': '안내 없음', 'reason': '횡단보도 접근 중; 20m 안에서 신호 확인 시작'}
         if '429' in signal_reason or 'quota' in signal_reason:
             return {'state': '신호 없음', 'reason': '신호 API 호출 한도 소진; 재시도 대기 중'}
         if 'disagree' in signal_reason or 'mapping' in signal_reason or 'geometry' in signal_reason:

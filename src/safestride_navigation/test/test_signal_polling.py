@@ -5,7 +5,9 @@ from types import SimpleNamespace
 from typing import Optional, Tuple
 from unittest.mock import Mock
 
-from safestride_navigation.signal_logic import evaluate_crosswalk_signal
+from safestride_navigation.signal_logic import (
+    evaluate_crosswalk_signal, timing_required_for_phase,
+)
 
 
 def node():
@@ -15,7 +17,8 @@ def node():
     methods = [n for n in cls.body if isinstance(n, ast.FunctionDef)
                and n.name in ('_signal_state', '_request_signal_if_due')]
     scope = dict(Optional=Optional, Tuple=Tuple, request_signal_bundle=Mock(),
-                 evaluate_crosswalk_signal=evaluate_crosswalk_signal)
+                 evaluate_crosswalk_signal=evaluate_crosswalk_signal,
+                 timing_required_for_phase=timing_required_for_phase)
     exec(compile(ast.Module(body=methods, type_ignores=[]), str(path), 'exec'), scope)
     n = SimpleNamespace(_api_key='test', _signal_future=None,
         _last_signal_request=1000, _last_signal_request_key=('42', 'nt'),
@@ -40,6 +43,7 @@ def test_candidate_changes_do_not_bypass_poll_interval():
         n._request_signal_if_due(identifier, 1001, direction)
         assert n._signal_future_id == identifier
         assert n._executor.submit.call_args.kwargs['direction'] == direction
+        assert not n._executor.submit.call_args.kwargs['timing_required']
         assert n._executor.submit.call_args.kwargs['client'] is n._signal_client
 
 
@@ -90,3 +94,22 @@ def test_endpoint_quota_error_remains_visible_after_candidate_switch():
     assert not result[1]
     assert '429' in result[2]
     n._executor.submit.assert_not_called()
+
+
+def test_green_phase_requests_countdown_but_red_phase_does_not():
+    for phase, expected in (
+        ('stop-And-Remain', False),
+        ('permissive-Movement-Allowed', True),
+    ):
+        n = node()
+        n._phase_cache = {'ntPdsgStatNm': phase}
+        n._request_signal_if_due('42', 1001, 'nt', ['nt'])
+        assert n._executor.submit.call_args.kwargs['timing_required'] is expected
+
+
+def test_phase_from_previous_intersection_never_triggers_countdown_request():
+    n = node()
+    n._phase_cache = {'ntPdsgStatNm': 'permissive-Movement-Allowed'}
+    n._signal_cache_id = 'old-intersection'
+    n._request_signal_if_due('new-intersection', 1001, 'nt', ['nt'])
+    assert not n._executor.submit.call_args.kwargs['timing_required']

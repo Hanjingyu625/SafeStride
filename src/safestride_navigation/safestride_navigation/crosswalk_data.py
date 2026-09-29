@@ -151,10 +151,12 @@ def angular_difference_deg(first: float, second: float) -> float:
 
 
 def resolve_signal_direction(crosswalk, intersection, intersection_id):
-    """Infer an intersection arm, never a signal colour, from static geometry.
+    """Infer the official pedestrian signal group from static geometry.
 
-    The arm convention still needs field validation. Explicit surveyed mappings
-    take precedence; uncertain geometry must not fall back to walking direction.
+    Seoul assigns a crosswalk to the straight-moving vehicle approach that has
+    the crosswalk on its right. For example, a west-side crosswalk belongs to
+    the north approach (``ntPdsg*``), not the west approach. Explicit surveyed
+    mappings take precedence; uncertain geometry remains unresolved.
     """
     result = dict(crosswalk)
     source = result.get('signal_direction_source', 'crosswalk_data')
@@ -168,11 +170,12 @@ def resolve_signal_direction(crosswalk, intersection, intersection_id):
     result['signal_direction_candidates'] = []
     if not intersection or str(intersection.get('intersection_id', '')) != str(intersection_id):
         return result
-    # When the intersection centre cannot distinguish the two arms, retain
-    # both possibilities. Only matching live phases can support a decision.
-    axis_normal = (float(crosswalk['axis_bearing_deg']) + 90.0) % 180.0
+    # A crosswalk's long axis is parallel to the associated vehicle approach.
+    # Without a reliable side-of-intersection vector, both opposing approaches
+    # remain possible and live phase consensus is the only safe fallback.
+    crossing_axis = float(crosswalk['axis_bearing_deg']) % 180.0
     candidates = [direction for i, direction in enumerate(directions)
-                  if undirected_axis_difference_deg(i * 45.0, axis_normal) <= 22.5]
+                  if undirected_axis_difference_deg(i * 45.0, crossing_axis) <= 22.5]
     result['signal_direction_candidates'] = candidates
     distance = haversine_m(intersection['latitude'], intersection['longitude'],
                            crosswalk['latitude'], crosswalk['longitude'])
@@ -181,19 +184,26 @@ def resolve_signal_direction(crosswalk, intersection, intersection_id):
         return result
     radial = bearing_deg(intersection['latitude'], intersection['longitude'],
                          crosswalk['latitude'], crosswalk['longitude'])
-    normal = (float(crosswalk['axis_bearing_deg']) + 90.0) % 360.0
-    if angular_difference_deg(radial, normal) > 90.0:
-        normal = (normal + 180.0) % 360.0
-    error = angular_difference_deg(radial, normal)
-    sector = round(normal / 45.0) * 45.0
-    if error > 30.0 or angular_difference_deg(normal, sector) > 17.5:
+    signal_bearing = (radial + 90.0) % 360.0
+    axis_error = undirected_axis_difference_deg(
+        signal_bearing,
+        float(crosswalk['axis_bearing_deg']),
+    )
+    sector = round(signal_bearing / 45.0) * 45.0
+    axis_sector = round(crossing_axis / 45.0) * 45.0
+    if (
+        axis_error > 30.0
+        or angular_difference_deg(signal_bearing, sector) > 17.5
+        or angular_difference_deg(crossing_axis, axis_sector) > 17.5
+    ):
         result['signal_mapping_reason'] = 'ambiguous intersection arm geometry'
         return result
-    result.update(signal_direction=bearing_to_direction(normal),
-                  signal_direction_candidates=[bearing_to_direction(normal)],
-                  signal_bearing_deg=normal,
+    direction = bearing_to_direction(signal_bearing)
+    result.update(signal_direction=direction,
+                  signal_direction_candidates=[direction],
+                  signal_bearing_deg=signal_bearing,
                   signal_direction_source='intersection_arm_inferred',
-                  signal_mapping_reason='arm inferred from intersection centre and crosswalk axis')
+                  signal_mapping_reason='official right-side pedestrian signal group inferred from geometry')
     return result
 
 
@@ -330,7 +340,7 @@ def nearest_crosswalk(
         <= angular_difference_deg(orientation_reference, axis_b)
         else axis_b
     )
-    signal_bearing = (crossing_bearing + 90.0) % 360.0
+    signal_bearing = crossing_bearing
     output.update(
         {
             'target_bearing_deg': best_target_bearing,
@@ -339,7 +349,7 @@ def nearest_crosswalk(
             'crossing_bearing_deg': crossing_bearing,
             'crossing_direction': bearing_to_direction(crossing_bearing),
             'signal_bearing_deg': signal_bearing,
-            'signal_direction_source': 'crosswalk_data' if best.get('signal_direction') else 'walking_axis_inferred',
+            'signal_direction_source': 'crosswalk_data' if best.get('signal_direction') else 'walking_axis_candidate',
             'signal_direction': (
                 best.get('signal_direction') or bearing_to_direction(signal_bearing)
             ),
