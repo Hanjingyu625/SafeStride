@@ -316,17 +316,38 @@ def evaluate_pedestrian_signal(timing, phase, direction, now, max_age_s=12.0):
 
 
 def evaluate_crosswalk_signal(timing, phase, directions, now, max_age_s=12.0):
-    """An unresolved arm requires agreement of every geometrically plausible head."""
-    if not directions:
+    """Evaluate only the mapped head; other heads never veto this crosswalk."""
+    if len(directions) != 1:
         return None, False, 'crosswalk signal mapping unavailable'
-    results = [evaluate_pedestrian_signal(timing, phase, direction, now, max_age_s)
-               for direction in directions]
-    for direction, (_, valid, reason) in zip(directions, results):
-        if not valid:
-            return None, False, 'signal head %s: %s' % (direction, reason)
-    if len({reason for _, _, reason in results}) != 1:
-        return None, False, 'ambiguous signal heads disagree; cannot determine this crosswalk signal'
-    return min(value for value, _, _ in results), True, results[0][2]
+    return evaluate_pedestrian_signal(timing, phase, directions[0], now, max_age_s)
+
+
+def cached_signal_window(timing, phase, directions, received_at, now, max_age_s=12.0):
+    """Use a fresh-at-receipt snapshot only until its reported phase end."""
+    if received_at is None or now < received_at or len(directions) != 1:
+        return None
+    _, valid, reason = evaluate_crosswalk_signal(
+        timing, phase, directions, received_at, max_age_s)
+    if not valid or not timing or not phase:
+        return None
+    try:
+        stamp = float(timing['trsmUtcTime']) / 1000.0
+        phase_stamp = float(phase['trsmUtcTime']) / 1000.0
+        duration = _valid_signal(timing.get(directions[0] + 'PdsgRmdrCs'))
+        if (duration is None or str(timing.get('itstId')) != str(phase.get('itstId'))
+                or not -1.0 <= received_at - stamp <= max_age_s
+                or abs(stamp - phase_stamp) > 3.0):
+            return None
+        deadline = stamp + duration
+        if not math.isfinite(deadline):
+            return None
+        if now >= deadline:
+            return (None, False, 'signal countdown expired; awaiting new phase')
+        # Red time is a poll deadline, never time available for crossing.
+        return (0.0 if reason == 'red pedestrian signal' else deadline - now,
+                True, reason)
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return None
 
 
 def signal_lookup_active(crosswalk, maximum_distance_m):

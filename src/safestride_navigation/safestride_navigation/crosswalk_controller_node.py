@@ -43,9 +43,9 @@ from .signal_logic import (
     request_signal_bundle,
     SignalApiClient,
     evaluate_crosswalk_signal,
+    cached_signal_window,
     load_signal_api_key,
     signal_lookup_active,
-    timing_required_for_phase,
 )
 from .speed_profile import UserSpeedProfile
 
@@ -609,7 +609,7 @@ class CrosswalkController(Node):
                 if record is not None and newer_signal_record(record, getattr(self, attribute)):
                     setattr(self, attribute, record)
             self._signal_cache_id = requested_id
-            self._signal_cache_time = self._last_signal_request
+            self._signal_cache_time = now
             self._signal_error = '; '.join(
                 name + ': ' + result[name + '_error']
                 for name in ('combined', 'timing', 'phase') if result.get(name + '_error'))
@@ -667,12 +667,13 @@ class CrosswalkController(Node):
     def _request_signal_if_due(self, intersection_id: str, now: float,
                                direction: str, directions=None) -> None:
         directions = directions or ([direction] if direction else [])
-        cached_phase = (
-            self._phase_cache
-            if self._signal_cache_id == intersection_id
-            else None
-        )
-        timing_required = timing_required_for_phase(cached_phase, directions)
+        if self._signal_cache_id == intersection_id:
+            window = cached_signal_window(
+                self._signal_cache, self._phase_cache, directions,
+                self._signal_cache_time, now, self._signal_cache_max_age)
+            if window is not None and window[1]:
+                return
+        timing_required = True
         request_key = (intersection_id, tuple(directions), timing_required)
         if (
             not self._api_key
@@ -714,6 +715,11 @@ class CrosswalkController(Node):
         if self._signal_cache_id != intersection_id:
             return None, False, (self._signal_client.wait_reason((self._signal_url, self._phase_url))
                                  or 'awaiting signal for intersection ' + intersection_id)
+        window = cached_signal_window(
+            self._signal_cache, self._phase_cache, directions or [direction],
+            self._signal_cache_time, now, self._signal_cache_max_age)
+        if window is not None:
+            return window
         if (
             self._phase_cache is None
             or not self._fresh(
@@ -1171,13 +1177,6 @@ class CrosswalkController(Node):
                         self._signal_activation_distance)
                 if not preview['signal_direction'] and not signal_valid:
                     signal_reason = preview['signal_mapping_reason'] + '; ' + signal_reason
-                elif not preview['signal_direction'] and signal_valid:
-                    consensus = dict(signal_direction_source='axis_heads_consensus',
-                                     signal_mapping_reason='all plausible signal heads agree')
-                    if candidate is not None and candidate['index'] == preview['index']:
-                        candidate.update(consensus)
-                    if self._controller.locked_crosswalk is not None:
-                        self._controller.locked_crosswalk.update(consensus)
             else:
                 signal_reason = self._approach_selector.reason
             safe_speed = self._profile.safe_speed()

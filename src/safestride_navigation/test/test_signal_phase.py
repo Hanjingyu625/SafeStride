@@ -187,12 +187,13 @@ class AmbiguousArmTests(unittest.TestCase):
         timing = dict(itstId='2620', trsmUtcTime=1000000, ntPdsgRmdrCs=260, stPdsgRmdrCs=240)
         phase = dict(itstId='2620', trsmUtcTime=1000000,
                      ntPdsgStatNm='permissive-Movement-Allowed', stPdsgStatNm='permissive-Movement-Allowed')
-        self.assertEqual(evaluate_crosswalk_signal(timing, phase, ['nt', 'st'], 1001),
-                         (23, True, 'green pedestrian signal'))
+        self.assertFalse(evaluate_crosswalk_signal(timing, phase, ['nt', 'st'], 1001)[1])
         phase['stPdsgStatNm'] = 'stop-And-Remain'
+        self.assertEqual(evaluate_crosswalk_signal(timing, phase, ['nt'], 1001),
+                         (25, True, 'green pedestrian signal'))
         self.assertFalse(evaluate_crosswalk_signal(timing, phase, ['nt', 'st'], 1001)[1])
         phase['ntPdsgStatNm'] = 'stop-And-Remain'
-        self.assertEqual(evaluate_crosswalk_signal(None, phase, ['nt', 'st'], 1001),
+        self.assertEqual(evaluate_crosswalk_signal(None, phase, ['nt'], 1001),
                          (0, True, 'red pedestrian signal'))
         phase['stPdsgStatNm'] = None
         self.assertFalse(evaluate_crosswalk_signal(timing, phase, ['nt', 'st'], 1001)[1])
