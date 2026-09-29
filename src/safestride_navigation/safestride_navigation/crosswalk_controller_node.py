@@ -18,6 +18,7 @@ from std_msgs.msg import Float32, String
 from safestride_interfaces.msg import CrosswalkStatus
 
 from .crossing_policy import CrossingParameters, CrossingStateMachine
+from .approach_selector import ApproachSelector
 from .crosswalk_guidance import describe_crosswalk
 from .crosswalk_data import (
     CrosswalkSpatialIndex,
@@ -247,6 +248,7 @@ class CrosswalkController(Node):
         )
         self._fix: Optional[Tuple[float, float]] = None
         self._fix_time: Optional[float] = None
+        self._approach_selector = ApproachSelector()
         self._gps_motion = GpsMotionTracker(
             change_threshold_m=self._gps_change_threshold,
             heading_min_move_m=self._heading_min_move,
@@ -886,10 +888,11 @@ class CrosswalkController(Node):
             ),
             KeyValue(
                 key='search_candidate_count',
-                value=str(active.get('search_candidate_count', 0))
-                if active
-                else '0',
+                value=str(self._approach_selector.candidate_count),
             ),
+            KeyValue(key='candidate_selection_reason', value=self._approach_selector.reason),
+            KeyValue(key='candidate_approach_gain_m',
+                     value=str(active.get('approach_gain_m', 0.0)) if active else '0.0'),
             KeyValue(key='map_ready', value=str(self._map_ready).lower()),
             KeyValue(key='api_ready', value=str(self._api_ready).lower()),
             KeyValue(
@@ -1013,14 +1016,15 @@ class CrosswalkController(Node):
             assert self._fix is not None
             latitude, longitude = self._fix
             candidate = (
-                self._crosswalk_index.nearest(
+                self._approach_selector.select(
+                    self._crosswalk_index,
                     latitude,
                     longitude,
+                    self._fix_time,
                     maximum_distance_m=self._maximum_crosswalk_distance,
                     heading_deg=heading,
-                    maximum_heading_error_deg=self._heading_tolerance,
                 )
-                if self._crosswalk_index is not None and heading is not None
+                if self._crosswalk_index is not None
                 else None
             )
             self._controller.reconsider_candidate(candidate, latitude, longitude, heading)
@@ -1075,8 +1079,8 @@ class CrosswalkController(Node):
                 if not preview['signal_direction']:
                     signal_valid = False
                     signal_reason = preview['signal_mapping_reason'] + '; ' + signal_reason
-            elif heading is None:
-                signal_reason = 'waiting for reliable GPS travel direction'
+            else:
+                signal_reason = self._approach_selector.reason
             safe_speed = self._profile.safe_speed()
             active, required_entry_s, crossing_eta_s = self._controller.update(
                 candidate=candidate,
@@ -1105,6 +1109,7 @@ class CrosswalkController(Node):
             if self._controller.state == 'WAIT_AT_CURB' and signal_reason == 'red pedestrian signal':
                 self._controller.reason = 'wait; pedestrian signal is red'
         else:
+            self._approach_selector.reset()
             if self._controller.state in ('CROSSING', 'CROSSING_URGENT'):
                 self._controller.set_state(
                     'CROSSING_URGENT', 'continue crossing; GPS unavailable or stale')

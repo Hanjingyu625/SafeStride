@@ -122,7 +122,8 @@ class CrossingStateMachine:
 
     def reconsider_candidate(self, candidate, latitude, longitude, heading):
         """Release a pre-entry lock only after a persistently better match."""
-        if (self.locked_crosswalk is None or heading is None or candidate is None
+        if (self.locked_crosswalk is None or candidate is None
+                or (heading is None and not candidate.get('approach_confirmed', False))
                 or self.state not in ('APPROACHING', 'WAIT_AT_CURB', 'ENTRY_ALLOWED')):
             self._replacement = self._replacement_since = None
             return
@@ -133,7 +134,10 @@ class CrossingStateMachine:
         different = candidate['index'] != old['index']
         better = (old['edge_distance_m'] - candidate['edge_distance_m']
                   >= self.parameters.candidate_switch_advantage_m
-                  or undirected_axis_difference_deg(heading, old['axis_bearing_deg']) > 60.0)
+                  or (candidate.get('approach_confirmed', False)
+                      and candidate.get('approach_gain_m', 0.0) >= 2.0)
+                  or (heading is not None
+                      and undirected_axis_difference_deg(heading, old['axis_bearing_deg']) > 60.0))
         if not (before_entry and different and better):
             self._replacement = self._replacement_since = None
             return

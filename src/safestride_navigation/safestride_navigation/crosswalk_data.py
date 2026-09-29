@@ -421,6 +421,10 @@ class CrosswalkSpatialIndex:
                 )
         return result
 
+    def nearby(self, latitude, longitude, maximum_distance_m):
+        """Return spatially nearby records for temporal candidate ranking."""
+        return self._nearby(latitude, longitude, maximum_distance_m)
+
     def nearest(
         self,
         latitude: float,
