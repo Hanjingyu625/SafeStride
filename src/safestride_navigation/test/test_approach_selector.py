@@ -143,10 +143,12 @@ def test_heading_selects_ahead_instead_of_closer_behind_and_falls_back_when_lost
     assert selected['selection_source'] == 'nearest_distance'
 
 
-def test_valid_heading_without_aligned_crossing_does_not_choose_sideways():
+def test_valid_heading_without_aligned_crossing_falls_back_to_distance():
     selector = ApproachSelector()
     index = CrosswalkSpatialIndex([crossing()])
-    assert selector.select(index, 0, 0, 1, maximum_distance_m=80, heading_deg=90) is None
+    selected = selector.select(index, 0, 0, 1, maximum_distance_m=80, heading_deg=90)
+    assert selected['index'] == 1
+    assert selected['selection_source'] == 'nearest_distance'
     assert selector.select(index, 0, 0, 1, maximum_distance_m=80,
                            heading_deg=90, heading_tolerance_deg=100)['index'] == 1
 
@@ -158,3 +160,13 @@ def test_heading_filter_preserves_retreat_exclusion():
         selected = selector.select(index, north / 111320, 0, t,
                                    maximum_distance_m=80, heading_deg=0)
     assert selected is None
+
+
+def test_heading_fallback_does_not_restore_receding_candidate():
+    selector = ApproachSelector()
+    index = CrosswalkSpatialIndex([crossing()])
+    for t, north in enumerate([0, -1.2, -2.4]):
+        selected = selector.select(index, north / 111320, 0, t,
+                                   maximum_distance_m=80, heading_deg=90)
+    assert selected is None
+    assert selector.selected is None

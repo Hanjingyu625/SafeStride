@@ -67,13 +67,16 @@ class ApproachSelector:
             eligible,
             latitude, longitude, maximum_distance_m=maximum_distance_m,
             heading_deg=heading, maximum_heading_error_deg=heading_tolerance_deg)
+        used_heading = heading is not None and selected is not None
+        if selected is None and heading is not None:
+            selected = nearest_crosswalk(
+                eligible, latitude, longitude, maximum_distance_m=maximum_distance_m)
         self.selected = selected['index'] if selected else None
-        self.reason = ('nearest heading-aligned crosswalk selected' if selected and heading is not None else
+        self.reason = ('nearest heading-aligned crosswalk selected' if selected and used_heading else
                        'nearest crosswalk selected' if selected else
-                       'no crosswalk aligned with heading' if eligible and heading is not None else
                        'all nearby crosswalks receding' if records else
                        'no crosswalk within search range')
         if selected is not None:
-            selected.update(selection_source='nearest_heading' if heading is not None else 'nearest_distance',
+            selected.update(selection_source='nearest_heading' if used_heading else 'nearest_distance',
                             search_candidate_count=self.candidate_count)
         return selected
