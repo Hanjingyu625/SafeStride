@@ -35,6 +35,7 @@ _HANGUL_FINAL = (
     'k', 't', 'p', 'h',
 )
 _LOCATION_TERMS = (
+    ('우체국앞', ' POST OFFICE '),
     ('주민센터', ' COMMUNITY CTR '),
     ('고등학교', ' HIGH SCHOOL '),
     ('중학교', ' MIDDLE SCHOOL '),
