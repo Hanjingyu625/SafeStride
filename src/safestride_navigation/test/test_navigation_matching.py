@@ -155,10 +155,27 @@ def test_random_choice_is_stable_and_not_used_as_confirmed_history():
     for _ in range(10):
         selected = fallback.select(ambiguous, '42')
         assert selected['signal_direction'] == 'wt'
-        assert selected['signal_mapping_provisional']
+        assert not selected['signal_mapping_provisional']
         assert selected['signal_direction_source'] == 'random_candidate'
     assert len(calls) == 1
     assert fallback.select(dict(index=3, signal_direction='', signal_direction_candidates=[]), '42')['signal_direction'] == ''
+
+
+@pytest.mark.parametrize(('remaining', 'valid', 'allowed'), [
+    (100, True, True), (0, True, False), (2, True, False),
+    (None, False, False), (100, False, False),
+])
+def test_random_direction_uses_normal_entry_conditions(remaining, valid, allowed):
+    from safestride_navigation.crosswalk_data import SignalDirectionFallback
+    item = nearest_crosswalk([crossing(east=0, north=5)], 0, 0)
+    item.update(signal_direction='', signal_direction_candidates=['nt', 'st'])
+    item = SignalDirectionFallback(choose=lambda choices: choices[0]).select(item, '42')
+    machine = CrossingStateMachine()
+    for _ in range(3):
+        machine.update(candidate=item, intersection_id='42', latitude=0, longitude=0,
+                       signal_remaining_s=remaining, signal_valid=valid, safe_speed_mps=1,
+                       measured_speed_mps=.5)
+    assert machine.command(1, .5)['entry_allowed'] == allowed
 
 
 def test_provisional_green_never_allows_entry():

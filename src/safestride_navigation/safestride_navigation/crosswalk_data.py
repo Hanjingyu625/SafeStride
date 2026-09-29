@@ -209,7 +209,7 @@ def resolve_signal_direction(crosswalk, intersection, intersection_id):
 
 
 class SignalDirectionFallback:
-    """Keep tentative lookup choices separate from confirmed crossing guidance."""
+    """Select a stable fallback; random candidates participate in signal validation."""
 
     def __init__(self, choose=None):
         self._choose = choose or random.choice
@@ -233,9 +233,10 @@ class SignalDirectionFallback:
             self._choices[key] = (min(candidates, key=lambda d: angular_difference_deg(
                 directions.index(d) * 45.0, directions.index(previous) * 45.0))
                 if previous else self._choose(candidates))
-        result.update(signal_direction=self._choices[key], signal_mapping_provisional=True,
+        result.update(signal_direction=self._choices[key], signal_mapping_provisional=bool(previous),
                       signal_direction_source='previous_direction_candidate' if previous else 'random_candidate',
-                      signal_mapping_reason='unverified signal mapping; provisional lookup only')
+                      signal_mapping_reason=('unverified signal mapping; provisional lookup only'
+                                             if previous else 'random candidate selected for signal validation'))
         return result
 
 
