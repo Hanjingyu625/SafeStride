@@ -42,10 +42,9 @@ from .signal_logic import (
     newer_signal_record,
     request_signal_bundle,
     SignalApiClient,
-    evaluate_crosswalk_signal,
+    SignalCountdown,
     load_signal_api_key,
     signal_lookup_active,
-    timing_required_for_phase,
 )
 from .speed_profile import UserSpeedProfile
 
@@ -294,10 +293,11 @@ class CrosswalkController(Node):
         self._signal_cache_id = ''
         self._phase_cache = None
         self._signal_cache_time: Optional[float] = None
+        self._signal_countdown = SignalCountdown()
         self._last_signal_request = -math.inf
         self._signal_client = SignalApiClient(
             minimum_interval_s=self._signal_refresh,
-            cache_file='~/.cache/safestride/signal_backoff.json')
+            cache_file='~/.cache/safestride/signal_backoff.json', pace_quota=False)
         self._last_signal_request_key = None
         self._signal_error = ''
         self._last_diagnostic = -math.inf
@@ -608,6 +608,8 @@ class CrosswalkController(Node):
                 record = result.get(name)
                 if record is not None and newer_signal_record(record, getattr(self, attribute)):
                     setattr(self, attribute, record)
+            self._signal_countdown.observe(
+                self._signal_cache, self._phase_cache, now, self._signal_cache_max_age)
             self._signal_cache_id = requested_id
             self._signal_cache_time = self._last_signal_request
             self._signal_error = '; '.join(
@@ -667,13 +669,11 @@ class CrosswalkController(Node):
     def _request_signal_if_due(self, intersection_id: str, now: float,
                                direction: str, directions=None) -> None:
         directions = directions or ([direction] if direction else [])
-        cached_phase = (
-            self._phase_cache
-            if self._signal_cache_id == intersection_id
-            else None
-        )
-        timing_required = timing_required_for_phase(cached_phase, directions)
-        request_key = (intersection_id, tuple(directions), timing_required)
+        if len(directions) != 1:
+            return
+        if self._signal_countdown.remaining(intersection_id, directions, now) is not None:
+            return
+        request_key = (intersection_id, tuple(directions))
         if (
             not self._api_key
             or not intersection_id
@@ -696,7 +696,7 @@ class CrosswalkController(Node):
             timeout_s=self._signal_request_timeout,
             direction=direction,
             client=self._signal_client,
-            timing_required=timing_required,
+            timing_required=True,
         )
 
     def _signal_state(
@@ -714,24 +714,13 @@ class CrosswalkController(Node):
         if self._signal_cache_id != intersection_id:
             return None, False, (self._signal_client.wait_reason((self._signal_url, self._phase_url))
                                  or 'awaiting signal for intersection ' + intersection_id)
-        if (
-            self._phase_cache is None
-            or not self._fresh(
-                now,
-                self._signal_cache_time,
-                self._signal_cache_max_age,
-            )
-        ):
-            reason = (self._signal_client.wait_reason((self._signal_url, self._phase_url))
-                      or self._signal_error or 'signal data unavailable or stale')
-            return None, False, reason
-        remaining, valid, reason = evaluate_crosswalk_signal(
-            self._signal_cache, self._phase_cache, directions or [direction], now,
-            self._signal_cache_max_age)
+        remaining, valid, reason = self._signal_countdown.state(
+            intersection_id, directions or ([direction] if direction else []), now)
         if not valid:
             reason = '%s [intersection=%s, direction=%s]' % (reason, intersection_id, direction)
-            if self._signal_error:
-                reason += '; ' + self._signal_error
+            wait_reason = self._signal_client.wait_reason((self._signal_url, self._phase_url))
+            if wait_reason or self._signal_error:
+                reason += '; ' + (wait_reason or self._signal_error)
         return remaining, valid, reason
 
     def _publish_command(self, speed_mps: float) -> None:
@@ -795,6 +784,9 @@ class CrosswalkController(Node):
             'signal_direction': str(active.get('signal_direction', '')) if active else '',
             'signal_direction_source': str(active.get('signal_direction_source', 'unknown')) if active else '',
             'signal_valid': signal_valid,
+            'signal_countdown_s': self._signal_countdown.remaining(
+                intersection_id, [active.get('signal_direction', '')] if active else [],
+                self._now()) if signal_valid else None,
             'signal_color': (
                 'RED' if signal_valid and signal_reason == 'red pedestrian signal'
                 else 'GREEN' if signal_valid and signal_reason == 'green pedestrian signal'
@@ -1171,13 +1163,6 @@ class CrosswalkController(Node):
                         self._signal_activation_distance)
                 if not preview['signal_direction'] and not signal_valid:
                     signal_reason = preview['signal_mapping_reason'] + '; ' + signal_reason
-                elif not preview['signal_direction'] and signal_valid:
-                    consensus = dict(signal_direction_source='axis_heads_consensus',
-                                     signal_mapping_reason='all plausible signal heads agree')
-                    if candidate is not None and candidate['index'] == preview['index']:
-                        candidate.update(consensus)
-                    if self._controller.locked_crosswalk is not None:
-                        self._controller.locked_crosswalk.update(consensus)
             else:
                 signal_reason = self._approach_selector.reason
             safe_speed = self._profile.safe_speed()

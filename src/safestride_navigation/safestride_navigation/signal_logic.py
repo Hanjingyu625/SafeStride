@@ -117,9 +117,10 @@ class SignalApiError(RuntimeError):
 class SignalApiClient:
     """Endpoint-wide backoff, including when the selected intersection changes."""
     def __init__(self, *, clock=time.monotonic, fetch=None, minimum_interval_s=1.0,
-                 cache_file=None):
+                 cache_file=None, pace_quota=True):
         if not math.isfinite(minimum_interval_s) or minimum_interval_s <= 0:
             raise ValueError('minimum_interval_s must be finite and positive')
+        self._pace_quota = pace_quota
         self._minimum_interval_s = minimum_interval_s
         self._clock = clock
         self._fetch = fetch or request_signal_data
@@ -130,6 +131,8 @@ class SignalApiClient:
             try:
                 saved = json.loads(self._cache_file.read_text(encoding='utf-8'))
                 for url, item in saved.items():
+                    if not self._pace_quota and item.get('reason') == 'signal API quota pacing':
+                        continue
                     remaining = float(item['until']) - time.time()
                     if math.isfinite(remaining) and remaining > 0:
                         self._blocked[url] = (self._clock() + remaining, str(item['reason']))
@@ -182,7 +185,7 @@ class SignalApiClient:
         try:
             record = self._fetch(api_key, intersection_id, url=url, timeout_s=timeout_s, **kwargs)
             quota = record.get('_api_rate_limit', {})
-            if quota.get('reset_s', 0) > 0 and 'remaining' in quota:
+            if self._pace_quota and quota.get('reset_s', 0) > 0 and 'remaining' in quota:
                 interval = max(self._minimum_interval_s,
                                quota['reset_s'] / max(quota['remaining'], 1.0))
                 if interval > self._minimum_interval_s:
@@ -316,17 +319,76 @@ def evaluate_pedestrian_signal(timing, phase, direction, now, max_age_s=12.0):
 
 
 def evaluate_crosswalk_signal(timing, phase, directions, now, max_age_s=12.0):
-    """An unresolved arm requires agreement of every geometrically plausible head."""
+    """Evaluate only the mapped head; other heads never vote on its validity."""
     if not directions:
         return None, False, 'crosswalk signal mapping unavailable'
-    results = [evaluate_pedestrian_signal(timing, phase, direction, now, max_age_s)
-               for direction in directions]
-    for direction, (_, valid, reason) in zip(directions, results):
-        if not valid:
-            return None, False, 'signal head %s: %s' % (direction, reason)
-    if len({reason for _, _, reason in results}) != 1:
-        return None, False, 'ambiguous signal heads disagree; cannot determine this crosswalk signal'
-    return min(value for value, _, _ in results), True, results[0][2]
+    if len(directions) != 1:
+        return None, False, 'crosswalk signal mapping unresolved'
+    return evaluate_pedestrian_signal(timing, phase, directions[0], now, max_age_s)
+
+
+class SignalCountdown:
+    """Latch fresh pedestrian observations until their reported phase ends."""
+
+    def __init__(self):
+        self._seen = None
+        self._intersection = ''
+        self._heads = {}
+        self._observed_at = None
+
+    def observe(self, timing, phase, now, max_age_s=12.0):
+        token = tuple((str((record or {}).get('itstId', '')),
+                       (record or {}).get('trsmUtcTime')) for record in (timing, phase))
+        if token == self._seen:
+            return  # Duplicates must never extend an accepted countdown.
+        self._seen = token
+        self._heads = {}
+        self._observed_at = now
+        self._intersection = str((phase or {}).get('itstId', ''))
+        for direction in OPPOSITE_DIRECTION:
+            _, valid, reason = evaluate_pedestrian_signal(
+                timing, phase, direction, now, max_age_s)
+            if not valid:
+                continue
+            # Red is observable without timing, but cannot schedule a phase-end poll.
+            expiry = None
+            phase_stamp = float(phase['trsmUtcTime']) / 1000.0
+            try:
+                stamp = float(timing['trsmUtcTime']) / 1000.0
+                remaining = _valid_signal(timing.get(direction + 'PdsgRmdrCs'))
+                if (str(timing['itstId']) == self._intersection
+                        and -1.0 <= now - stamp <= max_age_s
+                        and abs(stamp - phase_stamp) <= 3.0
+                        and remaining is not None):
+                    expiry = stamp + remaining
+            except (TypeError, KeyError, ValueError, OverflowError):
+                pass
+            if expiry is not None and expiry > now:
+                self._heads[direction] = (reason, expiry, True)
+            elif reason == 'red pedestrian signal' and expiry is None:
+                self._heads[direction] = (reason, phase_stamp + max_age_s, False)
+
+    def state(self, intersection_id, directions, now):
+        if len(directions) != 1:
+            return None, False, 'crosswalk signal mapping unresolved'
+        if (str(intersection_id) != self._intersection or self._observed_at is None
+                or now < self._observed_at):
+            return None, False, 'awaiting fresh signal observation'
+        head = self._heads.get(directions[0])
+        if head is None:
+            return None, False, 'signal data unavailable or invalid'
+        reason, expiry, _ = head
+        if now >= expiry:
+            return None, False, 'signal countdown expired; awaiting fresh observation'
+        # The crossing policy consumes GREEN time: red must remain zero.
+        return (expiry - now if reason == 'green pedestrian signal' else 0.0,
+                True, reason)
+
+    def remaining(self, intersection_id, directions, now):
+        if not self.state(intersection_id, directions, now)[1]:
+            return None
+        _, expiry, has_timing = self._heads[directions[0]]
+        return expiry - now if has_timing else None
 
 
 def signal_lookup_active(crosswalk, maximum_distance_m):

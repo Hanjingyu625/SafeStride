@@ -91,3 +91,43 @@ def test_nearest_lock_keeps_resolved_signal_mapping_on_next_fix():
     machine.reconsider_candidate(candidate, 0, 0, fix_time=1)
     assert machine.current_crosswalk(candidate, 0, 0)['signal_direction'] == 'et'
     assert machine.locked_intersection_id == '42'
+
+
+def test_retreat_excludes_even_without_replacement_and_stop_keeps_exclusion():
+    selector = ApproachSelector()
+    index = CrosswalkSpatialIndex([crossing()])
+    for t, north in enumerate([0, -1.2, -2.4]):
+        selected = selector.select(index, north / 111320, 0, t, maximum_distance_m=80)
+    assert selected is None
+    for t in range(3, 12):
+        assert selector.select(index, -2.4 / 111320, 0, t, maximum_distance_m=80) is None
+    for t, north in enumerate([-1.2, 0, 1.2, 2.4, 3.6, 4.8], 12):
+        selected = selector.select(index, north / 111320, 0, t, maximum_distance_m=80)
+    assert selected['index'] == 1
+
+
+def test_retreat_selects_other_crosswalk():
+    selector = ApproachSelector()
+    index = CrosswalkSpatialIndex([crossing(), crossing(2, north=-40)])
+    for t, north in enumerate([0, -1.2, -2.4]):
+        selected = selector.select(index, north / 111320, 0, t, maximum_distance_m=80)
+    assert selected['index'] == 2
+
+
+def test_jitter_single_jump_and_repeated_fix_do_not_exclude():
+    for positions in ([0, -.2, .3, -.3, .1], [0, 0, -3, -3, -3]):
+        selector = ApproachSelector()
+        index = CrosswalkSpatialIndex([crossing()])
+        for t, north in enumerate(positions):
+            assert selector.select(index, north / 111320, 0, t, maximum_distance_m=80)
+    for _ in range(20):
+        assert selector.select(index, -10 / 111320, 0, 4, maximum_distance_m=80)
+
+
+def test_gps_gap_resets_retreat_evidence():
+    selector = ApproachSelector()
+    index = CrosswalkSpatialIndex([crossing()])
+    for t, north in enumerate([0, -1.2, -2.4]):
+        selector.select(index, north / 111320, 0, t, maximum_distance_m=80)
+    assert selector.selected is None
+    assert selector.select(index, -2.4 / 111320, 0, 10, maximum_distance_m=80)

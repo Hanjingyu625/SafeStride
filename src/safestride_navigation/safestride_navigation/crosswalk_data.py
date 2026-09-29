@@ -172,7 +172,7 @@ def resolve_signal_direction(crosswalk, intersection, intersection_id):
         return result
     # A crosswalk's long axis is parallel to the associated vehicle approach.
     # Without a reliable side-of-intersection vector, both opposing approaches
-    # remain possible and live phase consensus is the only safe fallback.
+    # remain possible; colour agreement cannot resolve the geometric mapping.
     crossing_axis = float(crosswalk['axis_bearing_deg']) % 180.0
     candidates = [direction for i, direction in enumerate(directions)
                   if undirected_axis_difference_deg(i * 45.0, crossing_axis) <= 22.5]
