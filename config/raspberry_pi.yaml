@@ -2,7 +2,7 @@
 # ros__parameters 아래의 값은 해당 ROS 노드가 시작할 때 읽는다. 수정 후 노드를 재시작한다.
 # 단위: m=미터, m/s=선속도, rad=라디안, rad/s=각속도, s=초, ms=밀리초, Hz=초당 횟수.
 # PWM은 Arduino 0~255 척도의 count다. 100은 약 39.2% 듀티이며 속도 100%를 뜻하지 않는다.
-# MCU의 P 게인, PWM 변화율, 3초/600ms 감속, 8/7km/h 과속 역치는 firmware의 config.h/코드에서 설정한다.
+# MCU의 P 게인, PWM 변화율, 2.5초/600ms 감속, 8/7km/h 과속 역치는 firmware의 config.h/코드에서 설정한다.
 # 속도 변화 경우와 역치 설명: docs/SPEED_CHANGE_THRESHOLDS_KO.md
 
 # 구동용 Arduino(Drive Uno)와 통신하고 모터 명령·Hall·압력·주행 상태를 전달한다.
@@ -119,7 +119,7 @@ safety_supervisor:
     require_surface_condition: false  # 노면 제어가 켜졌을 때 유효 노면 입력을 필수로 요구할지
     surface_control_enabled: false  # 카메라 노면 분류의 속도 배율을 목표에 반영할지. 현재 꺼짐
     drive_command_topic: /drive/command  # 목표·경사 FF·PWM cap·모드를 묶은 실제 구동 명령 토픽
-    brake_enter_deg: 7.0  # 7도 도달 즉시 현재 PWM에서 3초 감속 시작
+    brake_enter_deg: 7.0  # 7도 도달 즉시 현재 PWM에서 2.5초 감속 시작
     brake_release_deg: 3.0  # 3도 이하 0.5초 유지 시 복귀 허용; 시작된 감속은 완료
     brake_recovery_s: 0.5  # 해제 가능한 유효 경사를 유지해야 하는 시간(초)
     drive_pwm_cap: 140  # 최종 PWM cap(count). MCU MAX_PWM 상한도 함께 적용
@@ -137,7 +137,7 @@ safety_supervisor:
     slope_enter_angle_rad: 0.08726646259971647  # 경사 분류 진입 5도(rad). 오르막 보조 진입 기준
     slope_exit_angle_rad: 0.05235987755982989  # 경사 분류 이탈 3도(rad). 진입값보다 작아야 함
     slope_confirmation_time_s: 0.50  # 경사 후보가 지속돼야 상태를 확정하는 시간(초). 7도 정지 진입은 별도
-    downhill_speed_scale: 1.0  # 별도 TERRAIN_STOP 모드로 실제 PWM을 3초에 걸쳐 0으로 감속
+    downhill_speed_scale: 1.0  # 별도 TERRAIN_STOP 모드로 실제 PWM을 2.5초에 걸쳐 0으로 감속
     uphill_speed_scale: 1.0  # 오르막 목표속도 유지; 경사 FF만 추가
     max_combined_speed_scale: 1.25  # 노면·경사 증속 배율의 곱 상한. 감속 배율이 있으면 작은 배율 우선
     stop_distance: 0.35  # 전방 거리 <=0.35m BRAKE, range_control_enabled=true일 때만
@@ -250,7 +250,10 @@ gps_node:
 crosswalk_controller:
   ros__parameters:
     crosswalk_file: ''  # 횡단보도 지도 JSON 경로. 빈 값은 준비 감시; run.sh에서 파일 경로 전달 가능
-    api_key_file: ''  # 신호 API 키 파일 경로. run.sh에서 전달 가능
+    api_key_file: ''  # 저장된 키 자동 로드. run.sh 또는 /etc/safestride/signal_api_key.txt 우선
+    signal_url: https://t-data.seoul.go.kr/apig/apiman-gateway/tapi/v2xSignalPhaseTimingCurrentInfo/1.0
+    signal_phase_url: https://t-data.seoul.go.kr/apig/apiman-gateway/tapi/v2xSignalPhaseCurrentInfo/1.0
+    signal_combined_url: ''  # 승인된 개별 실시간 API 두 개를 병렬 조회
     intersection_id: ''  # 시험용 고정 교차로 ID. 실제 GPS/지도 매칭이 우선
     intersection_map_page_size: 100  # 교차로 지도 API 한 페이지의 요청 건수
     intersection_map_max_pages: 30  # 교차로 지도 조회 최대 페이지 수
@@ -264,21 +267,24 @@ crosswalk_controller:
     heading_timeout_s: 5.0  # 진행방향 입력 허용 나이(초)
     heading_min_move_m: 2.0  # 위치 변화로 방향을 계산하는 최소 이동거리(m)
     heading_max_step_m: 30.0  # 방향 추정에서 허용할 최대 위치 변화(m). 큰 GPS 점프 제외
-    candidate_heading_tolerance_deg: 60.0  # 후보 삭제가 아닌 선택 확정 시 방향 오차 상한(도)
+    candidate_heading_tolerance_deg: 60.0  # 이전 방향 필터 호환값. 현재 거리 추세 선택에는 사용하지 않음
+    candidate_switch_hold_s: 2.0  # 진입 전 더 적합한 후보가 지속돼야 하는 시간
+    candidate_switch_advantage_m: 3.0  # 현재 후보보다 이만큼 가까울 때 변경 검토
+    gps_course_min_speed_mps: 0.20  # GPS 노드와 같은 이동 방위 최소 속도
     imu_topic: /terrain/imu  # GPS로 잡은 절대방향에 자이로 회전량을 반영
     heading_imu_frame: imu_link  # 수평 장착 IMU 프레임; roll/pitch로 yaw rate 보정
     heading_gyro_sign: 1.0  # ROS 양의 yaw=반시계. 실제 장착 반전 시 -1 (현장 회전 확인)
     heading_imu_timeout_s: 0.35  # IMU 단절 시 방향 무효화; 새로운 GPS 방향으로 재설정
     heading_coast_s: 20.0  # GPS 기준 이후 연속 IMU만으로 방향을 유지하는 최대 시간(초)
-    selection_hold_s: 2.0  # 방향·후보 점수차 조건이 연속 유지돼야 선택 확정
-    selection_margin_m: 3.0  # 1·2순위 종합 점수의 최소 차이(m 환산 점수; 실측거리 아님)
+    selection_hold_s: 2.0  # 이전 선택기 호환값; 현재 거리 추세 선택에는 사용하지 않음
+    selection_margin_m: 3.0  # 이전 선택기 호환값; 현재 거리 추세 선택에는 사용하지 않음
     gps_change_threshold_m: 0.5  # GPS 위치가 갱신됐다고 인정하는 거리 변화(m)
     gps_stuck_timeout_s: 5.0  # 움직임이 있는데 좌표가 변하지 않으면 GPS 정체로 판단하는 시간(초)
     gps_stuck_speed_mps: 0.15  # GPS 좌표 정체 검사에 사용하는 이동속도 기준(m/s)
     wheel_motion_min_speed_mps: 0.02  # 바퀴 이동으로 인정할 최소 속도(m/s)
     wheel_motion_hold_s: 3.5  # 최근 바퀴 이동 확인을 유지할 최대 시간(초). 저속 펄스 간격 고려
     allow_gps_speed_fallback: false  # false: Hall odometry 우선/필수. GPS 속도만으로 이동을 대신 확인하지 않음
-    signal_refresh_interval_s: 3.0  # 신호정보 재조회 간격(초)
+    signal_refresh_interval_s: 1.0  # 정상 응답 시 각 API를 약 1초마다 조회. 429는 재시도 대기 준수
     signal_cache_max_age_s: 12.0  # 신호 캐시 최대 허용 나이(초)
     signal_request_timeout_s: 3.0  # 신호 API 요청 제한시간(초)
     maximum_crosswalk_distance_m: 80.0  # 횡단보도 후보 탐색 최대거리(m)

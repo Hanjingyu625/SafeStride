@@ -150,6 +150,45 @@ def angular_difference_deg(first: float, second: float) -> float:
     return abs((first - second + 180.0) % 360.0 - 180.0)
 
 
+def resolve_signal_direction(crosswalk, intersection, intersection_id):
+    """Infer an intersection arm, never a signal colour, from static geometry.
+
+    The arm convention still needs field validation. Explicit surveyed mappings
+    take precedence; uncertain geometry must not fall back to walking direction.
+    """
+    result = dict(crosswalk)
+    source = result.get('signal_direction_source', 'crosswalk_data')
+    direction = result.get('signal_direction', '')
+    directions = ('nt', 'ne', 'et', 'se', 'st', 'sw', 'wt', 'nw')
+    if source == 'crosswalk_data' and direction in directions:
+        result['signal_mapping_reason'] = 'explicit crosswalk signal direction'
+        return result
+    result.update(signal_direction='', signal_direction_source='unresolved',
+                  signal_mapping_reason='no matching intersection geometry')
+    if not intersection or str(intersection.get('intersection_id', '')) != str(intersection_id):
+        return result
+    distance = haversine_m(intersection['latitude'], intersection['longitude'],
+                           crosswalk['latitude'], crosswalk['longitude'])
+    if distance < 5.0:
+        result['signal_mapping_reason'] = 'crosswalk too close to intersection centre to resolve arm'
+        return result
+    radial = bearing_deg(intersection['latitude'], intersection['longitude'],
+                         crosswalk['latitude'], crosswalk['longitude'])
+    normal = (float(crosswalk['axis_bearing_deg']) + 90.0) % 360.0
+    if angular_difference_deg(radial, normal) > 90.0:
+        normal = (normal + 180.0) % 360.0
+    error = angular_difference_deg(radial, normal)
+    sector = round(normal / 45.0) * 45.0
+    if error > 30.0 or angular_difference_deg(normal, sector) > 17.5:
+        result['signal_mapping_reason'] = 'ambiguous intersection arm geometry'
+        return result
+    result.update(signal_direction=bearing_to_direction(normal),
+                  signal_bearing_deg=normal,
+                  signal_direction_source='intersection_arm_inferred',
+                  signal_mapping_reason='arm inferred from intersection centre and crosswalk axis')
+    return result
+
+
 def undirected_axis_difference_deg(first: float, second: float) -> float:
     difference = angular_difference_deg(first, second)
     return min(difference, abs(180.0 - difference))
@@ -292,6 +331,7 @@ def nearest_crosswalk(
             'crossing_bearing_deg': crossing_bearing,
             'crossing_direction': bearing_to_direction(crossing_bearing),
             'signal_bearing_deg': signal_bearing,
+            'signal_direction_source': 'crosswalk_data' if best.get('signal_direction') else 'walking_axis_inferred',
             'signal_direction': (
                 best.get('signal_direction') or bearing_to_direction(signal_bearing)
             ),
@@ -383,6 +423,10 @@ class CrosswalkSpatialIndex:
 
     def candidates(self, latitude, longitude, maximum_distance_m):
         """Nearby records for temporal ranking; exact edge cutoff is downstream."""
+        return self._nearby(latitude, longitude, maximum_distance_m)
+
+    def nearby(self, latitude, longitude, maximum_distance_m):
+        """Return spatially nearby records for temporal candidate ranking."""
         return self._nearby(latitude, longitude, maximum_distance_m)
 
     def nearest(

@@ -349,6 +349,7 @@ class SafetySupervisor(Node):
         self._assist_motion_seen = False
         self._assist_idle_expired = False
         self._assist_deadman = False
+        self._assist_launch_started = False
         self._assist_deadman_since = self._now_seconds()
         self._active_drive_pwm_cap = self._drive_pwm_cap
 
@@ -435,10 +436,12 @@ class SafetySupervisor(Node):
         if deadman and not self._assist_deadman:
             self._assist_motion_seen = False
             self._assist_idle_expired = False
+            self._assist_launch_started = False
             self._assist_deadman_since = self._now_seconds()
         elif not deadman:
             self._assist_motion_seen = False
             self._assist_idle_expired = False
+            self._assist_launch_started = False
 
         speed = float(msg.measured_speed_m_s)
         if (
@@ -461,12 +464,22 @@ class SafetySupervisor(Node):
         if command_m_s <= 0.0 or status is None or not bool(status.deadman):
             return self._drive_pwm_cap
 
+        # Count the four-second launch window only after an ARMED controller
+        # can receive a positive drive target. Waiting to arm or holding a
+        # downhill stop must not consume it; one grasp gets one window.
+        if bool(status.armed) and not self._assist_launch_started:
+            self._assist_launch_started = True
+            self._assist_deadman_since = now
+
         launch_cap = min(self._drive_pwm_cap, _HANDS_ON_PWM)
         if not self._assist_motion_seen:
             if (
                 self._assist_idle_expired
-                or now - self._assist_deadman_since
-                >= _NO_PULSE_ASSIST_TIMEOUT_S
+                or (
+                    self._assist_launch_started
+                    and now - self._assist_deadman_since
+                    >= _NO_PULSE_ASSIST_TIMEOUT_S
+                )
             ):
                 self._assist_idle_expired = True
                 return 0

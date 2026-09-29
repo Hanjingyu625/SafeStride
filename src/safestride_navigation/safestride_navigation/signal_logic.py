@@ -2,6 +2,10 @@
 
 import json
 import math
+import os
+import time
+from pathlib import Path
+from email.utils import parsedate_to_datetime
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal, InvalidOperation
 import urllib.error
@@ -12,17 +16,14 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 DEFAULT_TIMING_URL = (
     'https://t-data.seoul.go.kr/apig/apiman-gateway/'
-    'tapi/v2xSignalPhaseTimingInformation/1.0'
+    'tapi/v2xSignalPhaseTimingCurrentInfo/1.0'
 )
 INVALID_SIGNAL_VALUES = {36000, 36001, -1}
 DEFAULT_PHASE_URL = (
     'https://t-data.seoul.go.kr/apig/apiman-gateway/'
-    'tapi/v2xSignalPhaseInformation/1.0'
+    'tapi/v2xSignalPhaseCurrentInfo/1.0'
 )
-DEFAULT_COMBINED_URL = (
-    'https://t-data.seoul.go.kr/apig/apiman-gateway/'
-    'tapi/v2xSignalPhaseTimingFusionCurrentInfo/1.0'
-)
+DEFAULT_COMBINED_URL = ''  # The two separately approved current APIs are the default.
 OPPOSITE_DIRECTION = {
     'nt': 'st',
     'ne': 'sw',
@@ -33,6 +34,84 @@ OPPOSITE_DIRECTION = {
     'wt': 'et',
     'nw': 'se',
 }
+
+
+def current_signal_url(url):
+    """Migrate only the two known historical Seoul signal endpoints."""
+    base = 'https://t-data.seoul.go.kr/apig/apiman-gateway/tapi/'
+    return {
+        base + 'v2xSignalPhaseTimingInformation/1.0': DEFAULT_TIMING_URL,
+        base + 'v2xSignalPhaseInformation/1.0': DEFAULT_PHASE_URL,
+    }.get(url, url)
+
+
+def load_signal_api_key(path=''):
+    """Use a saved key on every startup; explicit configuration has priority."""
+    configured = path or os.environ.get('SAFESTRIDE_SIGNAL_API_KEY_FILE', '')
+    candidates = [Path(configured).expanduser()] if configured else [
+        Path('/etc/safestride/signal_api_key.txt'),
+        Path(__file__).resolve().parents[3] / 'raspberry_pi/api_key.txt',
+    ]
+    for source in candidates:
+        try:
+            key = source.read_text(encoding='utf-8-sig').strip()
+        except (OSError, UnicodeError):
+            continue
+        if key and 'CHANGE_ME' not in key:
+            return key
+    return ''
+
+
+def retry_after_seconds(value, now=None):
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        try:
+            seconds = parsedate_to_datetime(value).timestamp() - (time.time() if now is None else now)
+        except (TypeError, ValueError, OverflowError):
+            return 300.0
+    return max(1.0, seconds) if math.isfinite(seconds) else 300.0
+
+
+class SignalApiError(RuntimeError):
+    def __init__(self, message, *, status=None, retry_after_s=3.0):
+        super().__init__(message)
+        self.status = status
+        self.retry_after_s = retry_after_s
+
+
+class SignalApiClient:
+    """Endpoint-wide backoff, including when the selected intersection changes."""
+    def __init__(self, *, clock=time.monotonic, fetch=None, minimum_interval_s=1.0):
+        if not math.isfinite(minimum_interval_s) or minimum_interval_s <= 0:
+            raise ValueError('minimum_interval_s must be finite and positive')
+        self._minimum_interval_s = minimum_interval_s
+        self._clock = clock
+        self._fetch = fetch or request_signal_data
+        self._blocked = {}
+
+    def poll_interval_remaining(self, urls):
+        """Let the ROS timer defer normal polls instead of reporting jitter as an API error."""
+        now = self._clock()
+        return max([0.0] + [
+            until - now for url in urls
+            for until, reason in [self._blocked.get(current_signal_url(url), (0.0, ''))]
+            if reason == 'signal poll interval'
+        ])
+
+    def get(self, api_key, intersection_id, *, url, timeout_s, **kwargs):
+        url = current_signal_url(url)
+        now = self._clock()
+        until, reason = self._blocked.get(url, (0.0, ''))
+        if now < until:
+            raise SignalApiError('%s; retry in %.1fs' % (reason, until - now),
+                                 retry_after_s=until - now)
+        self._blocked[url] = (now + self._minimum_interval_s, 'signal poll interval')
+        try:
+            return self._fetch(api_key, intersection_id, url=url, timeout_s=timeout_s, **kwargs)
+        except SignalApiError as error:
+            self._blocked[url] = (self._clock() + error.retry_after_s, str(error))
+            raise
 
 
 def find_value(data: Any, key: str) -> Any:
@@ -154,10 +233,12 @@ def evaluate_pedestrian_signal(timing, phase, direction, now, max_age_s=12.0):
 
 
 def request_signal_bundle(api_key, intersection_id, *, url, phase_url,
-                          timeout_s, combined_url=None, direction=None):
+                          timeout_s, combined_url=None, direction=None, client=None):
+    fetch = client.get if client is not None else request_signal_data
+    combined_error = ''
     if combined_url:
         try:
-            combined = request_signal_data(
+            combined = fetch(
                 api_key, intersection_id, url=combined_url,
                 timeout_s=timeout_s, key_param='apikey')
             pedestrian_states = [
@@ -173,14 +254,16 @@ def request_signal_bundle(api_key, intersection_id, *, url, phase_url,
                 for prefix, state in pedestrian_states
             ):
                 return {'timing': combined, 'phase': combined}
-        except (RuntimeError, ValueError):
-            pass
+        except (RuntimeError, ValueError) as error:
+            combined_error = str(error)
     # Independent results allow a confirmed red even when countdown retrieval fails.
     with ThreadPoolExecutor(max_workers=2) as pool:
-        futures = {name: pool.submit(request_signal_data, api_key, intersection_id,
+        futures = {name: pool.submit(fetch, api_key, intersection_id,
                    url=endpoint, timeout_s=timeout_s)
                    for name, endpoint in (('timing', url), ('phase', phase_url))}
         result = {}
+        if combined_error:
+            result['combined_error'] = combined_error
         for name, future in futures.items():
             try:
                 result[name] = future.result()
@@ -226,7 +309,7 @@ def request_signal_data(
     *,
     url: str = DEFAULT_TIMING_URL,
     timeout_s: float = 10.0,
-    key_param: str = 'apiKey',
+    key_param: Optional[str] = None,
 ) -> Mapping[str, Any]:
     """Fetch and select the latest record for one intersection."""
 
@@ -234,6 +317,9 @@ def request_signal_data(
         raise ValueError('API key is empty')
     if not intersection_id:
         raise ValueError('intersection_id is empty')
+    url = current_signal_url(url)
+    if key_param is None:
+        key_param = 'apikey' if 'CurrentInfo/' in url else 'apiKey'
     query = urllib.parse.urlencode(
         {
             key_param: api_key,
@@ -252,9 +338,15 @@ def request_signal_data(
             body = response.read().decode('utf-8-sig')
     except urllib.error.HTTPError as error:
         detail = error.read().decode('utf-8', errors='replace')
-        raise RuntimeError('signal API HTTP %s: %s' % (error.code, detail[:160]))
+        detail = detail.replace(api_key, '[REDACTED]').replace(
+            urllib.parse.quote_plus(api_key), '[REDACTED]')
+        delay = retry_after_seconds(error.headers.get('Retry-After')) if error.code == 429 else (
+            300.0 if error.code in (401, 403, 404) else 5.0)
+        raise SignalApiError('signal API HTTP %s: %s' % (error.code, detail[:240]),
+                             status=error.code, retry_after_s=delay) from None
     except (urllib.error.URLError, TimeoutError, OSError) as error:
-        raise RuntimeError('signal API request failed: %s' % error) from error
+        raise SignalApiError('signal API transport failure: ' + type(error).__name__,
+                             retry_after_s=5.0) from None
     try:
         parsed = json.loads(body)
     except json.JSONDecodeError as error:

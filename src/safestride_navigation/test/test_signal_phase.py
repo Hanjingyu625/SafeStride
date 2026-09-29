@@ -22,6 +22,15 @@ class SignalPhaseTests(unittest.TestCase):
         self.timing = None
         self.assertEqual(self.evaluate(), (0.0, True, 'red pedestrian signal'))
 
+    def test_observed_red_with_unavailable_countdown_is_wait_not_missing_signal(self):
+        self.phase['ntPdsgStatNm'] = 'stop-And-Remain'
+        self.timing['ntPdsgRmdrCs'] = 36001.0
+        self.assertEqual(self.evaluate(), (0.0, True, 'red pedestrian signal'))
+
+    def test_green_with_unavailable_countdown_does_not_allow_entry(self):
+        self.timing['ntPdsgRmdrCs'] = 36001.0
+        self.assertFalse(self.evaluate()[1])
+
     def test_permissive_green_is_valid_with_fresh_countdown(self):
         self.phase['ntPdsgStatNm'] = 'permissive-Movement-Allowed'
         self.assertEqual(self.evaluate()[:2], (25.0, True))

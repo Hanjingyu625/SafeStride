@@ -99,6 +99,28 @@ Supervisor = production_class(
 
 
 class TestSupervisedDrive(unittest.TestCase):
+    def test_launch_window_starts_with_first_armed_drive(self):
+        n = self.node
+        status = NS(deadman=True, armed=False, new_pulse=False,
+                    speed_valid=False, measured_speed_m_s=0.0,
+                    speed_age=10.0)
+        n._status_callback(status)
+        n.now += 6.0
+        self.assertEqual(n._walking_assist_pwm_cap(n.now, 1.0), 35)
+
+        status.armed = True
+        n._status_callback(status)
+        self.assertEqual(n._walking_assist_pwm_cap(n.now, 0.0), 140)
+        n.now += 10.0  # A downhill stop does not consume launch time.
+        self.assertEqual(n._walking_assist_pwm_cap(n.now, 1.0), 35)
+        n.now += 4.01
+        self.assertEqual(n._walking_assist_pwm_cap(n.now, 1.0), 0)
+        status.armed = False
+        n._status_callback(status)
+        status.armed = True
+        n._status_callback(status)
+        self.assertEqual(n._walking_assist_pwm_cap(n.now, 1.0), 0)
+
     def test_caution_target_reaches_one_point_one_on_level_ground(self):
         self.node._last_command.twist.linear.x = 1.1
         for _ in range(140):
@@ -126,10 +148,11 @@ class TestSupervisedDrive(unittest.TestCase):
         n._timer_callback()
         return n._drive_publisher.messages[-1]
 
-    def walker_status(self, *, deadman=True, speed=0.0, speed_age=math.inf,
-                      speed_valid=False, new_pulse=False):
+    def walker_status(self, *, deadman=True, armed=True, speed=0.0,
+                      speed_age=math.inf, speed_valid=False, new_pulse=False):
         self.node._status_callback(Message(
             deadman=deadman,
+            armed=armed,
             measured_speed_m_s=speed,
             speed_age=speed_age,
             speed_valid=speed_valid,

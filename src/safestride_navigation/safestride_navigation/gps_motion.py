@@ -94,6 +94,7 @@ class GpsMotionTracker:
         self._position_change_time: Optional[float] = None
         self._heading: Optional[float] = None
         self._heading_time: Optional[float] = None
+        self._course_time: Optional[float] = None
         self.heading_source = 'unavailable'
 
     def update(
@@ -134,20 +135,23 @@ class GpsMotionTracker:
         if heading_distance < self._heading_min_move_m:
             return
         if heading_distance <= self._heading_max_step_m:
-            self._heading = bearing_deg(
-                self._heading_anchor[0],
-                self._heading_anchor[1],
-                latitude,
-                longitude,
-            )
-            self._heading_time = now
-            self.heading_source = 'position_delta'
+            # Do not let a noisy position delta overwrite a fresh RMC course.
+            if self._course_time is None or not 0.0 <= now - self._course_time <= 2.0:
+                self._heading = bearing_deg(
+                    self._heading_anchor[0], self._heading_anchor[1], latitude, longitude)
+                self._heading_time = now
+                self.heading_source = 'position_delta'
         self._heading_anchor = current
 
     def set_course(self, course_deg: float, now: float) -> None:
         if not math.isfinite(course_deg):
             raise ValueError('course must be finite')
-        self._heading = course_deg % 360.0
+        if self._course_time is not None and 0.0 <= now - self._course_time <= 2.0:
+            delta = (course_deg - self._heading + 180.0) % 360.0 - 180.0
+            self._heading = (self._heading + 0.5 * delta) % 360.0
+        else:
+            self._heading = course_deg % 360.0
+        self._course_time = now
         self._heading_time = now
         self.heading_source = 'rmc_course'
 

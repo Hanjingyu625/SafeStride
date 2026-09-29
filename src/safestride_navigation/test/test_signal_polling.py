@@ -19,23 +19,37 @@ def node():
     exec(compile(ast.Module(body=methods, type_ignores=[]), str(path), 'exec'), scope)
     n = SimpleNamespace(_api_key='test', _signal_future=None,
         _last_signal_request=1000, _last_signal_request_key=('42', 'nt'),
-        _signal_refresh=3, _executor=Mock(), _signal_url='timing',
+        _signal_refresh=1, _executor=Mock(), _signal_url='timing',
         _phase_url='phase', _combined_url='combined', _signal_request_timeout=3,
-        _signal_cache_id='42', _phase_cache=None, _signal_error='old error')
+        _signal_cache_id='42', _phase_cache=None, _signal_error='old error',
+        _signal_client=SimpleNamespace(poll_interval_remaining=lambda _: 0.0))
     n._request_signal_if_due = lambda *args: scope['_request_signal_if_due'](n, *args)
     n._signal_state = lambda *args: scope['_signal_state'](n, *args)
     return n
 
 
-def test_same_head_throttled_but_new_intersection_or_direction_immediate():
+def test_candidate_changes_do_not_bypass_poll_interval():
     n = node()
-    n._request_signal_if_due('42', 1001, 'nt')
+    n._request_signal_if_due('42', 1000.5, 'nt')
     n._executor.submit.assert_not_called()
     for identifier, direction in (('43', 'nt'), ('42', 'et')):
         n = node()
+        n._request_signal_if_due(identifier, 1000.5, direction)
+        n._executor.submit.assert_not_called()
         n._request_signal_if_due(identifier, 1001, direction)
         assert n._signal_future_id == identifier
         assert n._executor.submit.call_args.kwargs['direction'] == direction
+        assert n._executor.submit.call_args.kwargs['client'] is n._signal_client
+
+
+def test_worker_start_jitter_defers_poll_without_api_failure():
+    n = node()
+    n._signal_client.poll_interval_remaining = lambda _: 0.002
+    n._request_signal_if_due('42', 1001, 'nt')
+    n._executor.submit.assert_not_called()
+    n._signal_client.poll_interval_remaining = lambda _: 0.0
+    n._request_signal_if_due('42', 1001.2, 'nt')
+    n._executor.submit.assert_called_once()
 
 
 def test_no_overlap_and_no_old_intersection_error_on_new_candidate():

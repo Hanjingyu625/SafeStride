@@ -35,6 +35,10 @@ constexpr int32_t MAX_ACCEL_MRAD_S2 = 6000L;
 constexpr int32_t MAX_DECEL_MRAD_S2 = 5000L;
 constexpr int32_t ARM_MAX_MEASURED_SPEED_MRAD_S = 100L;
 constexpr uint16_t ARM_STATIONARY_DWELL_MS = 250U;
+// Allow controlled re-arming while the user slowly pushes on a slope. A
+// recent two-pulse Hall period must be at least this long (<=0.345 m/s).
+constexpr uint32_t ARM_MOVING_MIN_PULSE_PERIOD_US = 174533UL;
+constexpr uint32_t ARM_MOVING_MAX_PULSE_AGE_US = 750000UL;
 
 // Normal deployment follows the supervised ROS velocity target and closes the
 // speed loop with the single installed Hall sensor. The pressure inputs remain
@@ -91,6 +95,7 @@ constexpr uint8_t MOTOR_IN1_PIN = 6U;
 constexpr uint8_t MOTOR_IN2_PIN = 8U;
 constexpr int8_t MOTOR_SIGN = 1;
 constexpr uint16_t MAX_PWM = 140U;  // shared drive output ceiling
+constexpr uint32_t TERRAIN_STOP_RAMP_US = 2500000UL;
 // Initial feed-forward model; PWM counts are on Arduino's 0..255 scale.
 // 40 is a bias, NOT a minimum output. Calibrate 60 at 1.0 m/s under load.
 // Nominal FF=60 is an initial model, not a measured speed calibration.
@@ -234,6 +239,10 @@ static_assert(
 static_assert(
     ARM_STATIONARY_DWELL_MS > 0U,
     "arming stationary dwell must be positive");
+static_assert(
+    ARM_MOVING_MIN_PULSE_PERIOD_US >= HALL_MIN_PULSE_INTERVAL_US &&
+        ARM_MOVING_MAX_PULSE_AGE_US < HALL_ZERO_TIMEOUT_US,
+    "moving-arm Hall limits must require fresh, plausible pulses");
 static_assert(
     HALL_STALL_TARGET_MIN_MRAD_S > 0L &&
         HALL_STALL_TARGET_MIN_MRAD_S <=
