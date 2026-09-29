@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from typing import Optional, Tuple
 from unittest.mock import Mock
 
-from safestride_navigation.signal_logic import evaluate_pedestrian_signal
+from safestride_navigation.signal_logic import evaluate_crosswalk_signal
 
 
 def node():
@@ -15,14 +15,15 @@ def node():
     methods = [n for n in cls.body if isinstance(n, ast.FunctionDef)
                and n.name in ('_signal_state', '_request_signal_if_due')]
     scope = dict(Optional=Optional, Tuple=Tuple, request_signal_bundle=Mock(),
-                 evaluate_pedestrian_signal=evaluate_pedestrian_signal)
+                 evaluate_crosswalk_signal=evaluate_crosswalk_signal)
     exec(compile(ast.Module(body=methods, type_ignores=[]), str(path), 'exec'), scope)
     n = SimpleNamespace(_api_key='test', _signal_future=None,
         _last_signal_request=1000, _last_signal_request_key=('42', 'nt'),
         _signal_refresh=1, _executor=Mock(), _signal_url='timing',
         _phase_url='phase', _combined_url='combined', _signal_request_timeout=3,
         _signal_cache_id='42', _phase_cache=None, _signal_error='old error',
-        _signal_client=SimpleNamespace(poll_interval_remaining=lambda _: 0.0))
+        _signal_client=SimpleNamespace(poll_interval_remaining=lambda _: 0.0,
+                                       wait_reason=lambda _: ''))
     n._request_signal_if_due = lambda *args: scope['_request_signal_if_due'](n, *args)
     n._signal_state = lambda *args: scope['_signal_state'](n, *args)
     return n
@@ -79,3 +80,13 @@ def test_direction_error_is_not_hidden_by_timing_request_error():
     assert not result[1]
     assert 'direction=et' in result[2]
     assert 'old error' in result[2]
+
+
+def test_endpoint_quota_error_remains_visible_after_candidate_switch():
+    n = node()
+    n._signal_client.poll_interval_remaining = lambda _: 28819
+    n._signal_client.wait_reason = lambda _: 'signal API HTTP 429; retry in 28819s'
+    result = n._signal_state('2620', 'nt', 1001)
+    assert not result[1]
+    assert '429' in result[2]
+    n._executor.submit.assert_not_called()

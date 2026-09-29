@@ -29,6 +29,14 @@ def test_uncertain_geometry_never_falls_back_to_walking_direction(item):
     assert arm(item, item['axis_bearing_deg'])['signal_direction'] == ''
 
 
+def test_near_centre_field_geometry_retains_both_arms_without_user_heading():
+    item = crossing(east=1, north=0, axis=83.1)
+    for heading in (None, 83.1, 263.1):
+        resolved = arm(item, heading)
+        assert resolved['signal_direction'] == ''
+        assert set(resolved['signal_direction_candidates']) == {'nt', 'st'}
+
+
 def test_explicit_mapping_overrides_inference_and_mismatched_map_is_not_used():
     item = crossing()
     item.update(signal_direction='nt', signal_direction_source='crosswalk_data')
@@ -37,7 +45,7 @@ def test_explicit_mapping_overrides_inference_and_mismatched_map_is_not_used():
     assert resolve_signal_direction(item, dict(intersection_id='43'), '42')['signal_direction'] == ''
 
 
-def test_candidate_change_requires_hold_and_cannot_change_during_crossing():
+def test_pre_entry_candidate_changes_without_heading_or_hold():
     now = [0.0]
     machine = CrossingStateMachine(clock=lambda: now[0])
     old = nearest_crosswalk([crossing(east=0)], -10 / 111320, 0.0, heading_deg=0)
@@ -45,12 +53,7 @@ def test_candidate_change_requires_hold_and_cannot_change_during_crossing():
     machine.set_state('WAIT_AT_CURB', 'test')
     alternative = nearest_crosswalk([crossing(2, east=8, north=-10, axis=90)],
                                     -10 / 111320, 0.0, heading_deg=90)
-    for moment in (0.0, 1.0):
-        now[0] = moment
-        machine.reconsider_candidate(alternative, -10 / 111320, 0, 90)
-        assert machine.locked_crosswalk['index'] == 1
-    now[0] = 2.0
-    machine.reconsider_candidate(alternative, -10 / 111320, 0, 90)
+    machine.reconsider_candidate(alternative, -10 / 111320, 0, None)
     assert machine.locked_crosswalk is None
     machine.lock(old, '42')
     machine.set_state('CROSSING', 'test')
@@ -60,18 +63,13 @@ def test_candidate_change_requires_hold_and_cannot_change_during_crossing():
     assert machine.locked_crosswalk['index'] == 1
 
 
-def test_candidate_flicker_or_missing_heading_resets_switch_timer():
+def test_same_candidate_preserves_lock_without_heading():
     now = [0.0]
     machine = CrossingStateMachine(clock=lambda: now[0])
     old = nearest_crosswalk([crossing(east=0)], -10 / 111320, 0.0, heading_deg=0)
     machine.lock(old, '42')
     machine.set_state('WAIT_AT_CURB', 'test')
-    alternative = dict(old, index=2, edge_distance_m=0)
-    machine.reconsider_candidate(alternative, -10 / 111320, 0, 90)
-    now[0] = 1
-    machine.reconsider_candidate(alternative, -10 / 111320, 0, None)
-    now[0] = 2
-    machine.reconsider_candidate(alternative, -10 / 111320, 0, 90)
+    machine.reconsider_candidate(old, -10 / 111320, 0, None)
     assert machine.locked_crosswalk is not None
 
 

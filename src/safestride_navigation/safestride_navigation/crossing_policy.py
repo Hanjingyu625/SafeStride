@@ -6,7 +6,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any, Callable, Deque, Dict, Mapping, Optional, Tuple
 
-from .crosswalk_data import evaluate_locked_crosswalk, undirected_axis_difference_deg
+from .crosswalk_data import evaluate_locked_crosswalk
 
 
 @dataclass(frozen=True)
@@ -70,6 +70,7 @@ class CrossingStateMachine:
         self.reason = 'waiting for a crosswalk'
         self._replacement = None
         self._replacement_since = None
+        self._departure_fix_time = None
 
     def set_state(self, new_state: str, reason: str) -> None:
         if new_state not in self.STATES:
@@ -94,6 +95,7 @@ class CrossingStateMachine:
 
     def reset(self, reason: str = 'reset') -> None:
         self._replacement = self._replacement_since = None
+        self._departure_fix_time = None
         self.state = 'IDLE'
         self.state_since = self._clock()
         self.locked_crosswalk = None
@@ -112,9 +114,9 @@ class CrossingStateMachine:
         latitude: float,
         longitude: float,
     ) -> Optional[Dict[str, Any]]:
-        # Distance-trend locks use reconsider_candidate's hold before replacement.
+        # Nearest selection releases obsolete locks in reconsider_candidate.
         if (self.state not in ('CROSSING', 'CROSSING_URGENT', 'EXITING')
-                and (self.locked_crosswalk or {}).get('selection_source') != 'distance_trend'):
+                and (self.locked_crosswalk or {}).get('selection_source') != 'nearest_distance'):
             if self.locked_crosswalk is not None:
                 locked = self.locked_crosswalk
                 changed = candidate is None or any(
@@ -141,33 +143,38 @@ class CrossingStateMachine:
             )
         return None if candidate is None else dict(candidate)
 
-    def reconsider_candidate(self, candidate, latitude, longitude, heading):
-        """Release a pre-entry lock only after a persistently better match."""
-        if (self.locked_crosswalk is None or candidate is None
-                or (heading is None and not candidate.get('approach_confirmed', False))
-                or self.state not in ('APPROACHING', 'WAIT_AT_CURB', 'ENTRY_ALLOWED')):
-            self._replacement = self._replacement_since = None
+    def reconsider_candidate(self, candidate, latitude, longitude, heading=None,
+                             *, fix_time=None):
+        """Follow nearest selection; retain on-road progress only while plausible."""
+        if self.locked_crosswalk is None:
             return
         old = evaluate_locked_crosswalk(self.locked_crosswalk, latitude, longitude)
-        # Never reinterpret plausible on-road progress as a new approach.
-        before_entry = (old['progress_m'] < self.parameters.entry_start_progress_m
-                        or old['lateral_error_m'] > self.parameters.maximum_lateral_error_m)
-        different = candidate['index'] != old['index']
-        better = (old['edge_distance_m'] - candidate['edge_distance_m']
-                  >= self.parameters.candidate_switch_advantage_m
-                  or (candidate.get('approach_confirmed', False)
-                      and candidate.get('approach_gain_m', 0.0) >= 2.0)
-                  or (heading is not None
-                      and undirected_axis_difference_deg(heading, old['axis_bearing_deg']) > 60.0))
-        if not (before_entry and different and better):
-            self._replacement = self._replacement_since = None
+        different = candidate is None or candidate['index'] != old['index']
+        if self.state not in ('CROSSING', 'CROSSING_URGENT'):
+            if different:
+                self.reset('nearest crosswalk changed')
             return
-        now = self._clock()
-        if self._replacement != candidate['index']:
-            self._replacement, self._replacement_since = candidate['index'], now
-        elif now - self._replacement_since >= self.parameters.candidate_switch_hold_s:
-            self.reset('approach changed; reselecting crosswalk')
-            self._replacement = self._replacement_since = None
+
+        outside = (old['lateral_error_m'] > self.parameters.maximum_lateral_error_m
+                   or old['progress_m'] < -self.parameters.exit_clearance_m
+                   or old['progress_m'] > old['length_m'] + self.parameters.exit_clearance_m)
+        closer = (candidate is not None and different and
+                  old['edge_distance_m'] - candidate['edge_distance_m']
+                  >= self.parameters.candidate_switch_advantage_m)
+        departed = (outside and old['edge_distance_m'] > self.parameters.maximum_lateral_error_m
+                    and (closer or old['edge_distance_m'] > self.parameters.curb_release_distance_m))
+        if not departed:
+            self._replacement_since = self._departure_fix_time = None
+            return
+        observed = self._clock() if fix_time is None else fix_time
+        if self._departure_fix_time is not None and observed <= self._departure_fix_time:
+            return
+        if self._departure_fix_time is None or observed - self._departure_fix_time > 3.0:
+            self._replacement_since = observed
+        self._departure_fix_time = observed
+        if observed - self._replacement_since >= self.parameters.candidate_switch_hold_s:
+            # Release an obsolete track, not a claim that a crossing was completed.
+            self.reset('left tracked crosswalk area; selecting nearest')
 
     def _record_progress(self, progress_m: float) -> None:
         now = self._clock()

@@ -10,6 +10,7 @@ from safestride_navigation.signal_logic import (
     DEFAULT_TIMING_URL, SignalApiClient, SignalApiError,
     current_signal_url, request_signal_data, retry_after_seconds,
     load_signal_api_key,
+    rate_limit_info,
 )
 
 
@@ -84,3 +85,49 @@ def test_saved_key_loads_without_prompt_and_explicit_missing_path_is_not_ignored
     monkeypatch.setenv('SAFESTRIDE_SIGNAL_API_KEY_FILE', str(saved))
     assert load_signal_api_key() == 'saved-test-key'
     assert load_signal_api_key(str(tmp_path / 'missing')) == ''
+
+
+def test_observed_gateway_quota_reset_is_respected_and_survives_restart(tmp_path):
+    body = json.dumps({'message': 'Rate limit exceeded.', 'headers': {
+        'X-RateLimit-Limit': '1000', 'X-RateLimit-Remaining': '-1',
+        'X-RateLimit-Reset': '28819'}}).encode()
+    error = HTTPError('https://example.test', 429, 'failure', {}, io.BytesIO(body))
+    cache = tmp_path / 'backoff.json'
+    client = SignalApiClient(cache_file=cache)
+    with patch('urllib.request.urlopen', side_effect=error):
+        with pytest.raises(SignalApiError) as caught:
+            client.get('secret', '2620', url=DEFAULT_TIMING_URL, timeout_s=1)
+    assert caught.value.retry_after_s == 28819
+    assert 'secret' not in cache.read_text()
+    fetch = Mock()
+    restarted = SignalApiClient(cache_file=cache, fetch=fetch)
+    with pytest.raises(SignalApiError, match='retry in'):
+        restarted.get('secret', '1697', url=DEFAULT_TIMING_URL, timeout_s=1)
+    fetch.assert_not_called()
+    assert restarted.retry_remaining([DEFAULT_TIMING_URL]) > 28800
+
+
+def test_quota_metadata_supports_seconds_and_epoch_reset():
+    assert rate_limit_info({'X-RateLimit-Reset': '120'})['reset_s'] == 120
+    assert rate_limit_info({'X-RateLimit-Reset': '1700000120'}, now=1700000000)['reset_s'] == 120
+
+
+def test_remaining_quota_paces_successful_requests():
+    now = [10.0]
+    fetch = Mock(return_value={'_api_rate_limit': {'remaining': 100, 'reset_s': 1000}})
+    client = SignalApiClient(clock=lambda: now[0], fetch=fetch)
+    client.get('key', '42', url=DEFAULT_TIMING_URL, timeout_s=1)
+    now[0] = 11
+    with pytest.raises(SignalApiError, match='quota pacing'):
+        client.get('key', '42', url=DEFAULT_TIMING_URL, timeout_s=1)
+    assert fetch.call_count == 1
+
+
+def test_blocked_timing_does_not_block_available_phase_endpoint():
+    fetch = Mock(side_effect=[SignalApiError('HTTP 429', retry_after_s=300), {'ok': True}])
+    client = SignalApiClient(clock=lambda: 100, fetch=fetch)
+    with pytest.raises(SignalApiError):
+        client.get('key', '42', url='timing', timeout_s=1)
+    assert client.poll_interval_remaining(['timing', 'phase', '']) == 0
+    client.get('key', '42', url='phase', timeout_s=1)
+    assert client.poll_interval_remaining(['timing', 'phase', '']) == 1

@@ -165,8 +165,15 @@ def resolve_signal_direction(crosswalk, intersection, intersection_id):
         return result
     result.update(signal_direction='', signal_direction_source='unresolved',
                   signal_mapping_reason='no matching intersection geometry')
+    result['signal_direction_candidates'] = []
     if not intersection or str(intersection.get('intersection_id', '')) != str(intersection_id):
         return result
+    # When the intersection centre cannot distinguish the two arms, retain
+    # both possibilities. Only matching live phases can support a decision.
+    axis_normal = (float(crosswalk['axis_bearing_deg']) + 90.0) % 180.0
+    candidates = [direction for i, direction in enumerate(directions)
+                  if undirected_axis_difference_deg(i * 45.0, axis_normal) <= 22.5]
+    result['signal_direction_candidates'] = candidates
     distance = haversine_m(intersection['latitude'], intersection['longitude'],
                            crosswalk['latitude'], crosswalk['longitude'])
     if distance < 5.0:
@@ -183,6 +190,7 @@ def resolve_signal_direction(crosswalk, intersection, intersection_id):
         result['signal_mapping_reason'] = 'ambiguous intersection arm geometry'
         return result
     result.update(signal_direction=bearing_to_direction(normal),
+                  signal_direction_candidates=[bearing_to_direction(normal)],
                   signal_bearing_deg=normal,
                   signal_direction_source='intersection_arm_inferred',
                   signal_mapping_reason='arm inferred from intersection centre and crosswalk axis')

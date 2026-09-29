@@ -15,6 +15,10 @@ def _describe_crosswalk(state, reason, gps_valid, signal_valid, signal_reason):
         return {'state': '방향 확인 중',
                 'reason': '주변 횡단보도 있음; 방향과 횡단보도 선택 확인 중'}
     if not signal_valid:
+        if '429' in signal_reason or 'quota' in signal_reason:
+            return {'state': '신호 없음', 'reason': '신호 API 호출 한도 소진; 재시도 대기 중'}
+        if 'disagree' in signal_reason or 'mapping' in signal_reason or 'geometry' in signal_reason:
+            return {'state': '신호 없음', 'reason': '횡단보도에 해당하는 보행신호 확인 불가'}
         return {'state': '신호 없음',
                 'reason': '신호정보 수신 불가; 횡단 중 실제 신호 직접 확인' if crossing
                 else '신호정보 수신 불가; 실제 신호 직접 확인'}

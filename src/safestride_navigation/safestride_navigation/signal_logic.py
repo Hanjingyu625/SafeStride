@@ -4,6 +4,7 @@ import json
 import math
 import os
 import time
+import threading
 from pathlib import Path
 from email.utils import parsedate_to_datetime
 from concurrent.futures import ThreadPoolExecutor
@@ -73,6 +74,39 @@ def retry_after_seconds(value, now=None):
     return max(1.0, seconds) if math.isfinite(seconds) else 300.0
 
 
+def rate_limit_info(headers, body='', *, now=None):
+    """Seoul's gateway puts its quota headers inside the JSON error body."""
+    values = {}
+    try:
+        nested = json.loads(body).get('headers', {}) if body else {}
+        if isinstance(nested, dict):
+            values.update({str(k).lower(): v for k, v in nested.items()})
+    except (ValueError, AttributeError):
+        pass
+    for name in ('X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'Retry-After'):
+        value = headers.get(name) if headers is not None else None
+        if isinstance(value, (str, int, float)):
+            values[name.lower()] = value
+    result = {}
+    for name, field in (('limit', 'x-ratelimit-limit'),
+                        ('remaining', 'x-ratelimit-remaining'),
+                        ('reset_s', 'x-ratelimit-reset')):
+        try:
+            value = float(values[field])
+            if math.isfinite(value):
+                result[name] = value
+        except (KeyError, ValueError, TypeError):
+            pass
+    if 'reset_s' in result:
+        current = time.time() if now is None else now
+        if result['reset_s'] > 1_000_000_000:
+            result['reset_s'] -= current
+        result['reset_s'] = max(1.0, result['reset_s'])
+    if 'retry-after' in values:
+        result['retry_s'] = retry_after_seconds(values['retry-after'], now=now)
+    return result
+
+
 class SignalApiError(RuntimeError):
     def __init__(self, message, *, status=None, retry_after_s=3.0):
         super().__init__(message)
@@ -82,35 +116,84 @@ class SignalApiError(RuntimeError):
 
 class SignalApiClient:
     """Endpoint-wide backoff, including when the selected intersection changes."""
-    def __init__(self, *, clock=time.monotonic, fetch=None, minimum_interval_s=1.0):
+    def __init__(self, *, clock=time.monotonic, fetch=None, minimum_interval_s=1.0,
+                 cache_file=None):
         if not math.isfinite(minimum_interval_s) or minimum_interval_s <= 0:
             raise ValueError('minimum_interval_s must be finite and positive')
         self._minimum_interval_s = minimum_interval_s
         self._clock = clock
         self._fetch = fetch or request_signal_data
         self._blocked = {}
+        self._lock = threading.Lock()
+        self._cache_file = Path(cache_file).expanduser() if cache_file else None
+        if self._cache_file:
+            try:
+                saved = json.loads(self._cache_file.read_text(encoding='utf-8'))
+                for url, item in saved.items():
+                    remaining = float(item['until']) - time.time()
+                    if math.isfinite(remaining) and remaining > 0:
+                        self._blocked[url] = (self._clock() + remaining, str(item['reason']))
+            except (OSError, ValueError, TypeError, KeyError, AttributeError):
+                pass
+
+    def _save_backoff(self):
+        if self._cache_file is None:
+            return
+        saved = {url: dict(until=time.time() + until - self._clock(), reason=reason)
+                 for url, (until, reason) in self._blocked.items()
+                 if until > self._clock() and reason != 'signal poll interval'}
+        try:
+            self._cache_file.parent.mkdir(parents=True, exist_ok=True)
+            temporary = self._cache_file.with_suffix('.tmp')
+            temporary.write_text(json.dumps(saved), encoding='utf-8')
+            temporary.replace(self._cache_file)
+        except OSError:
+            pass
+
+    def retry_remaining(self, urls):
+        with self._lock:
+            return max([0.0] + [self._blocked.get(current_signal_url(url), (0.0, ''))[0]
+                                - self._clock() for url in urls if url])
 
     def poll_interval_remaining(self, urls):
-        """Let the ROS timer defer normal polls instead of reporting jitter as an API error."""
-        now = self._clock()
-        return max([0.0] + [
-            until - now for url in urls
-            for until, reason in [self._blocked.get(current_signal_url(url), (0.0, ''))]
-            if reason == 'signal poll interval'
-        ])
+        """Poll when at least one endpoint is due; a blocked timer must not spin."""
+        with self._lock:
+            remaining = [max(0.0, self._blocked.get(current_signal_url(url), (0.0, ''))[0]
+                             - self._clock()) for url in urls if url]
+        return min(remaining, default=0.0)
+
+    def wait_reason(self, urls):
+        with self._lock:
+            reasons = [('%s; retry in %.0fs' % (reason, until - self._clock()))
+                       for url in urls if url
+                       for until, reason in [self._blocked.get(current_signal_url(url), (0.0, ''))]
+                       if until > self._clock() and reason != 'signal poll interval']
+        return '; '.join(dict.fromkeys(reasons))
 
     def get(self, api_key, intersection_id, *, url, timeout_s, **kwargs):
         url = current_signal_url(url)
         now = self._clock()
-        until, reason = self._blocked.get(url, (0.0, ''))
-        if now < until:
-            raise SignalApiError('%s; retry in %.1fs' % (reason, until - now),
-                                 retry_after_s=until - now)
-        self._blocked[url] = (now + self._minimum_interval_s, 'signal poll interval')
+        with self._lock:
+            until, reason = self._blocked.get(url, (0.0, ''))
+            if now < until:
+                raise SignalApiError('%s; retry in %.1fs' % (reason, until - now),
+                                     retry_after_s=until - now)
+            self._blocked[url] = (now + self._minimum_interval_s, 'signal poll interval')
         try:
-            return self._fetch(api_key, intersection_id, url=url, timeout_s=timeout_s, **kwargs)
+            record = self._fetch(api_key, intersection_id, url=url, timeout_s=timeout_s, **kwargs)
+            quota = record.get('_api_rate_limit', {})
+            if quota.get('reset_s', 0) > 0 and 'remaining' in quota:
+                interval = max(self._minimum_interval_s,
+                               quota['reset_s'] / max(quota['remaining'], 1.0))
+                if interval > self._minimum_interval_s:
+                    with self._lock:
+                        self._blocked[url] = (self._clock() + interval, 'signal API quota pacing')
+                        self._save_backoff()
+            return record
         except SignalApiError as error:
-            self._blocked[url] = (self._clock() + error.retry_after_s, str(error))
+            with self._lock:
+                self._blocked[url] = (self._clock() + error.retry_after_s, str(error))
+                self._save_backoff()
             raise
 
 
@@ -232,6 +315,20 @@ def evaluate_pedestrian_signal(timing, phase, direction, now, max_age_s=12.0):
         return None, False, str(error)
 
 
+def evaluate_crosswalk_signal(timing, phase, directions, now, max_age_s=12.0):
+    """An unresolved arm requires agreement of every geometrically plausible head."""
+    if not directions:
+        return None, False, 'crosswalk signal mapping unavailable'
+    results = [evaluate_pedestrian_signal(timing, phase, direction, now, max_age_s)
+               for direction in directions]
+    for direction, (_, valid, reason) in zip(directions, results):
+        if not valid:
+            return None, False, 'signal head %s: %s' % (direction, reason)
+    if len({reason for _, _, reason in results}) != 1:
+        return None, False, 'ambiguous signal heads disagree; cannot determine this crosswalk signal'
+    return min(value for value, _, _ in results), True, results[0][2]
+
+
 def request_signal_bundle(api_key, intersection_id, *, url, phase_url,
                           timeout_s, combined_url=None, direction=None, client=None):
     fetch = client.get if client is not None else request_signal_data
@@ -336,12 +433,15 @@ def request_signal_data(
     try:
         with urllib.request.urlopen(request, timeout=timeout_s) as response:
             body = response.read().decode('utf-8-sig')
+            quota = rate_limit_info(response.headers)
     except urllib.error.HTTPError as error:
         detail = error.read().decode('utf-8', errors='replace')
         detail = detail.replace(api_key, '[REDACTED]').replace(
             urllib.parse.quote_plus(api_key), '[REDACTED]')
-        delay = retry_after_seconds(error.headers.get('Retry-After')) if error.code == 429 else (
-            300.0 if error.code in (401, 403, 404) else 5.0)
+        quota = rate_limit_info(error.headers, detail)
+        delay = (max(quota.get('retry_s', 0), quota.get('reset_s', 0)) or 300.0
+                 if error.code == 429 else
+                 300.0 if error.code in (401, 403, 404) else 5.0)
         raise SignalApiError('signal API HTTP %s: %s' % (error.code, detail[:240]),
                              status=error.code, retry_after_s=delay) from None
     except (urllib.error.URLError, TimeoutError, OSError) as error:
@@ -351,7 +451,10 @@ def request_signal_data(
         parsed = json.loads(body)
     except json.JSONDecodeError as error:
         raise ValueError('signal API response is not JSON') from error
-    return latest_signal_record(parsed, intersection_id)
+    record = dict(latest_signal_record(parsed, intersection_id))
+    if quota:
+        record['_api_rate_limit'] = quota
+    return record
 
 
 __all__ = [
