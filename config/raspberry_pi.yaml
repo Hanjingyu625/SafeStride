@@ -268,7 +268,7 @@ crosswalk_controller:
     heading_timeout_s: 5.0  # 진행방향 입력 허용 나이(초)
     heading_min_move_m: 2.0  # 위치 변화로 방향을 계산하는 최소 이동거리(m)
     heading_max_step_m: 30.0  # 방향 추정에서 허용할 최대 위치 변화(m). 큰 GPS 점프 제외
-    candidate_heading_tolerance_deg: 60.0  # 호환용. 최근접 선택에는 방위를 사용하지 않음
+    candidate_heading_tolerance_deg: 60.0  # 유효 진행방향과 횡단축·중심방위의 최대 오차(도); 방향 없으면 거리 선택
     candidate_switch_hold_s: 2.0  # 횡단 중 기존 영역 이탈을 서로 다른 GPS fix로 확인하는 시간
     candidate_switch_advantage_m: 3.0  # 횡단 중 이탈 시 새 후보가 더 가까워야 하는 거리
     gps_course_min_speed_mps: 0.20  # GPS 노드와 같은 이동 방위 최소 속도

@@ -2,7 +2,7 @@
 
 from collections import deque
 
-from .crosswalk_data import crosswalk_edge_distance_m, nearest_crosswalk
+from .crosswalk_data import crosswalk_edge_distance_m, nearest_crosswalk, number
 
 
 class ApproachSelector:
@@ -35,7 +35,7 @@ class ApproachSelector:
                 >= 0.7 * (len(distances) - 1))
 
     def select(self, index, latitude, longitude, fix_time, *, maximum_distance_m,
-               heading_deg=None):
+               heading_deg=None, heading_tolerance_deg=60.0):
         if self._last_fix is not None and (
                 fix_time < self._last_fix or fix_time - self._last_fix > self.MAX_FIX_GAP_S):
             self.reset()
@@ -61,14 +61,19 @@ class ApproachSelector:
                     self._excluded.add(key)
                     history.clear()
             self._last_fix = fix_time
+        heading = number(heading_deg)
+        eligible = [record for record in records if record['index'] not in self._excluded]
         selected = nearest_crosswalk(
-            [record for record in records if record['index'] not in self._excluded],
-            latitude, longitude, maximum_distance_m=maximum_distance_m)
+            eligible,
+            latitude, longitude, maximum_distance_m=maximum_distance_m,
+            heading_deg=heading, maximum_heading_error_deg=heading_tolerance_deg)
         self.selected = selected['index'] if selected else None
-        self.reason = ('nearest crosswalk selected' if selected else
+        self.reason = ('nearest heading-aligned crosswalk selected' if selected and heading is not None else
+                       'nearest crosswalk selected' if selected else
+                       'no crosswalk aligned with heading' if eligible and heading is not None else
                        'all nearby crosswalks receding' if records else
                        'no crosswalk within search range')
         if selected is not None:
-            selected.update(selection_source='nearest_distance',
+            selected.update(selection_source='nearest_heading' if heading is not None else 'nearest_distance',
                             search_candidate_count=self.candidate_count)
         return selected

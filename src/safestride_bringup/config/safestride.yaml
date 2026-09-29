@@ -265,7 +265,7 @@ crosswalk_controller:
     heading_timeout_s: 5.0
     heading_min_move_m: 2.0
     heading_max_step_m: 30.0
-    candidate_heading_tolerance_deg: 60.0
+    candidate_heading_tolerance_deg: 60.0  # 유효 진행방향과 횡단축·중심방위의 최대 오차(도); 방향 없으면 거리 선택
     gps_change_threshold_m: 0.5
     gps_stuck_timeout_s: 5.0
     gps_stuck_speed_mps: 0.15

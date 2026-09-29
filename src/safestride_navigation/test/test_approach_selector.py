@@ -10,8 +10,8 @@ def crossing(index=1, east=0, north=20):
                 length_m=10.0, width_m=3.0, axis_bearing_deg=0.0)
 
 
-@pytest.mark.parametrize('heading', [None, 0, 90, 180, 270])
-def test_stationary_first_fix_selects_nearest_regardless_of_heading(heading):
+@pytest.mark.parametrize('heading', [None, float('nan'), float('inf')])
+def test_missing_or_invalid_heading_selects_nearest(heading):
     selector = ApproachSelector()
     index = CrosswalkSpatialIndex([crossing(1), crossing(2, north=-10)])
     selected = selector.select(index, 0, 0, 1, maximum_distance_m=80, heading_deg=heading)
@@ -131,3 +131,30 @@ def test_gps_gap_resets_retreat_evidence():
         selector.select(index, north / 111320, 0, t, maximum_distance_m=80)
     assert selector.selected is None
     assert selector.select(index, -2.4 / 111320, 0, 10, maximum_distance_m=80)
+
+
+def test_heading_selects_ahead_instead_of_closer_behind_and_falls_back_when_lost():
+    selector = ApproachSelector()
+    index = CrosswalkSpatialIndex([crossing(1), crossing(2, north=-10)])
+    assert selector.select(index, 0, 0, 1, maximum_distance_m=80, heading_deg=0)['index'] == 1
+    assert selector.select(index, 0, 0, 1, maximum_distance_m=80, heading_deg=180)['index'] == 2
+    selected = selector.select(index, 0, 0, 1, maximum_distance_m=80)
+    assert selected['index'] == 2
+    assert selected['selection_source'] == 'nearest_distance'
+
+
+def test_valid_heading_without_aligned_crossing_does_not_choose_sideways():
+    selector = ApproachSelector()
+    index = CrosswalkSpatialIndex([crossing()])
+    assert selector.select(index, 0, 0, 1, maximum_distance_m=80, heading_deg=90) is None
+    assert selector.select(index, 0, 0, 1, maximum_distance_m=80,
+                           heading_deg=90, heading_tolerance_deg=100)['index'] == 1
+
+
+def test_heading_filter_preserves_retreat_exclusion():
+    selector = ApproachSelector()
+    index = CrosswalkSpatialIndex([crossing()])
+    for t, north in enumerate([0, -1.2, -2.4]):
+        selected = selector.select(index, north / 111320, 0, t,
+                                   maximum_distance_m=80, heading_deg=0)
+    assert selected is None

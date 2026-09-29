@@ -1097,6 +1097,7 @@ class CrosswalkController(Node):
                     self._fix_time,
                     maximum_distance_m=self._maximum_crosswalk_distance,
                     heading_deg=heading,
+                    heading_tolerance_deg=self._heading_tolerance,
                 )
                 if self._crosswalk_index is not None
                 else None

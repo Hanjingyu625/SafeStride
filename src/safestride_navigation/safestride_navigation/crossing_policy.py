@@ -116,7 +116,7 @@ class CrossingStateMachine:
     ) -> Optional[Dict[str, Any]]:
         # Nearest selection releases obsolete locks in reconsider_candidate.
         if (self.state not in ('CROSSING', 'CROSSING_URGENT', 'EXITING')
-                and (self.locked_crosswalk or {}).get('selection_source') != 'nearest_distance'):
+                and (self.locked_crosswalk or {}).get('selection_source') not in ('nearest_distance', 'nearest_heading')):
             if self.locked_crosswalk is not None:
                 locked = self.locked_crosswalk
                 changed = candidate is None or any(
