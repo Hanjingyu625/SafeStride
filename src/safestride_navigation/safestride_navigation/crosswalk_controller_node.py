@@ -25,6 +25,7 @@ from .crosswalk_data import (
     CrosswalkSpatialIndex,
     load_crosswalks,
     resolve_signal_direction,
+    SignalDirectionFallback,
 )
 from .gps_motion import GpsFixGate, GpsMotionTracker, StationaryPosition, select_motion_measurement
 from .intersection_map import (
@@ -293,6 +294,7 @@ class CrosswalkController(Node):
         self._signal_cache_id = ''
         self._phase_cache = None
         self._signal_cache_time: Optional[float] = None
+        self._signal_direction_fallback = SignalDirectionFallback()
         self._signal_countdown = SignalCountdown()
         self._last_signal_request = -math.inf
         self._signal_client = SignalApiClient(
@@ -784,6 +786,9 @@ class CrosswalkController(Node):
             'signal_direction': str(active.get('signal_direction', '')) if active else '',
             'signal_direction_source': str(active.get('signal_direction_source', 'unknown')) if active else '',
             'signal_valid': signal_valid,
+            'signal_mapping_provisional': bool((active or {}).get('signal_mapping_provisional')),
+            'provisional_signal_color': (active or {}).get('provisional_signal_color', 'UNKNOWN'),
+            'provisional_signal_countdown_s': (active or {}).get('provisional_signal_countdown_s'),
             'signal_countdown_s': self._signal_countdown.remaining(
                 intersection_id, [active.get('signal_direction', '')] if active else [],
                 self._now()) if signal_valid else None,
@@ -1139,8 +1144,10 @@ class CrosswalkController(Node):
             if preview is not None:
                 preview = resolve_signal_direction(
                     preview, self._nearest_intersection, intersection_id)
+                preview = self._signal_direction_fallback.select(preview, intersection_id)
                 mapping = {key: preview[key] for key in (
-                    'signal_direction', 'signal_direction_source', 'signal_mapping_reason')}
+                    'signal_direction', 'signal_direction_source', 'signal_mapping_reason',
+                    'signal_mapping_provisional')}
                 mapping['signal_direction_candidates'] = preview.get('signal_direction_candidates', [])
                 if candidate is not None and candidate['index'] == preview['index']:
                     candidate.update(mapping)
@@ -1162,6 +1169,23 @@ class CrosswalkController(Node):
                 else:
                     signal_reason = 'outside signal lookup range; starts within %.1f m' % (
                         self._signal_activation_distance)
+                provisional = bool(preview.get('signal_mapping_provisional'))
+                observed = {
+                    'provisional_signal_color': (
+                        'RED' if provisional and signal_valid and signal_reason == 'red pedestrian signal'
+                        else 'GREEN' if provisional and signal_valid and signal_reason == 'green pedestrian signal'
+                        else 'UNKNOWN'),
+                    'provisional_signal_countdown_s': (
+                        self._signal_countdown.remaining(intersection_id, lookup_directions, now)
+                        if provisional and signal_valid else None),
+                }
+                if candidate is not None and candidate['index'] == preview['index']:
+                    candidate.update(observed)
+                if self._controller.locked_crosswalk is not None:
+                    self._controller.locked_crosswalk.update(observed)
+                if provisional:
+                    signal_remaining_s, signal_valid = None, False
+                    signal_reason = 'unverified signal mapping; provisional lookup only; ' + signal_reason
                 if not preview['signal_direction'] and not signal_valid:
                     signal_reason = preview['signal_mapping_reason'] + '; ' + signal_reason
             else:

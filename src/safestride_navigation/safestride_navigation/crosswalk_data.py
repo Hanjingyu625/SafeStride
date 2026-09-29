@@ -2,6 +2,7 @@
 
 import json
 import math
+import random
 from collections import defaultdict
 from pathlib import Path
 from typing import (
@@ -179,7 +180,7 @@ def resolve_signal_direction(crosswalk, intersection, intersection_id):
     result['signal_direction_candidates'] = candidates
     distance = haversine_m(intersection['latitude'], intersection['longitude'],
                            crosswalk['latitude'], crosswalk['longitude'])
-    if distance < 5.0:
+    if distance < 1.0:
         result['signal_mapping_reason'] = 'crosswalk too close to intersection centre to resolve arm'
         return result
     radial = bearing_deg(intersection['latitude'], intersection['longitude'],
@@ -205,6 +206,37 @@ def resolve_signal_direction(crosswalk, intersection, intersection_id):
                   signal_direction_source='intersection_arm_inferred',
                   signal_mapping_reason='official right-side pedestrian signal group inferred from geometry')
     return result
+
+
+class SignalDirectionFallback:
+    """Keep tentative lookup choices separate from confirmed crossing guidance."""
+
+    def __init__(self, choose=None):
+        self._choose = choose or random.choice
+        self._previous = {}
+        self._choices = {}
+
+    def select(self, resolved, intersection_id):
+        result = dict(resolved)
+        result['signal_mapping_provisional'] = False
+        directions = ('nt', 'ne', 'et', 'se', 'st', 'sw', 'wt', 'nw')
+        direction = result.get('signal_direction', '')
+        if intersection_id and direction in directions:
+            self._previous[str(intersection_id)] = direction
+            return result
+        candidates = [d for d in result.get('signal_direction_candidates', []) if d in directions]
+        if not intersection_id or not candidates:
+            return result
+        previous = self._previous.get(str(intersection_id))
+        key = (str(intersection_id), result['index'], tuple(candidates), previous)
+        if key not in self._choices:
+            self._choices[key] = (min(candidates, key=lambda d: angular_difference_deg(
+                directions.index(d) * 45.0, directions.index(previous) * 45.0))
+                if previous else self._choose(candidates))
+        result.update(signal_direction=self._choices[key], signal_mapping_provisional=True,
+                      signal_direction_source='previous_direction_candidate' if previous else 'random_candidate',
+                      signal_mapping_reason='unverified signal mapping; provisional lookup only')
+        return result
 
 
 def undirected_axis_difference_deg(first: float, second: float) -> float:

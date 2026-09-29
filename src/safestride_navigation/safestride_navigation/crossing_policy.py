@@ -258,6 +258,9 @@ class CrossingStateMachine:
             self.reset('no crosswalk candidate')
             return None, None, None
 
+        if active.get('signal_mapping_provisional', False):
+            signal_valid = False
+
         if (self.state in ('WAIT_AT_CURB', 'ENTRY_ALLOWED')
                 and self.locked_crosswalk is None):
             self.set_state('APPROACHING', 'rechecking crosswalk selection')

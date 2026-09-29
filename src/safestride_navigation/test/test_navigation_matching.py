@@ -124,3 +124,49 @@ def test_slow_entry_estimate_is_not_raised_to_minimum_speed():
         safe_speed_mps=0.1, measured_speed_mps=0.1)
     assert required == pytest.approx(103)
     assert machine.state == 'WAIT_AT_CURB'
+
+
+def test_geometry_accepts_one_to_five_metres_but_rejects_under_one():
+    assert arm(crossing(east=2), 0)['signal_direction'] == 'st'
+    assert arm(crossing(east=.5), 0)['signal_direction'] == ''
+
+
+def test_previous_signal_direction_selects_nearest_candidate_without_other_intersection_leak():
+    from safestride_navigation.crosswalk_data import SignalDirectionFallback
+    fallback = SignalDirectionFallback(choose=lambda choices: choices[-1])
+    confirmed = dict(index=1, signal_direction='ne')
+    fallback.select(confirmed, '42')
+    ambiguous = dict(index=2, signal_direction='', signal_direction_candidates=['nt', 'st'])
+    selected = fallback.select(ambiguous, '42')
+    assert selected['signal_direction'] == 'nt'
+    assert selected['signal_direction_source'] == 'previous_direction_candidate'
+    assert selected['signal_mapping_provisional']
+    assert fallback.select(ambiguous, '43')['signal_direction_source'] == 'random_candidate'
+
+
+def test_random_choice_is_stable_and_not_used_as_confirmed_history():
+    from safestride_navigation.crosswalk_data import SignalDirectionFallback
+    calls = []
+    def choose(choices):
+        calls.append(choices)
+        return choices[-1]
+    fallback = SignalDirectionFallback(choose=choose)
+    ambiguous = dict(index=2, signal_direction='', signal_direction_candidates=['et', 'wt'])
+    for _ in range(10):
+        selected = fallback.select(ambiguous, '42')
+        assert selected['signal_direction'] == 'wt'
+        assert selected['signal_mapping_provisional']
+        assert selected['signal_direction_source'] == 'random_candidate'
+    assert len(calls) == 1
+    assert fallback.select(dict(index=3, signal_direction='', signal_direction_candidates=[]), '42')['signal_direction'] == ''
+
+
+def test_provisional_green_never_allows_entry():
+    item = nearest_crosswalk([crossing(east=0, north=5)], 0, 0)
+    item['signal_mapping_provisional'] = True
+    machine = CrossingStateMachine()
+    for _ in range(3):
+        machine.update(candidate=item, intersection_id='42', latitude=0, longitude=0,
+                       signal_remaining_s=100, signal_valid=True, safe_speed_mps=1,
+                       measured_speed_mps=.5)
+    assert not machine.command(1, .5)['entry_allowed']
