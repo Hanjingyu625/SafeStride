@@ -19,9 +19,9 @@ def arm(item, heading):
 
 
 def test_same_crosswalk_signal_arm_does_not_flip_with_walking_direction():
-    assert arm(crossing(), 0)['signal_direction'] == 'et'
-    assert arm(crossing(), 180)['signal_direction'] == 'et'
-    assert arm(crossing(east=-20), 0)['signal_direction'] == 'wt'
+    assert arm(crossing(), 0)['signal_direction'] == 'st'
+    assert arm(crossing(), 180)['signal_direction'] == 'st'
+    assert arm(crossing(east=-20), 0)['signal_direction'] == 'nt'
 
 
 @pytest.mark.parametrize('item', [crossing(east=1), crossing(east=0, north=20), crossing(axis=22.5)])
@@ -34,7 +34,23 @@ def test_near_centre_field_geometry_retains_both_arms_without_user_heading():
     for heading in (None, 83.1, 263.1):
         resolved = arm(item, heading)
         assert resolved['signal_direction'] == ''
-        assert set(resolved['signal_direction_candidates']) == {'nt', 'st'}
+        assert set(resolved['signal_direction_candidates']) == {'et', 'wt'}
+
+
+def test_official_west_crosswalk_example_maps_to_north_pedestrian_group():
+    resolved = arm(crossing(east=-20, north=0, axis=0), 180)
+    assert resolved['signal_direction'] == 'nt'
+    assert resolved['signal_mapping_reason'].startswith('official right-side')
+
+
+@pytest.mark.parametrize(('item', 'expected'), (
+    (crossing(east=0, north=20, axis=90), 'et'),
+    (crossing(east=20, north=0, axis=0), 'st'),
+    (crossing(east=0, north=-20, axis=90), 'wt'),
+    (crossing(east=-20, north=0, axis=0), 'nt'),
+))
+def test_official_pedestrian_group_rotates_clockwise_from_crosswalk_side(item, expected):
+    assert arm(item, item['axis_bearing_deg'])['signal_direction'] == expected
 
 
 def test_explicit_mapping_overrides_inference_and_mismatched_map_is_not_used():

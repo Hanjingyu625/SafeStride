@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from safestride_navigation.signal_logic import (
     evaluate_pedestrian_signal, evaluate_crosswalk_signal, request_signal_bundle,
+    signal_lookup_active, timing_required_for_phase,
 )
 from safestride_navigation.gps_motion import StationaryPosition
 
@@ -68,6 +69,27 @@ class SignalPhaseTests(unittest.TestCase):
         self.assertIsNone(result['timing'])
         self.assertEqual(result['phase'], self.phase)
         self.assertEqual(result['timing_error'], 'timing unavailable')
+
+    def test_red_or_first_lookup_uses_only_phase_endpoint(self):
+        with patch('safestride_navigation.signal_logic.request_signal_data',
+                   return_value=self.phase) as fetch:
+            result = request_signal_bundle(
+                'test', '42', url='timing', phase_url='phase', timeout_s=1,
+                timing_required=False)
+        self.assertEqual(result, {'phase': self.phase})
+        fetch.assert_called_once_with('test', '42', url='phase', timeout_s=1)
+
+    def test_signal_lookup_uses_polygon_edge_twenty_metre_gate(self):
+        self.assertTrue(signal_lookup_active({'edge_distance_m': 20.0}, 20.0))
+        self.assertFalse(signal_lookup_active({'edge_distance_m': 20.01}, 20.0))
+        self.assertFalse(signal_lookup_active(None, 20.0))
+
+    def test_only_possible_green_requires_timing_endpoint(self):
+        self.assertFalse(timing_required_for_phase(None, ['nt']))
+        self.assertFalse(timing_required_for_phase(
+            {'ntPdsgStatNm': 'stop-And-Remain'}, ['nt']))
+        self.assertTrue(timing_required_for_phase(
+            {'ntPdsgStatNm': 'permissive-Movement-Allowed'}, ['nt']))
 
     def test_combined_current_record_keeps_phase_and_countdown_paired(self):
         combined = {**self.timing, **self.phase}

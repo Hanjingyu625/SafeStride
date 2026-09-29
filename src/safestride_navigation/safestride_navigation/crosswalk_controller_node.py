@@ -44,6 +44,8 @@ from .signal_logic import (
     SignalApiClient,
     evaluate_crosswalk_signal,
     load_signal_api_key,
+    signal_lookup_active,
+    timing_required_for_phase,
 )
 from .speed_profile import UserSpeedProfile
 
@@ -112,7 +114,8 @@ class CrosswalkController(Node):
             'wheel_motion_min_speed_mps': 0.02,
             'wheel_motion_hold_s': 3.5,
             'allow_gps_speed_fallback': False,
-            'signal_refresh_interval_s': 1.0,
+            'signal_refresh_interval_s': 3.0,
+            'signal_activation_distance_m': 20.0,
             'signal_cache_max_age_s': 12.0,
             'signal_request_timeout_s': 3.0,
             'maximum_crosswalk_distance_m': 80.0,
@@ -218,6 +221,9 @@ class CrosswalkController(Node):
         )
         self._signal_refresh = self._positive(
             'signal_refresh_interval_s'
+        )
+        self._signal_activation_distance = self._positive(
+            'signal_activation_distance_m'
         )
         self._signal_cache_max_age = self._positive(
             'signal_cache_max_age_s'
@@ -659,8 +665,15 @@ class CrosswalkController(Node):
         )
 
     def _request_signal_if_due(self, intersection_id: str, now: float,
-                               direction: str) -> None:
-        request_key = (intersection_id, direction)
+                               direction: str, directions=None) -> None:
+        directions = directions or ([direction] if direction else [])
+        cached_phase = (
+            self._phase_cache
+            if self._signal_cache_id == intersection_id
+            else None
+        )
+        timing_required = timing_required_for_phase(cached_phase, directions)
+        request_key = (intersection_id, tuple(directions), timing_required)
         if (
             not self._api_key
             or not intersection_id
@@ -683,6 +696,7 @@ class CrosswalkController(Node):
             timeout_s=self._signal_request_timeout,
             direction=direction,
             client=self._signal_client,
+            timing_required=timing_required,
         )
 
     def _signal_state(
@@ -696,7 +710,7 @@ class CrosswalkController(Node):
             return None, False, 'no matched V2X intersection'
         if not self._api_key:
             return None, False, 'signal API key unavailable'
-        self._request_signal_if_due(intersection_id, now, direction)
+        self._request_signal_if_due(intersection_id, now, direction, directions)
         if self._signal_cache_id != intersection_id:
             return None, False, (self._signal_client.wait_reason((self._signal_url, self._phase_url))
                                  or 'awaiting signal for intersection ' + intersection_id)
@@ -1139,15 +1153,22 @@ class CrosswalkController(Node):
                     candidate.update(mapping)
                 if self._controller.locked_crosswalk is not None:
                     self._controller.locked_crosswalk.update(mapping)
-                signal_remaining_s, signal_valid, signal_reason = (
-                    self._signal_state(
-                        intersection_id,
-                        str(preview['signal_direction']),
-                        now,
-                        directions=([preview['signal_direction']] if preview['signal_direction']
-                                    else preview.get('signal_direction_candidates', [])),
-                    )
+                lookup_directions = (
+                    [preview['signal_direction']] if preview['signal_direction']
+                    else preview.get('signal_direction_candidates', [])
                 )
+                if signal_lookup_active(preview, self._signal_activation_distance):
+                    signal_remaining_s, signal_valid, signal_reason = (
+                        self._signal_state(
+                            intersection_id,
+                            str(preview['signal_direction']),
+                            now,
+                            directions=lookup_directions,
+                        )
+                    )
+                else:
+                    signal_reason = 'outside signal lookup range; starts within %.1f m' % (
+                        self._signal_activation_distance)
                 if not preview['signal_direction'] and not signal_valid:
                     signal_reason = preview['signal_mapping_reason'] + '; ' + signal_reason
                 elif not preview['signal_direction'] and signal_valid:

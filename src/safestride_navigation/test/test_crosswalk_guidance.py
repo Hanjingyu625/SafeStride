@@ -52,3 +52,10 @@ class GuidanceTest(unittest.TestCase):
     def test_gps_loss_overrides_permission(self):
         self.assertEqual(describe_crosswalk('ENTRY_ALLOWED', '', False, True)['state'], '안내 없음')
         self.assertEqual(describe_crosswalk('CROSSING', '', False, True)['state'], '주의')
+
+    def test_outside_twenty_metres_is_approach_not_api_failure(self):
+        result = describe_crosswalk(
+            'APPROACHING', '', True, False,
+            signal_reason='outside signal lookup range; starts within 20.0 m')
+        self.assertEqual(result['decision'], 'NONE')
+        self.assertIn('20m', result['reason'])

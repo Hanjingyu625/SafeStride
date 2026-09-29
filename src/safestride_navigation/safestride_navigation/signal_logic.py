@@ -329,8 +329,29 @@ def evaluate_crosswalk_signal(timing, phase, directions, now, max_age_s=12.0):
     return min(value for value, _, _ in results), True, results[0][2]
 
 
+def signal_lookup_active(crosswalk, maximum_distance_m):
+    """Only spend live-signal quota close to the selected crosswalk."""
+    if not crosswalk or not math.isfinite(maximum_distance_m) or maximum_distance_m <= 0:
+        return False
+    try:
+        distance = float(crosswalk.get('edge_distance_m'))
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(distance) and distance >= 0 and distance <= maximum_distance_m
+
+
+def timing_required_for_phase(phase, directions):
+    """Red needs only phase data; a possible green also needs countdown data."""
+    if not phase:
+        return False
+    green = {'protected-Movement-Allowed', 'permissive-Movement-Allowed'}
+    return any(phase.get(direction + 'PdsgStatNm') in green
+               for direction in directions)
+
+
 def request_signal_bundle(api_key, intersection_id, *, url, phase_url,
-                          timeout_s, combined_url=None, direction=None, client=None):
+                          timeout_s, combined_url=None, direction=None, client=None,
+                          timing_required=True):
     fetch = client.get if client is not None else request_signal_data
     combined_error = ''
     if combined_url:
@@ -354,10 +375,13 @@ def request_signal_bundle(api_key, intersection_id, *, url, phase_url,
         except (RuntimeError, ValueError) as error:
             combined_error = str(error)
     # Independent results allow a confirmed red even when countdown retrieval fails.
-    with ThreadPoolExecutor(max_workers=2) as pool:
+    endpoints = [('phase', phase_url)]
+    if timing_required:
+        endpoints.insert(0, ('timing', url))
+    with ThreadPoolExecutor(max_workers=len(endpoints)) as pool:
         futures = {name: pool.submit(fetch, api_key, intersection_id,
                    url=endpoint, timeout_s=timeout_s)
-                   for name, endpoint in (('timing', url), ('phase', phase_url))}
+                   for name, endpoint in endpoints}
         result = {}
         if combined_error:
             result['combined_error'] = combined_error
