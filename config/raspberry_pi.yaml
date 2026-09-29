@@ -235,15 +235,16 @@ crosswalk_controller:
     intersection_map_file: ''  # 로컬 교차로 지도 파일 경로
     intersection_map_cache_file: ~/.cache/safestride/v2x_intersections.json  # 조회 지도 캐시 경로
     maximum_intersection_distance_m: 120.0  # 교차로 매칭 최대 허용거리(m)
+    intersection_ambiguity_margin_m: 0.0  # 선택 횡단보도 중심에서 가장 가까운 교차로를 선택
     update_rate_hz: 5.0  # 횡단보도 상태 계산 주기(Hz)
     gps_timeout_s: 2.0  # 위치 입력 허용 나이(초)
     speed_timeout_s: 1.0  # 속도 입력 허용 나이(초)
     heading_timeout_s: 5.0  # 진행방향 입력 허용 나이(초)
     heading_min_move_m: 2.0  # 위치 변화로 방향을 계산하는 최소 이동거리(m)
     heading_max_step_m: 30.0  # 방향 추정에서 허용할 최대 위치 변화(m). 큰 GPS 점프 제외
-    candidate_heading_tolerance_deg: 60.0  # 이전 방향 필터 호환값. 현재 거리 추세 선택에는 사용하지 않음
-    candidate_switch_hold_s: 2.0  # 진입 전 더 적합한 후보가 지속돼야 하는 시간
-    candidate_switch_advantage_m: 3.0  # 현재 후보보다 이만큼 가까울 때 변경 검토
+    candidate_heading_tolerance_deg: 60.0  # 호환용. 최근접 선택에는 방위를 사용하지 않음
+    candidate_switch_hold_s: 2.0  # 횡단 중 기존 영역 이탈을 서로 다른 GPS fix로 확인하는 시간
+    candidate_switch_advantage_m: 3.0  # 횡단 중 이탈 시 새 후보가 더 가까워야 하는 거리
     gps_course_min_speed_mps: 0.20  # GPS 노드와 같은 이동 방위 최소 속도
     gps_change_threshold_m: 0.5  # GPS 위치가 갱신됐다고 인정하는 거리 변화(m)
     gps_stuck_timeout_s: 5.0  # 움직임이 있는데 좌표가 변하지 않으면 GPS 정체로 판단하는 시간(초)
@@ -251,7 +252,7 @@ crosswalk_controller:
     wheel_motion_min_speed_mps: 0.02  # 바퀴 이동으로 인정할 최소 속도(m/s)
     wheel_motion_hold_s: 3.5  # 최근 바퀴 이동 확인을 유지할 최대 시간(초). 저속 펄스 간격 고려
     allow_gps_speed_fallback: false  # false: Hall odometry 우선/필수. GPS 속도만으로 이동을 대신 확인하지 않음
-    signal_refresh_interval_s: 1.0  # 정상 응답 시 각 API를 약 1초마다 조회. 429는 재시도 대기 준수
+    signal_refresh_interval_s: 1.0  # 최소 조회 간격. 서버의 잔여 호출량/초기화 시간에 따라 자동 연장
     signal_cache_max_age_s: 12.0  # 신호 캐시 최대 허용 나이(초)
     signal_request_timeout_s: 3.0  # 신호 API 요청 제한시간(초)
     maximum_crosswalk_distance_m: 80.0  # 횡단보도 후보 탐색 최대거리(m)

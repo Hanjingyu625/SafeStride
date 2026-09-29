@@ -188,12 +188,23 @@ class StationaryPosition:
         self.position = None
         self.time = None
         self.held = False
+        self._outside_since = None
 
     def update(self, latitude, longitude, now, stationary, timeout_s=2.0):
         continuous = self.time is not None and 0 <= now - self.time <= timeout_s
         self.held = stationary and continuous and self.position is not None
+        if self.held:
+            distance = haversine_m(*self.position, latitude, longitude)
+            if distance > 3.0:
+                if self._outside_since is None:
+                    self._outside_since = now
+                elif now - self._outside_since >= 2.0:
+                    self.held = False
+            else:
+                self._outside_since = None
         if not self.held:
             self.position = (latitude, longitude)
+            self._outside_since = None
         self.time = now
         return self.position
 

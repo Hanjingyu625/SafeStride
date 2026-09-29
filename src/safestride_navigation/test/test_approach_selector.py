@@ -10,109 +10,71 @@ def crossing(index=1, east=0, north=20):
                 length_m=10.0, width_m=3.0, axis_bearing_deg=0.0)
 
 
-def sample(selector, index, t, north, heading=None):
-    return selector.select(index, north / 111320, 0.0, t,
-                           maximum_distance_m=80.0, heading_deg=heading)
-
-
-@pytest.mark.parametrize('heading', [None, 180.0])
-def test_approach_without_heading_or_with_wrong_heading(heading):
+@pytest.mark.parametrize('heading', [None, 0, 90, 180, 270])
+def test_stationary_first_fix_selects_nearest_regardless_of_heading(heading):
     selector = ApproachSelector()
-    index = CrosswalkSpatialIndex([crossing()])
-    for t in range(5):
-        assert sample(selector, index, t, t, heading) is None
-    selected = sample(selector, index, 5, 5, heading)
-    assert selected['index'] == 1
-    assert selected['approach_confirmed']
-
-
-def test_stationary_jitter_and_single_jump_do_not_select():
-    index = CrosswalkSpatialIndex([crossing()])
-    for positions in ([0, .3, -.2, .4, 0, -.4, .2, 0, .1],
-                      [0, 0, 0, 4, 4, 4, 4, 4, 4]):
-        selector = ApproachSelector()
-        for t, north in enumerate(positions):
-            assert sample(selector, index, t, north) is None
-
-
-def test_equal_approaches_remain_ambiguous():
-    selector = ApproachSelector()
-    index = CrosswalkSpatialIndex([crossing(1, -5), crossing(2, 5)])
-    for t in range(8):
-        assert sample(selector, index, t, t) is None
-    assert selector.reason == 'ambiguous approaching crosswalks'
-    assert selector.candidate_count == 2
-
-
-def test_repeated_tick_cannot_create_progress_or_finish_hold():
-    selector = ApproachSelector()
-    index = CrosswalkSpatialIndex([crossing()])
-    for t in range(4):
-        assert sample(selector, index, t, t) is None
-    for _ in range(30):
-        assert sample(selector, index, 3, 3) is None
-    assert len(selector.history) == 4
-
-
-def test_stop_preserves_selection_retreat_releases_and_gap_clears_history():
-    selector = ApproachSelector()
-    index = CrosswalkSpatialIndex([crossing()])
-    for t in range(6):
-        selected = sample(selector, index, t, t)
-    assert selected['index'] == 1
-    for t in range(6, 18):
-        assert sample(selector, index, t, 5)['index'] == 1
-    for t in range(18, 22):
-        selected = sample(selector, index, t, 5 - (t - 17))
-    assert selected is None
-    assert sample(selector, index, 30, 10) is None
-    assert len(selector.history) == 1
-
-
-def test_moving_away_never_selects():
-    selector = ApproachSelector()
-    index = CrosswalkSpatialIndex([crossing()])
-    for t in range(10):
-        assert sample(selector, index, t, -t) is None
-
-
-def test_closer_receding_crosswalk_loses_to_approaching_crosswalk():
-    selector = ApproachSelector()
-    index = CrosswalkSpatialIndex([crossing(1), crossing(2, north=-5)])
-    for t in range(6):
-        selected = sample(selector, index, t, t)
-    assert selected['index'] == 1
-
-
-def test_turning_reselects_using_distance_without_heading():
-    selector = ApproachSelector()
-    index = CrosswalkSpatialIndex([crossing(1, north=30), crossing(2, east=30, north=5)])
-    for t in range(6):
-        selected = sample(selector, index, t, t)
-    assert selected['index'] == 1
-    for t in range(6, 23):
-        selected = selector.select(index, 5 / 111320, (t - 5) / 111320, t,
-                                   maximum_distance_m=80)
+    index = CrosswalkSpatialIndex([crossing(1), crossing(2, north=-10)])
+    selected = selector.select(index, 0, 0, 1, maximum_distance_m=80, heading_deg=heading)
     assert selected['index'] == 2
+    assert selected['selection_source'] == 'nearest_distance'
 
 
-def test_lock_can_change_without_heading_only_before_entry_after_hold():
-    now = [0.0]
-    machine = CrossingStateMachine(clock=lambda: now[0])
-    index = CrosswalkSpatialIndex([crossing(1, 10), crossing(2)])
-    old = index.nearest(0, 0, maximum_distance_m=80)
-    old['index'] = 1
-    candidate = dict(old, index=2, approach_confirmed=True, approach_gain_m=3.0)
-    machine.lock(old, '42')
-    machine.set_state('APPROACHING', 'test')
-    machine.reconsider_candidate(candidate, 0, 0, None)
-    assert machine.locked_crosswalk is not None
-    now[0] = 2.0
-    machine.reconsider_candidate(candidate, 0, 0, None)
+def test_new_closest_is_selected_immediately_and_out_of_range_clears():
+    selector = ApproachSelector()
+    index = CrosswalkSpatialIndex([crossing(1), crossing(2, north=60)])
+    assert selector.select(index, 0, 0, 1, maximum_distance_m=80)['index'] == 1
+    assert selector.select(index, 50 / 111320, 0, 2, maximum_distance_m=80)['index'] == 2
+    assert selector.select(index, 200 / 111320, 0, 3, maximum_distance_m=80) is None
+    assert selector.selected is None
+
+
+def test_nearest_uses_polygon_edge_not_centre():
+    selector = ApproachSelector()
+    long = dict(crossing(1, north=35), length_m=60)
+    short = crossing(2, north=20)
+    index = CrosswalkSpatialIndex([long, short])
+    assert selector.select(index, 0, 0, 1, maximum_distance_m=80)['index'] == 1
+
+
+@pytest.mark.parametrize('state', ['CROSSING', 'CROSSING_URGENT'])
+def test_departed_crossing_releases_after_distinct_fixes_even_130_metres_away(state):
+    selector = ApproachSelector()
+    index = CrosswalkSpatialIndex([crossing(1, north=0), crossing(2, north=145)])
+    machine = CrossingStateMachine(clock=lambda: 0)
+    machine.lock(selector.select(index, -5 / 111320, 0, 0, maximum_distance_m=80), '2620')
+    machine.set_state(state, 'crossing timeout')
+    for t in (10, 11):
+        selected = selector.select(index, 135 / 111320, 0, t, maximum_distance_m=80)
+        machine.reconsider_candidate(selected, 135 / 111320, 0, fix_time=t)
+        assert machine.locked_intersection_id == '2620'
+    machine.reconsider_candidate(selected, 135 / 111320, 0, fix_time=12)
     assert machine.locked_crosswalk is None
+    assert machine.locked_intersection_id == ''
+    assert machine.current_crosswalk(selected, 135 / 111320, 0)['index'] == 2
+    assert machine.state == 'IDLE'
+    assert 'completed' not in machine.reason
+
+
+def test_one_outlier_or_repeated_tick_cannot_release_on_road_track():
+    index = CrosswalkSpatialIndex([crossing(1, north=0), crossing(2, east=20, north=0)])
+    machine = CrossingStateMachine(clock=lambda: 100)
+    old = index.nearest(-5 / 111320, 0, maximum_distance_m=80)
     machine.lock(old, '42')
     machine.set_state('CROSSING', 'test')
-    machine.reconsider_candidate(candidate, 0, 0, None)
-    now[0] = 10.0
-    machine.reconsider_candidate(candidate, 0, 0, None)
-    assert machine.locked_crosswalk is not None
+    new = index.nearest(0, 20 / 111320, maximum_distance_m=80)
+    for _ in range(30):
+        machine.reconsider_candidate(new, 0, 20 / 111320, fix_time=10)
+    assert machine.locked_crosswalk['index'] == 1
+    machine.reconsider_candidate(old, 0, 0, fix_time=11)
+    machine.reconsider_candidate(new, 0, 20 / 111320, fix_time=12)
+    assert machine.locked_crosswalk['index'] == 1
+
+
+def test_departed_track_releases_even_when_no_new_crosswalk_exists():
+    machine = CrossingStateMachine(clock=lambda: 0)
+    index = CrosswalkSpatialIndex([crossing(1, north=0)])
+    machine.lock(index.nearest(-5 / 111320, 0, maximum_distance_m=80), '42')
+    machine.set_state('CROSSING_URGENT', 'test')
+    for t in (0, 1, 2):
+        machine.reconsider_candidate(None, 130 / 111320, 0, fix_time=t)
+    assert machine.locked_crosswalk is None

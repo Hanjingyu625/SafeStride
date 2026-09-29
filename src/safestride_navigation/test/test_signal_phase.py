@@ -1,7 +1,9 @@
 import unittest
 from unittest.mock import patch
 
-from safestride_navigation.signal_logic import evaluate_pedestrian_signal, request_signal_bundle
+from safestride_navigation.signal_logic import (
+    evaluate_pedestrian_signal, evaluate_crosswalk_signal, request_signal_bundle,
+)
 from safestride_navigation.gps_motion import StationaryPosition
 
 
@@ -136,6 +138,14 @@ class SignalPhaseTests(unittest.TestCase):
 
 
 class StationaryPositionTests(unittest.TestCase):
+    def test_zero_wheel_speed_cannot_freeze_position_after_sustained_gps_motion(self):
+        hold = StationaryPosition()
+        hold.update(37, 127, 0, True)
+        for t in (1, 2):
+            self.assertEqual(hold.update(37.0001, 127, t, True), (37, 127))
+        self.assertEqual(hold.update(37.0001, 127, 3, True), (37.0001, 127))
+        self.assertFalse(hold.held)
+
     def test_hold_and_release(self):
         hold = StationaryPosition()
         self.assertEqual(hold.update(37, 127, 0, False), (37, 127))
@@ -148,3 +158,20 @@ class StationaryPositionTests(unittest.TestCase):
         hold = StationaryPosition()
         hold.update(37, 127, 0, True)
         self.assertEqual(hold.update(38, 127, 4, True), (38, 127))
+
+
+class AmbiguousArmTests(unittest.TestCase):
+    def test_all_plausible_arms_must_agree_and_have_valid_countdowns(self):
+        timing = dict(itstId='2620', trsmUtcTime=1000000, ntPdsgRmdrCs=260, stPdsgRmdrCs=240)
+        phase = dict(itstId='2620', trsmUtcTime=1000000,
+                     ntPdsgStatNm='permissive-Movement-Allowed', stPdsgStatNm='permissive-Movement-Allowed')
+        self.assertEqual(evaluate_crosswalk_signal(timing, phase, ['nt', 'st'], 1001),
+                         (23, True, 'green pedestrian signal'))
+        phase['stPdsgStatNm'] = 'stop-And-Remain'
+        self.assertFalse(evaluate_crosswalk_signal(timing, phase, ['nt', 'st'], 1001)[1])
+        phase['ntPdsgStatNm'] = 'stop-And-Remain'
+        self.assertEqual(evaluate_crosswalk_signal(None, phase, ['nt', 'st'], 1001),
+                         (0, True, 'red pedestrian signal'))
+        phase['stPdsgStatNm'] = None
+        self.assertFalse(evaluate_crosswalk_signal(timing, phase, ['nt', 'st'], 1001)[1])
+        self.assertFalse(evaluate_crosswalk_signal(timing, phase, [], 1001)[1])
