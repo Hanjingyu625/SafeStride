@@ -358,11 +358,16 @@ def cached_signal_window(timing, phase, directions, received_at, now, max_age_s=
 class SignalCountdown:
     """Latch fresh pedestrian observations until their reported phase ends."""
 
+    ZERO_RETRY_INTERVAL_S = 2.0
+    ZERO_RETRY_LIMIT = 3
+
     def __init__(self):
         self._seen = None
         self._intersection = ''
         self._heads = {}
         self._observed_at = None
+        # Keep budgets per signal head, including across selection changes.
+        self._zero_retries = {}
 
     def observe(self, timing, phase, now, max_age_s=12.0):
         token = tuple((str((record or {}).get('itstId', '')),
@@ -389,12 +394,27 @@ class SignalCountdown:
                         and abs(stamp - phase_stamp) <= 3.0
                         and remaining is not None):
                     expiry = stamp + remaining
+                    key = (self._intersection, direction)
+                    if remaining == 0:
+                        self._zero_retries.setdefault(key, 0)
+                    elif expiry > now:
+                        self._zero_retries.pop(key, None)
             except (TypeError, KeyError, ValueError, OverflowError):
                 pass
             if expiry is not None and expiry > now:
                 self._heads[direction] = (reason, expiry, True)
-            elif reason == 'red pedestrian signal' and expiry is None:
+            elif reason == 'red pedestrian signal':
                 self._heads[direction] = (reason, phase_stamp + max_age_s, False)
+
+    def zero_retry_count(self, intersection_id, directions):
+        if len(directions) != 1:
+            return None
+        return self._zero_retries.get((str(intersection_id), directions[0]))
+
+    def record_zero_retry(self, intersection_id, directions):
+        key = (str(intersection_id), directions[0])
+        if key in self._zero_retries:
+            self._zero_retries[key] += 1
 
     def state(self, intersection_id, directions, now):
         if len(directions) != 1:

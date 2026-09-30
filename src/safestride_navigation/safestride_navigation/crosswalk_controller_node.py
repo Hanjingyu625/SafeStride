@@ -297,8 +297,9 @@ class CrosswalkController(Node):
         self._signal_direction_fallback = SignalDirectionFallback()
         self._signal_countdown = SignalCountdown()
         self._last_signal_request = -math.inf
+        self._signal_response_time = -math.inf
         self._signal_client = SignalApiClient(
-            minimum_interval_s=self._signal_refresh,
+            minimum_interval_s=min(self._signal_refresh, SignalCountdown.ZERO_RETRY_INTERVAL_S),
             cache_file='~/.cache/safestride/signal_backoff.json', pace_quota=False)
         self._last_signal_request_key = None
         self._signal_error = ''
@@ -600,6 +601,7 @@ class CrosswalkController(Node):
         requested_id = self._signal_future_id
         self._signal_future = None
         self._signal_future_id = ''
+        self._signal_response_time = now
         try:
             result = future.result()
             # Repeated API records must not restart the freshness timer.
@@ -675,12 +677,19 @@ class CrosswalkController(Node):
             return
         if self._signal_countdown.remaining(intersection_id, directions, now) is not None:
             return
+        zero_retries = self._signal_countdown.zero_retry_count(intersection_id, directions)
+        if zero_retries is not None and zero_retries >= SignalCountdown.ZERO_RETRY_LIMIT:
+            return
+        interval = (SignalCountdown.ZERO_RETRY_INTERVAL_S
+                    if zero_retries is not None else self._signal_refresh)
+        last_attempt = (max(self._last_signal_request, self._signal_response_time)
+                        if zero_retries is not None else self._last_signal_request)
         request_key = (intersection_id, tuple(directions))
         if (
             not self._api_key
             or not intersection_id
             or self._signal_future is not None
-            or now - self._last_signal_request < self._signal_refresh
+            or now - last_attempt < interval
             or self._signal_client.poll_interval_remaining(
                 (self._signal_url, self._phase_url, self._combined_url)) > 0.0
         ):
@@ -688,6 +697,7 @@ class CrosswalkController(Node):
         self._last_signal_request = now
         self._last_signal_request_key = request_key
         self._signal_future_id = intersection_id
+        self._signal_countdown.record_zero_retry(intersection_id, directions)
         self._signal_future = self._executor.submit(
             request_signal_bundle,
             self._api_key,
@@ -723,6 +733,10 @@ class CrosswalkController(Node):
             wait_reason = self._signal_client.wait_reason((self._signal_url, self._phase_url))
             if wait_reason or self._signal_error:
                 reason += '; ' + (wait_reason or self._signal_error)
+            retries = self._signal_countdown.zero_retry_count(
+                intersection_id, directions or ([direction] if direction else []))
+            if retries is not None and retries >= SignalCountdown.ZERO_RETRY_LIMIT:
+                reason += '; zero countdown retry limit reached (3)'
         return remaining, valid, reason
 
     def _publish_command(self, speed_mps: float) -> None:

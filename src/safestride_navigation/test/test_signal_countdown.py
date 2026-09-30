@@ -84,3 +84,28 @@ def test_countdown_keeps_heads_independent_when_colours_differ():
     assert timer.state('42', ['nt'], 1005) == (15, True, 'green pedestrian signal')
     assert timer.state('42', ['st'], 1005) == (0, True, 'red pedestrian signal')
     assert timer.remaining('42', ['st'], 1005) == 55
+
+
+def test_zero_red_preserves_colour_without_inventing_a_countdown():
+    timer = SignalCountdown()
+    timing, phase = records('stop-And-Remain', 0)
+    timer.observe(timing, phase, 1001)
+    assert timer.state('42', ['nt'], 1005) == (0, True, 'red pedestrian signal')
+    assert timer.remaining('42', ['nt'], 1005) is None
+    assert timer.zero_retry_count('42', ['nt']) == 0
+    timer.observe(timing, phase, 1011)
+    assert not timer.state('42', ['nt'], 1012)[1]
+
+
+def test_zero_green_never_grants_entry_time():
+    timer = SignalCountdown()
+    timer.observe(*records(seconds=0), 1001)
+    assert not timer.state('42', ['nt'], 1001)[1]
+    assert timer.zero_retry_count('42', ['nt']) == 0
+
+
+def test_expired_positive_red_still_preserves_fresh_phase():
+    timer = SignalCountdown()
+    timer.observe(*records('stop-And-Remain', 1), 1002)
+    assert timer.state('42', ['nt'], 1002) == (0, True, 'red pedestrian signal')
+    assert timer.zero_retry_count('42', ['nt']) is None

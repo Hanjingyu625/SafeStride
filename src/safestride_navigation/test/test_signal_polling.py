@@ -20,7 +20,8 @@ def node():
                  SignalCountdown=SignalCountdown, newer_signal_record=newer_signal_record)
     exec(compile(ast.Module(body=methods, type_ignores=[]), str(path), 'exec'), scope)
     n = SimpleNamespace(_api_key='test', _signal_future=None,
-        _last_signal_request=1000, _last_signal_request_key=('42', 'nt'),
+        _last_signal_request=1000, _signal_response_time=1000,
+        _last_signal_request_key=('42', 'nt'),
         _signal_refresh=1, _executor=Mock(), _signal_url='timing',
         _phase_url='phase', _combined_url='combined', _signal_request_timeout=3,
         _signal_cache_id='42', _phase_cache=None, _signal_error='old error',
@@ -165,3 +166,88 @@ def test_worker_observation_latches_once_and_failure_cannot_extend_it():
     response({'timing_error': 'timeout', 'phase_error': 'timeout'})
     n._consume_signal_future(1021)
     assert not n._signal_state('42', 'nt', 1021)[1]
+
+
+def deliver(n, now, seconds=0, state='stop-And-Remain', stamp=None, identifier='42'):
+    from concurrent.futures import Future
+    stamp = now if stamp is None else stamp
+    n._signal_future = Future()
+    n._signal_future_id = identifier
+    n._signal_future.set_result({
+        'timing': {'itstId': identifier, 'trsmUtcTime': stamp * 1000,
+                   'ntPdsgRmdrCs': seconds * 10},
+        'phase': {'itstId': identifier, 'trsmUtcTime': stamp * 1000,
+                  'ntPdsgStatNm': state},
+    })
+    n._consume_signal_future(now)
+
+
+def test_zero_countdown_retries_two_seconds_after_response_at_most_three_times():
+    n = node()
+    n._signal_refresh = 3
+    deliver(n, 1001)
+    for attempt, now in enumerate((1003, 1006, 1009), 1):
+        n._request_signal_if_due('42', now - .01, 'nt')
+        assert n._executor.submit.call_count == attempt - 1
+        assert n._signal_state('42', 'nt', now) == (0, True, 'red pedestrian signal')
+        assert n._executor.submit.call_count == attempt
+        # A one-second response delay: the next retry waits from completion.
+        deliver(n, now + 1)
+    for now in (1012, 1025, 1100):
+        n._request_signal_if_due('42', now, 'nt')
+    assert n._executor.submit.call_count == 3
+    assert 'zero countdown retry limit' in n._signal_state('42', 'nt', 1100)[2]
+
+
+def test_duplicate_zero_and_failed_requests_do_not_reset_retry_budget():
+    from concurrent.futures import Future
+    n = node()
+    deliver(n, 1001)
+    for now in (1003, 1005, 1007):
+        n._request_signal_if_due('42', now, 'nt')
+        if now == 1005:
+            n._signal_future = Future()
+            n._signal_future.set_exception(RuntimeError('timeout'))
+            n._consume_signal_future(now)
+        else:
+            deliver(n, now, stamp=1001)
+    n._request_signal_if_due('42', 1030, 'nt')
+    assert n._executor.submit.call_count == 3
+
+
+def test_positive_countdown_recovers_and_next_zero_has_a_new_budget():
+    n = node()
+    deliver(n, 1001)
+    n._request_signal_if_due('42', 1003, 'nt')
+    deliver(n, 1003, seconds=10)
+    assert n._signal_countdown.zero_retry_count('42', ['nt']) is None
+    n._request_signal_if_due('42', 1005, 'nt')
+    assert n._executor.submit.call_count == 1
+    n._request_signal_if_due('42', 1013, 'nt')
+    assert n._executor.submit.call_count == 2
+    deliver(n, 1013)
+    assert n._signal_countdown.zero_retry_count('42', ['nt']) == 0
+    n._request_signal_if_due('42', 1015, 'nt')
+    assert n._executor.submit.call_count == 3
+
+
+def test_switching_signal_heads_does_not_restart_exhausted_zero_budget():
+    n = node()
+    deliver(n, 1001)
+    for now in (1003, 1005, 1007):
+        n._request_signal_if_due('42', now, 'nt')
+        deliver(n, now)
+    n._request_signal_if_due('43', 1010, 'nt')
+    assert n._executor.submit.call_count == 4
+    deliver(n, 1010, identifier='43', seconds=10)
+    n._request_signal_if_due('42', 1013, 'nt')
+    assert n._executor.submit.call_count == 4
+
+
+def test_zero_retries_honour_http_backoff_without_spending_budget():
+    n = node()
+    deliver(n, 1001)
+    n._signal_client.poll_interval_remaining = lambda _: 60
+    n._request_signal_if_due('42', 1003, 'nt')
+    assert n._signal_countdown.zero_retry_count('42', ['nt']) == 0
+    n._executor.submit.assert_not_called()

@@ -273,7 +273,7 @@ crosswalk_controller:
     wheel_motion_hold_s: 3.5
     # Hall odometry is required; GNSS alone cannot verify very slow motion.
     allow_gps_speed_fallback: false
-    signal_refresh_interval_s: 3.0  # 정상은 잔여시간 만료 시 재조회; 실패·누락 시 최소 재시도 간격
+    signal_refresh_interval_s: 3.0  # 일반 실패·누락 재시도 간격; API 0초 응답은 별도로 2초 간격 최대 3회 추가 조회
     signal_cache_max_age_s: 12.0  # 최초 응답 수용 시 원본 나이 상한; 수용 후 해당 현시 종료까지 계산
     signal_request_timeout_s: 3.0
     maximum_crosswalk_distance_m: 80.0
