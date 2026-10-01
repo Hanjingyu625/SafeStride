@@ -16,7 +16,10 @@ bool urgent
 float32 edge_distance_m
 float32 progress_m
 float32 remaining_m
+# Control budget: time available for crossing; always zero for red.
 float32 signal_remaining_s
+# Display countdown for the current red/green phase; NaN if unavailable.
+float32 signal_countdown_s
 float32 required_entry_s
 float32 crossing_eta_s
 float32 target_speed_mps

@@ -778,6 +778,10 @@ class CrosswalkController(Node):
         status.remaining_m = _finite_or_nan(
             active.get('remaining_m') if active else None
         )
+        countdown = self._signal_countdown.remaining(
+            intersection_id, [active.get('signal_direction', '')] if active else [],
+            self._now()) if signal_valid else None
+        status.signal_countdown_s = _finite_or_nan(countdown)
         status.signal_remaining_s = _finite_or_nan(signal_remaining_s)
         status.required_entry_s = _finite_or_nan(required_entry_s)
         status.crossing_eta_s = _finite_or_nan(crossing_eta_s)
@@ -803,9 +807,7 @@ class CrosswalkController(Node):
             'signal_mapping_provisional': bool((active or {}).get('signal_mapping_provisional')),
             'provisional_signal_color': (active or {}).get('provisional_signal_color', 'UNKNOWN'),
             'provisional_signal_countdown_s': (active or {}).get('provisional_signal_countdown_s'),
-            'signal_countdown_s': self._signal_countdown.remaining(
-                intersection_id, [active.get('signal_direction', '')] if active else [],
-                self._now()) if signal_valid else None,
+            'signal_countdown_s': countdown,
             'signal_color': (
                 'RED' if signal_valid and signal_reason == 'red pedestrian signal'
                 else 'GREEN' if signal_valid and signal_reason == 'green pedestrian signal'

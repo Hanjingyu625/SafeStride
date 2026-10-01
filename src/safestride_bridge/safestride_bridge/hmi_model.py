@@ -163,7 +163,8 @@ class Snapshot:
                     getattr(cross, 'intersection_name', '')
                 )
                 if cross.signal_valid:
-                    w[6] = scaled(cross.signal_remaining_s)
+                    # The crossing budget is zero on red; display phase time.
+                    w[6] = scaled(cross.signal_countdown_s)
         terrain = self.fresh('terrain', now, .6)
         if terrain is not None:
             if terrain.mpu_valid and finite(terrain.pitch_rad):

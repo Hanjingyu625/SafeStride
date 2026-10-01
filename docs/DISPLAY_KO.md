@@ -169,7 +169,7 @@ VisualTFT의 `도구 → 프로토콜 및 변수 설정`에서 다음과 같이 
 | `0003` | `ss_speed` | km/h × 100, `65535`는 무효 |
 | `0004` | `ss_hands` | 왼쪽=1, 오른쪽=2 |
 | `0005` | `ss_crosswalk` | CrosswalkStatus 상태 0..6 |
-| `0006` | `ss_seconds` | 신호 잔여 초, `65535`는 무효 |
+| `0006` | `ss_seconds` | 현재 빨강/초록 현시 잔여 초 (`signal_countdown_s`), `65535`는 미확정 |
 | `0007` | `ss_distance` | 횡단보도 경계 거리 m × 10, `65535`는 무효 |
 | `0008` | `ss_pitch` | int16 2의 보수, degree × 10 |
 | `0009` | `ss_tof` | ToF 상태 0..5, 5는 무효 |
@@ -409,3 +409,12 @@ Lua 테스트는 system liblua5.3으로 제조사 API를 mock하여 로고 전�
 무효화, 제동/진입 허가 문구를 검사한다. 라이브러리가 없으면 skip된다.
 ROS가 없는 환경에서는 실제 ROS 통합 테스트 2건도 skip되므로 ROS Jazzy의
 빌드된 workspace에서 검사한다. 이 테스트들은 실제 VisualTFT/LCD 검증을 대신하지 않는다.
+
+### 2026-10-01 빨간불 잔여시간 전달
+
+ROS `CrosswalkStatus.signal_countdown_s`를 `ss_seconds`에 전달한다. 기존
+`signal_remaining_s`는 횡단 제어용 초록불 시간 예산으로 빨간불이면 0이다.
+빨간불 종료 시각이 확인되면 `WAIT` 상태에서도 `Signal 46s`처럼 남은 시간을 표시한다.
+시간이 없거나 신호가 무효/만료되면 `--`이며, 잔여시간 표시가 진입 허가를 뜻하지 않는다.
+ROS 인터페이스와 발행·구독 패키지를 함께 재빌드해야 한다. MCU와 Lua의 v3 레지스터
+배치는 동일하므로 이번 시간 필드 수정만을 위해 화면 펌웨어를 다시 올릴 필요는 없다.

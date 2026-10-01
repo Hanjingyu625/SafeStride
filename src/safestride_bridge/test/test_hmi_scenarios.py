@@ -44,6 +44,7 @@ def crosswalk(
         urgent=False,
         edge_distance_m=distance,
         signal_remaining_s=seconds,
+        signal_countdown_s=seconds,
     )
 
 

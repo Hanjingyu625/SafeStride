@@ -5,7 +5,7 @@ address_hex,name,type,default,meaning
 0003,ss_speed,uint16,65535,Speed km/h x100; 65535 unknown
 0004,ss_hands,uint16,0,Left=1 right=2
 0005,ss_crosswalk,uint16,0,CrosswalkStatus state 0..6
-0006,ss_seconds,uint16,65535,Signal remaining seconds; 65535 unknown
+0006,ss_seconds,uint16,65535,Current red/green phase countdown seconds; 65535 unknown
 0007,ss_distance,uint16,65535,Edge distance metres x10; 65535 unknown
 0008,ss_pitch,uint16,0,Two's complement int16 degrees x10; Lua decodes signed value
 0009,ss_tof,uint16,5,ToF alert 0..5; 5 invalid

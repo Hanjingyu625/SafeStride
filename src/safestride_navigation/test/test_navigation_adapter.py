@@ -59,3 +59,34 @@ def test_guidance_reports_mapping_and_finite_time_budget_without_json_nan():
     assert data['crossing_eta_s'] is None
     assert data['signal_mapping_reason'] == 'inferred'
     assert data['signal_direction_source'] == 'intersection_arm_inferred'
+
+
+def test_red_phase_countdown_reaches_status_and_guidance_but_not_entry_budget():
+    publish = method('_publish_status',
+        CrosswalkStatus=lambda: SimpleNamespace(header=SimpleNamespace()),
+        STATE_VALUES={'WAIT_AT_CURB': 2},
+        _finite_or_nan=lambda value: value if value is not None else math.nan)
+    countdown = SignalCountdown()
+    countdown.observe(
+        dict(itstId='2742', trsmUtcTime=1000000, wtPdsgRmdrCs=600),
+        dict(itstId='2742', trsmUtcTime=1000000, wtPdsgStatNm='stop-And-Remain'), 1000)
+    node = SimpleNamespace(_controller=SimpleNamespace(state='WAIT_AT_CURB', reason='wait'),
+        get_clock=lambda: SimpleNamespace(now=lambda: SimpleNamespace(to_msg=lambda: None)),
+        _status_publisher=Mock(), _guidance_publisher=Mock(),
+        _signal_countdown=countdown, _now=lambda: 1014)
+    kwargs = dict(active=dict(index=8566, signal_direction='wt'),
+        gps_valid=True, signal_valid=True, signal_remaining_s=0, required_entry_s=25,
+        crossing_eta_s=None, command=dict(entry_allowed=False, mode='WAIT'),
+        target_speed_mps=0, intersection_id='2742', intersection_name='test',
+        signal_reason='red pedestrian signal')
+    publish(node, **kwargs)
+    status = node._status_publisher.publish.call_args.args[0]
+    guidance = json.loads(node._guidance_publisher.publish.call_args.args[0].data)
+    assert status.signal_countdown_s == guidance['signal_countdown_s'] == 46
+    assert status.signal_remaining_s == 0
+    assert not status.entry_allowed
+    assert guidance['signal_color'] == 'RED'
+    kwargs['signal_valid'] = False
+    publish(node, **kwargs)
+    assert math.isnan(node._status_publisher.publish.call_args.args[0].signal_countdown_s)
+    assert json.loads(node._guidance_publisher.publish.call_args.args[0].data)['signal_countdown_s'] is None

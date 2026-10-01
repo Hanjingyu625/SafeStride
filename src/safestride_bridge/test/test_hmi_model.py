@@ -54,7 +54,7 @@ class HmiModelTests(unittest.TestCase):
         model = Snapshot()
         cross = Msg(gps_valid=True, state=3, signal_valid=True,
                     entry_allowed=False, urgent=False, edge_distance_m=4.2,
-                    signal_remaining_s=6.4)
+                    signal_remaining_s=6.4, signal_countdown_s=6.4)
         model.update('crosswalk', cross, 0)
         self.assertFalse(model.words(.1)[15] & ENTRY_ALLOWED)
         cross.entry_allowed = True
@@ -65,6 +65,25 @@ class HmiModelTests(unittest.TestCase):
         self.assertFalse(model.words(.1)[15] & ENTRY_ALLOWED)
         self.assertEqual(model.words(.1)[6], UNKNOWN)
         self.assertFalse(model.words(1.6)[2] & CROSS)
+
+    def test_red_countdown_is_displayed_without_granting_entry(self):
+        model = Snapshot()
+        cross = Msg(gps_valid=True, state=2, signal_valid=True,
+                    entry_allowed=False, urgent=False, edge_distance_m=4.4,
+                    signal_remaining_s=0.0, signal_countdown_s=46.3)
+        model.update('crosswalk', cross, 0)
+        words = model.words(.1)
+        self.assertEqual(words[6], 46)
+        self.assertTrue(words[15] & SIGNAL_VALID)
+        self.assertFalse(words[15] & ENTRY_ALLOWED)
+        # Known red without a usable phase end is not a zero-second countdown.
+        cross.signal_countdown_s = math.nan
+        self.assertEqual(model.words(.2)[6], UNKNOWN)
+        cross.signal_countdown_s = 40
+        cross.signal_valid = False
+        self.assertEqual(model.words(.3)[6], UNKNOWN)
+        cross.signal_valid = True
+        self.assertEqual(model.words(1.6)[6], UNKNOWN)
 
     def test_pitch_and_hazard_latch(self):
         model = Snapshot(-1, .01)

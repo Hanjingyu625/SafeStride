@@ -160,12 +160,21 @@ class SignalPhaseTests(unittest.TestCase):
 
 
 class StationaryPositionTests(unittest.TestCase):
-    def test_zero_wheel_speed_cannot_freeze_position_after_sustained_gps_motion(self):
+    def test_sustained_31m_drift_does_not_release_wheel_confirmed_standstill(self):
         hold = StationaryPosition()
         hold.update(37, 127, 0, True)
-        for t in (1, 2):
-            self.assertEqual(hold.update(37.0001, 127, t, True), (37, 127))
-        self.assertEqual(hold.update(37.0001, 127, 3, True), (37.0001, 127))
+        for t in range(1, 41):
+            drift = min(t, 31) / 111_320
+            self.assertEqual(hold.update(37 + drift, 127, t, True), (37, 127))
+            self.assertTrue(hold.held)
+        # Actual motion (or unavailable wheel evidence) releases immediately.
+        self.assertEqual(hold.update(37.0003, 127, 41, False), (37.0003, 127))
+        self.assertFalse(hold.held)
+
+    def test_clock_rewind_reacquires(self):
+        hold = StationaryPosition()
+        hold.update(37, 127, 5, True)
+        self.assertEqual(hold.update(38, 127, 4, True), (38, 127))
         self.assertFalse(hold.held)
 
     def test_hold_and_release(self):
